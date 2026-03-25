@@ -165,12 +165,19 @@ function updateFocus(): void {
       var container = $root.find('.detail__info')[0];
       var epEl = $ep[0];
       if (container && epEl) {
-        var containerRect = container.getBoundingClientRect();
-        var epRect = epEl.getBoundingClientRect();
-        if (epRect.bottom > containerRect.bottom - 20) {
-          container.scrollTop += epRect.bottom - containerRect.bottom + 40;
-        } else if (epRect.top < containerRect.top + 20) {
-          container.scrollTop -= containerRect.top - epRect.top + 40;
+        var epTop = 0;
+        var el: HTMLElement | null = epEl;
+        while (el && el !== container) {
+          epTop += el.offsetTop;
+          el = el.offsetParent as HTMLElement | null;
+        }
+        var epBottom = epTop + epEl.offsetHeight;
+        var scrollTop = container.scrollTop;
+        var viewH = container.clientHeight;
+        if (epBottom > scrollTop + viewH - 20) {
+          container.scrollTop = epBottom - viewH + 40;
+        } else if (epTop < scrollTop + 20) {
+          container.scrollTop = Math.max(0, epTop - 40);
         }
       }
     }
