@@ -1,3 +1,4 @@
+import objectFitImages from 'object-fit-images';
 import '../css/app.css';
 import { configure } from './api/client';
 import { registerPage, navigate } from './router';
@@ -11,6 +12,8 @@ import { serialPage } from './pages/serial';
 import { playerPage } from './pages/player';
 import { settingsPage } from './pages/settings';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
+
+objectFitImages();
 
 configure(CLIENT_ID, CLIENT_SECRET);
 
