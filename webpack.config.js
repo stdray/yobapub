@@ -1,6 +1,19 @@
 var path = require('path');
+var { execSync } = require('child_process');
+var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var CopyWebpackPlugin = require('copy-webpack-plugin');
+
+function getAppVersion() {
+  try {
+    var hash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+    var date = execSync('git log -1 --format=%cd --date=short', { encoding: 'utf-8' }).trim();
+    var count = execSync('git rev-list --count HEAD', { encoding: 'utf-8' }).trim();
+    return count + '-' + hash + ' (' + date + ')';
+  } catch (e) {
+    return 'unknown';
+  }
+}
 
 module.exports = function (_env, argv) {
   var isProd = argv.mode === 'production';
@@ -49,6 +62,9 @@ module.exports = function (_env, argv) {
       ]
     },
     plugins: [
+      new webpack.DefinePlugin({
+        __APP_VERSION__: JSON.stringify(getAppVersion())
+      }),
       new HtmlWebpackPlugin({
         template: './src/index.html',
         inject: 'body'

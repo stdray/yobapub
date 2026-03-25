@@ -625,3 +625,11 @@ video::-webkit-media-text-track-display {
 .soptions__item.selected.focused {
   color: #e94560;
 }
+
+.settings-page__version {
+  position: absolute;
+  bottom: 40px;
+  left: 120px;
+  font-size: 20px;
+  color: #555;
+}

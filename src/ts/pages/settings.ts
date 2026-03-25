@@ -52,6 +52,7 @@ var tplPage = doT.template(
   '<div class="settings-page">' +
     '<div class="settings-page__title">Настройки</div>' +
     '<div class="settings-page__list">{{=it.items}}</div>' +
+    '<div class="settings-page__version">{{=it.version}}</div>' +
   '</div>'
 );
 
@@ -120,7 +121,7 @@ function render(): void {
       focused: !optionsOpen && i === focusedIndex
     });
   }
-  $root.html(tplPage({ items: html }));
+  $root.html(tplPage({ items: html, version: __APP_VERSION__ }));
 }
 
 function renderOptions(): void {
