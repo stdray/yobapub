@@ -3,7 +3,8 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { getDeviceSettings, saveDeviceSettings } from '../api/device';
 import { goBack } from '../router';
-import { TvKey } from '../utils/platform';
+import { TvKey, isLegacyTizen } from '../utils/platform';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS } from '../utils/storage';
 
 var $root = $('#page-settings');
 var keyHandler: ((e: JQuery.Event) => void) | null = null;
@@ -101,6 +102,20 @@ function parseSettings(raw: Record<string, any>): SettingItem[] {
   return items;
 }
 
+function buildQualitySetting(): SettingItem {
+  var savedId = getDefaultQuality();
+  if (savedId === -1) {
+    savedId = isLegacyTizen() ? 3 : 0;
+    setDefaultQuality(savedId);
+  }
+  var opts: SettingOption[] = [];
+  for (var i = 0; i < QUALITY_OPTIONS.length; i++) {
+    var q = QUALITY_OPTIONS[i];
+    opts.push({ id: q.id, label: q.label, description: '', selected: q.id === savedId ? 1 : 0 });
+  }
+  return { key: '_defaultQuality', label: 'Качество по умолчанию', type: 'list', value: null, options: opts };
+}
+
 function getDisplayValue(item: SettingItem): string {
   if (item.type === 'list' && item.options) {
     for (var i = 0; i < item.options.length; i++) {
@@ -159,6 +174,17 @@ function closeOptions(): void {
 function applyOption(): void {
   var item = allSettings[focusedIndex];
   if (!item) return;
+
+  if (item.key === '_defaultQuality') {
+    if (item.options) {
+      for (var j = 0; j < item.options.length; j++) {
+        item.options[j].selected = (j === focusedOptionIndex) ? 1 : 0;
+      }
+      setDefaultQuality(item.options[focusedOptionIndex].id);
+    }
+    closeOptions();
+    return;
+  }
 
   var saveData: Record<string, any> = {};
 
@@ -253,6 +279,7 @@ export var settingsPage: Page = {
         if (data && data.settings) {
           allSettings = parseSettings(data.settings);
         }
+        allSettings.unshift(buildQualitySetting());
         render();
       },
       function () {

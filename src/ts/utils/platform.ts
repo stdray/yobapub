@@ -96,6 +96,22 @@ export function getDeviceInfo(): DeviceInfo {
   return { title: title, hardware: hardware, software: software };
 }
 
+export function getTizenVersion(): number {
+  try {
+    if (typeof tizen !== 'undefined' && tizen.systeminfo) {
+      var cap = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
+      if (cap) return parseFloat(cap) || 0;
+    }
+  } catch (e) { /* ignore */ }
+  var m = navigator.userAgent.match(/Tizen\s*([\d.]+)/);
+  return m ? (parseFloat(m[1]) || 0) : 0;
+}
+
+export function isLegacyTizen(): boolean {
+  var v = getTizenVersion();
+  return v > 0 && v < 3;
+}
+
 export function exitApp(): void {
   try {
     if (typeof tizen !== 'undefined' && tizen.application) {

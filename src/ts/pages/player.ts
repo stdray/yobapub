@@ -6,7 +6,8 @@ import { markTime } from '../api/watching';
 import { apiGet } from '../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
-import { TvKey } from '../utils/platform';
+import { TvKey, isLegacyTizen } from '../utils/platform';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS } from '../utils/storage';
 
 var $root = $('#page-player');
 var keyHandler: ((e: JQuery.Event) => void) | null = null;
@@ -78,6 +79,24 @@ function findVideoData(item: Item, videoNum: number): { files: VideoFile[]; audi
     return { files: v.files || [], audios: v.audios || [], subs: v.subtitles || [], title: v.title || 'Видео ' + videoNum };
   }
   return null;
+}
+
+function pickDefaultQualityIndex(files: VideoFile[]): number {
+  var savedId = getDefaultQuality();
+  if (savedId === -1) {
+    savedId = isLegacyTizen() ? 3 : 0;
+    setDefaultQuality(savedId);
+  }
+  if (savedId === 0 || files.length === 0) return 0;
+  var maxH = 0;
+  for (var q = 0; q < QUALITY_OPTIONS.length; q++) {
+    if (QUALITY_OPTIONS[q].id === savedId) { maxH = QUALITY_OPTIONS[q].maxH; break; }
+  }
+  if (maxH === 0) return 0;
+  for (var i = 0; i < files.length; i++) {
+    if (files[i].h <= maxH) return i;
+  }
+  return files.length - 1;
 }
 
 function getResumeTime(item: Item, seasonNum?: number, epNum?: number, videoNum?: number): number {
@@ -421,6 +440,15 @@ function playSource(url: string): void {
           hlsSubTracks = hlsInstance.subtitleTracks || [];
           onSourceReady();
         });
+        hlsInstance.on(Hls.Events.ERROR, function (_ev: any, data: any) {
+          if (data.fatal) {
+            console.error('[Player] HLS fatal error: type=' + data.type + ' details=' + data.details);
+            showPlaybackError(
+              { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED, message: 'HLS: ' + data.details } as any,
+              url
+            );
+          }
+        });
         if (Hls.Events.SUBTITLE_TRACKS_UPDATED) {
           hlsInstance.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, function () {
             hlsSubTracks = hlsInstance.subtitleTracks || [];
@@ -453,16 +481,59 @@ function hideSpinner(): void {
   $root.find('.player__spinner').hide();
 }
 
+function getVideoErrorMessage(error: MediaError | null): string {
+  if (!error) return 'Неизвестная ошибка воспроизведения';
+  switch (error.code) {
+    case MediaError.MEDIA_ERR_ABORTED:
+      return 'Воспроизведение прервано';
+    case MediaError.MEDIA_ERR_NETWORK:
+      return 'Ошибка сети при загрузке видео';
+    case MediaError.MEDIA_ERR_DECODE:
+      return 'Ошибка декодирования видео (формат не поддерживается устройством)';
+    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+      return 'Формат видео не поддерживается (Tizen 2.3 не может воспроизвести этот поток)';
+    default:
+      return 'Ошибка воспроизведения (код: ' + error.code + ')';
+  }
+}
+
+function showPlaybackError(error: MediaError | null, url: string): void {
+  var msg = getVideoErrorMessage(error);
+  var code = error ? error.code : 0;
+  var detail = error && (error as any).message ? (error as any).message : '';
+  console.error('[Player] Playback error: code=' + code + ' msg=' + msg + (detail ? ' detail=' + detail : '') + ' url=' + url);
+  destroyPlayer();
+  $root.html(
+    '<div class="player">' +
+      '<div class="player__title" style="padding:60px;">' +
+        '<div>' + msg + '</div>' +
+        '<div style="font-size:0.7em;margin-top:20px;opacity:0.6;">Код ошибки: ' + code + '</div>' +
+      '</div>' +
+    '</div>'
+  );
+  keyHandler = function (e: JQuery.Event) {
+    if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace || e.keyCode === TvKey.Escape) {
+      goBack();
+      e.preventDefault();
+    }
+  };
+  $(window).off('keydown').on('keydown', keyHandler);
+}
+
 function playUrl(url: string, title: string): void {
   $root.html(tplPlayer({ title: title }));
   videoEl = $root.find('video')[0] as HTMLVideoElement;
 
+  var sourceUrl = url;
   videoEl.addEventListener('ended', function () { savePosition(); goBack(); });
   videoEl.addEventListener('waiting', showSpinner);
   videoEl.addEventListener('seeking', showSpinner);
   videoEl.addEventListener('canplay', hideSpinner);
   videoEl.addEventListener('playing', hideSpinner);
   videoEl.addEventListener('seeked', hideSpinner);
+  videoEl.addEventListener('error', function () {
+    if (videoEl) showPlaybackError(videoEl.error, sourceUrl);
+  });
 
   playSource(url);
 }
@@ -622,6 +693,7 @@ export var playerPage: Page = {
         currentAudios = result.audios;
         currentSubs = result.subs.filter(function (s) { return s.url && !s.embed; });
         currentTitle = result.title;
+        selectedQuality = pickDefaultQualityIndex(currentFiles);
 
         // Load subtitles from media-links API if not present
         if (currentSubs.length === 0 && currentFiles.length > 0 && currentFiles[0].file) {
@@ -634,7 +706,7 @@ export var playerPage: Page = {
           });
         }
 
-        var url = getUrlFromFile(currentFiles[0]);
+        var url = getUrlFromFile(currentFiles[selectedQuality]);
         if (url) {
           var itemTitle = currentItem.title.split(' / ')[0];
           playUrl(url, itemTitle + ' - ' + currentTitle);
