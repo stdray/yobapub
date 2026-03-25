@@ -49,6 +49,15 @@ jobs:
           name: yobapub-release
           path: release
 
+      - name: Clean remote directory
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          script: |
+            rm -rf ${{ secrets.DEPLOY_WORKDIR }}/*
+
       - name: Deploy files via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -59,4 +68,3 @@ jobs:
           target: ${{ secrets.DEPLOY_WORKDIR }}
           strip_components: 1
           overwrite: true
-          rm: true
