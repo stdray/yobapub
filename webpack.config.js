@@ -61,7 +61,7 @@ module.exports = function (_env, argv) {
         },
         {
           test: /\.css$/,
-          use: ['style-loader', 'css-loader']
+          use: ['style-loader', 'css-loader', 'postcss-loader']
         }
       ]
     },
@@ -75,13 +75,8 @@ module.exports = function (_env, argv) {
       }),
       new CopyWebpackPlugin({
         patterns: [
-          { from: 'src/config.xml', to: 'config.xml', noErrorOnMissing: true },
-          { from: 'src/icon.png', to: 'icon.png', noErrorOnMissing: true },
-          { from: 'src/icon.svg', to: 'icon.svg', noErrorOnMissing: true },
           { from: 'node_modules/jquery/dist/jquery.min.js', to: 'vendor/jquery.min.js' },
-          { from: 'node_modules/hls.js/dist/hls.min.js', to: 'vendor/hls.min.js' },
-          { from: 'src/.project', to: '.project', toType: 'file', noErrorOnMissing: true },
-          { from: 'src/.tproject', to: '.tproject', toType: 'file', noErrorOnMissing: true }
+          { from: 'node_modules/hls.js/dist/hls.min.js', to: 'vendor/hls.min.js' }
         ]
       })
     ]
