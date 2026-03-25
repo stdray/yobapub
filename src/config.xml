@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://yobapub.tv" version="1.0.0" viewmodes="maximized">
+  <tizen:application id="yobapub.tv" package="yobapub" required_version="2.3"/>
+  <content src="index.html"/>
+  <name>YobaPub</name>
+  <icon src="icon.png"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable" encryption="disable" install-location="auto"/>
+  <access origin="*" subdomains="true"/>
+</widget>

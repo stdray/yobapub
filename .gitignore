@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+bower_components/
+
+# Build output
+dist/
+build/
+.buildResult/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Tizen
+.sign/
+*.wgt
+.project
+.tproject
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Source maps
+*.map
