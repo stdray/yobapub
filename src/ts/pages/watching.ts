@@ -133,8 +133,10 @@ function updateFocus(): void {
     var cardEl = $card[0];
     var container = $root.find('.watching')[0];
     if (cardEl && container) {
-      var cardTop = cardEl.offsetTop - container.offsetTop;
-      var cardBottom = cardTop + cardEl.offsetHeight;
+      var cardRect = cardEl.getBoundingClientRect();
+      var contRect = container.getBoundingClientRect();
+      var cardTop = cardRect.top - contRect.top + container.scrollTop;
+      var cardBottom = cardTop + cardRect.height;
       var scrollTop = container.scrollTop;
       var viewH = container.clientHeight;
       if (cardBottom > scrollTop + viewH - 40) {
