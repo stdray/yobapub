@@ -120,7 +120,8 @@ html, body {
 
 .content {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  height: 100%;
 }
 
 /* --- Watching --- */
