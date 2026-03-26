@@ -34,7 +34,7 @@ public class WebViewActivity extends Activity {
 
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
-        webView.loadUrl("https://yobapub.3po.su");
+        webView.loadUrl("http://yobapub.3po.su");
     }
 
     @Override

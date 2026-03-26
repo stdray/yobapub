@@ -18,7 +18,7 @@ import java.util.List;
 
 public class LauncherActivity extends Activity {
 
-    private static final Uri LAUNCH_URI = Uri.parse("https://yobapub.3po.su");
+    private static final Uri LAUNCH_URI = Uri.parse("http://yobapub.3po.su");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

@@ -31,6 +31,7 @@ app.MapGet("/.well-known/assetlinks.json", () => Results.Json(
             target = new {
                 @namespace = "android_app",
                 package_name = "su.p3o.yobapub",
+                // TWA requires HTTPS; on HTTP only WebView fallback is used
                 sha256_cert_fingerprints = new[] {
                     app.Configuration["Proxy:AndroidCertFingerprint"] ?? ""
                 }
