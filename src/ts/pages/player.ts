@@ -359,7 +359,9 @@ function getVideoDuration(): number {
     var d = videoEl.duration;
     if (d && !isNaN(d) && isFinite(d) && d > 0) return d;
   }
-  return currentDuration || 0;
+  var fd = currentDuration || 0;
+  if (fd > 86400) fd = fd / 1000;
+  return fd;
 }
 
 function startSeek(dir: string): void {
