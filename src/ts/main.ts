@@ -7,6 +7,7 @@ import { getAccessToken } from './utils/storage';
 import { apiPostWithRefresh } from './api/client';
 import { loginPage } from './pages/login';
 import { watchingPage } from './pages/watching';
+import { bookmarksPage } from './pages/bookmarks';
 import { moviePage } from './pages/movie';
 import { serialPage } from './pages/serial';
 import { playerPage } from './pages/player';
@@ -21,6 +22,7 @@ registerTizenKeys();
 
 registerPage('login', loginPage);
 registerPage('watching', watchingPage);
+registerPage('bookmarks', bookmarksPage);
 registerPage('movie', moviePage);
 registerPage('serial', serialPage);
 registerPage('player', playerPage);

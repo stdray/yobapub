@@ -226,3 +226,21 @@ export interface WatchingInfoResponse {
   status: number;
   item: WatchingInfoItem;
 }
+
+export interface BookmarkFolder {
+  id: number;
+  title: string;
+  count: number;
+  views: number;
+}
+
+export interface BookmarkFoldersResponse {
+  status: number;
+  items: BookmarkFolder[];
+}
+
+export interface BookmarkItemsResponse {
+  status: number;
+  items: Item[];
+  pagination: Pagination;
+}

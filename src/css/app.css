@@ -789,3 +789,48 @@ video::cue {
   font-size: 20px;
   color: #555;
 }
+
+/* --- Bookmarks --- */
+.folder-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  padding: 20px 24px;
+  border: 3px solid transparent;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  outline: none;
+}
+
+.folder-item.focused {
+  border-color: #e94560;
+  background: #2a2a4a;
+}
+
+.folder-item__icon {
+  font-size: 48px;
+  margin-right: 24px;
+  line-height: 1;
+}
+
+.folder-item__info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.folder-item__title {
+  font-size: 30px;
+  color: #eee;
+}
+
+.folder-item__count {
+  font-size: 24px;
+  color: #888;
+}

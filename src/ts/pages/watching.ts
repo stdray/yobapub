@@ -168,7 +168,8 @@ function handleMenuKey(e: JQuery.Event): void {
       if (sections.length > 0) { menuFocused = false; updateFocus(); }
       e.preventDefault(); break;
     case TvKey.Enter:
-      if (menuIndex === 3) { navigate('settings'); }
+      if (menuIndex === 1) { navigate('bookmarks'); }
+      else if (menuIndex === 3) { navigate('settings'); }
       else if (menuIndex === 4) { clearTokens(); navigate('login'); }
       e.preventDefault(); break;
   }
