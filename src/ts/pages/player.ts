@@ -970,7 +970,7 @@ function destroyPlayer(): void {
 // --- Keys ---
 
 function getKeyCode(e: JQuery.Event): number {
-  var orig = e.originalEvent as KeyboardEvent;
+  var orig = (e as any).originalEvent as KeyboardEvent;
   return (orig && orig.keyCode) ? orig.keyCode : (e.keyCode || 0);
 }
 
