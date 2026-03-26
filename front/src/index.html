@@ -8,6 +8,15 @@
 
 </head>
 <body>
+  <script>
+  (function(){
+    if(window.tizen||/Tizen|SmartTV|SMART-TV|Web0S/i.test(navigator.userAgent))return;
+    document.querySelector('meta[name=viewport]').setAttribute('content','width=device-width,initial-scale=1.0');
+    var st=document.createElement('style');
+    st.textContent='html,body{width:1920px;height:1080px;overflow:auto}';
+    document.head.appendChild(st);
+  })();
+  </script>
   <script src="vendor/jquery.min.js"></script>
   <script src="vendor/hls.min.js"></script>
   <div id="app">

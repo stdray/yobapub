@@ -870,3 +870,16 @@ video::cue {
   font-size: 24px;
   color: #888;
 }
+
+/* Non-TV: allow scroll when scaled */
+@media screen and (max-width: 1919px) {
+  html, body {
+    width: 100%;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  #app {
+    transform-origin: 0 0;
+  }
+}
