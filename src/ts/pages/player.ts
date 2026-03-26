@@ -172,7 +172,7 @@ function getStreamInfo(): string {
   var parts: string[] = [];
 
   // stream type
-  parts.push(useHls ? 'HLS' : 'HTTP');
+  parts.push(getStreamingType().toUpperCase());
 
   // quality
   if (currentFiles.length > 0 && selectedQuality < currentFiles.length) {
