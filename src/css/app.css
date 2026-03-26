@@ -514,6 +514,7 @@ html, body {
 .player__toast.hidden {
   opacity: 0;
   pointer-events: none;
+  
 }
 
 .player__menu {
