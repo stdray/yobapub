@@ -10,7 +10,8 @@
 <body>
   <script>
   (function(){
-    if(window.tizen||/Tizen|SmartTV|SMART-TV|Web0S/i.test(navigator.userAgent))return;
+    var ua=navigator.userAgent;
+    if(window.tizen||/Tizen|SmartTV|SMART-TV|Web0S|BRAVIA|AFT|Android TV/i.test(ua))return;
     var st=document.createElement('style');
     st.textContent='html,body{overflow-y:auto!important;height:auto!important}';
     document.head.appendChild(st);
