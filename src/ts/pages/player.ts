@@ -265,13 +265,8 @@ function getStreamInfo(): string {
   }
 
   // subs
-  if (selectedSub >= 0) {
-    var tracks = getVideoTextTracks();
-    if (tracks && selectedSub < tracks.length) {
-      parts.push('Sub: ' + (tracks[selectedSub].label || tracks[selectedSub].language || '?'));
-    } else if (selectedSub < currentSubs.length) {
-      parts.push('Sub: ' + currentSubs[selectedSub].lang.toUpperCase());
-    }
+  if (selectedSub >= 0 && selectedSub < currentSubs.length) {
+    parts.push('Sub: ' + currentSubs[selectedSub].lang.toUpperCase());
   }
 
   // bitrate from HLS
@@ -603,7 +598,7 @@ function getAudioItems(): Array<{ label: string; selected: boolean }> {
     var seen: Record<string, boolean> = {};
     for (var i = 0; i < hlsAudioTracks.length; i++) {
       var at = hlsAudioTracks[i];
-      var lbl = at.name || at.lang || ('\u0414\u043E\u0440\u043E\u0436\u043A\u0430 ' + (i + 1));
+      var lbl = at.name || at.lang || ('Дорожка ' + (i + 1));
       if (seen[lbl]) { lbl += ' #' + (i + 1); }
       seen[lbl] = true;
       items.push({ label: lbl, selected: i === selectedAudio });
@@ -614,12 +609,12 @@ function getAudioItems(): Array<{ label: string; selected: boolean }> {
     var native = (videoEl as any).audioTracks;
     if (native && native.length > 0) {
       for (var k = 0; k < native.length; k++) {
-        items.push({ label: native[k].label || native[k].language || ('\u0414\u043E\u0440\u043E\u0436\u043A\u0430 ' + (k + 1)), selected: native[k].enabled });
+        items.push({ label: native[k].label || native[k].language || ('Дорожка ' + (k + 1)), selected: native[k].enabled });
       }
       return items;
     }
   }
-  items.push({ label: '\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445', selected: false });
+  items.push({ label: 'Нет данных', selected: false });
   return items;
 }
 
@@ -632,25 +627,14 @@ function getVideoTextTracks(): TextTrackList | null {
 
 function getSubItems(): Array<{ label: string; selected: boolean }> {
   var items: Array<{ label: string; selected: boolean }> = [];
-  var tracks = getVideoTextTracks();
-  if (tracks && tracks.length > 0) {
-    items.push({ label: '\u0412\u044B\u043A\u043B', selected: selectedSub === -1 });
-    for (var i = 0; i < tracks.length; i++) {
-      var t = tracks[i];
-      var label = (t.label || t.language || '\u0421\u0443\u0431\u0442\u0438\u0442\u0440\u044B ' + (i + 1));
-      if (label.length <= 3) label = label.toUpperCase();
-      items.push({ label: label, selected: i === selectedSub });
-    }
-    return items;
-  }
   if (currentSubs.length > 0) {
-    items.push({ label: '\u0412\u044B\u043A\u043B', selected: selectedSub === -1 });
+    items.push({ label: 'Выкл', selected: selectedSub === -1 });
     for (var j = 0; j < currentSubs.length; j++) {
       items.push({ label: currentSubs[j].lang.toUpperCase(), selected: j === selectedSub });
     }
     return items;
   }
-  items.push({ label: '\u041D\u0435\u0442 \u0441\u0443\u0431\u0442\u0438\u0442\u0440\u043E\u0432', selected: false });
+  items.push({ label: 'Нет субтитров', selected: false });
   return items;
 }
 
@@ -779,7 +763,7 @@ function applyAudioSwitch(idx: number): void {
     if (hlsAudioTracks.length > 1) {
       hlsInstance.audioTrack = idx;
     } else if (currentAudios.length > 1) {
-      showToast('\u0410\u0443\u0434\u0438\u043E: ' + buildAudioLabel(currentAudios[idx]));
+      showToast('Аудио: ' + buildAudioLabel(currentAudios[idx]));
     }
     return;
   }
@@ -793,24 +777,14 @@ function applyAudioSwitch(idx: number): void {
     }
   }
   if (currentAudios.length > 1) {
-    showToast('\u0421\u043C\u0435\u043D\u0430 \u0430\u0443\u0434\u0438\u043E \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 \u0434\u043B\u044F HTTP');
+    showToast('Смена аудио недоступна для HTTP');
   }
 }
 
 function applySubSwitch(menuIdx: number): void {
   var subIdx = menuIdx - 1;
   selectedSub = subIdx;
-  var tracks = getVideoTextTracks();
-  if (tracks && tracks.length > 0) {
-    for (var i = 0; i < tracks.length; i++) {
-      tracks[i].mode = (i === subIdx) ? 'showing' : 'disabled';
-    }
-    return;
-  }
-  if (currentSubs.length > 0) {
-    loadSubtitleTrack(subIdx);
-    return;
-  }
+  loadSubtitleTrack(subIdx);
 }
 
 function handlePanelKey(e: JQuery.Event): void {
