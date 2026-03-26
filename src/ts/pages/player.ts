@@ -537,6 +537,13 @@ function updateProgress(): void {
 
 // --- Subtitles ---
 
+function srtToVtt(srt: string): string {
+  var vtt = 'WEBVTT\n\n' + srt
+    .replace(/\r\n/g, '\n')
+    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+  return vtt;
+}
+
 function loadSubtitleTrack(subIdx: number): void {
   if (!videoEl) return;
   // remove existing tracks
@@ -549,23 +556,33 @@ function loadSubtitleTrack(subIdx: number): void {
   if (subIdx < 0 || subIdx >= currentSubs.length) return;
 
   var sub = currentSubs[subIdx];
-  var track = document.createElement('track');
-  track.kind = 'subtitles';
-  track.label = sub.lang;
-  track.srclang = sub.lang;
-  track.src = sub.url;
-  track.setAttribute('default', '');
-  videoEl.appendChild(track);
-
   var v = videoEl;
-  track.addEventListener('load', function () {
-    if (v && v.textTracks.length > 0) {
-      v.textTracks[v.textTracks.length - 1].mode = 'showing';
+
+  $.ajax({
+    url: sub.url,
+    dataType: 'text',
+    success: function (data: string) {
+      if (!v || !v.parentNode) return;
+      var vtt = srtToVtt(data);
+      var blob = new Blob([vtt], { type: 'text/vtt' });
+      var blobUrl = URL.createObjectURL(blob);
+
+      var track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.label = sub.lang;
+      track.srclang = sub.lang;
+      track.src = blobUrl;
+      track.setAttribute('default', '');
+      v.appendChild(track);
+
+      if (v.textTracks.length > 0) {
+        v.textTracks[v.textTracks.length - 1].mode = 'showing';
+      }
+    },
+    error: function () {
+      showToast('Не удалось загрузить субтитры');
     }
   });
-  if (v.textTracks.length > 0) {
-    v.textTracks[v.textTracks.length - 1].mode = 'showing';
-  }
 }
 
 // --- Panel (settings bottom) ---
