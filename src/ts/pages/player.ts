@@ -36,6 +36,7 @@ var currentTitle = '';
 var hlsAudioTracks: any[] = [];
 var hlsSubTracks: any[] = [];
 var useHls = false;
+var currentHlsUrl = '';
 var playbackStarted = false;
 
 function formatTime(sec: number): string {
@@ -535,6 +536,85 @@ function updateProgress(): void {
 
 
 
+// --- HLS manifest rewriting ---
+
+function getBaseUrl(url: string): string {
+  var i = url.indexOf('?');
+  var clean = i >= 0 ? url.substring(0, i) : url;
+  var last = clean.lastIndexOf('/');
+  return last >= 0 ? clean.substring(0, last + 1) : '';
+}
+
+function makeUrlsAbsolute(manifest: string, baseUrl: string): string {
+  if (!baseUrl) return manifest;
+  var lines = manifest.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (line && line.charAt(0) !== '#' && line.indexOf('://') === -1) {
+      lines[i] = baseUrl + line;
+    }
+    if (line.indexOf('URI="') >= 0) {
+      lines[i] = lines[i].replace(/URI="([^"]+)"/g, function (_m: string, uri: string) {
+        if (uri.indexOf('://') === -1) return 'URI="' + baseUrl + uri + '"';
+        return _m;
+      });
+    }
+  }
+  return lines.join('\n');
+}
+
+function rewriteHlsManifest(manifest: string, audioIndex: number): string {
+  var lines = manifest.split('\n');
+  var result: string[] = [];
+  var defaultGroup = '';
+  var targetGroup = '';
+
+  // find audio groups, pick target by index
+  var audioCount = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (line.indexOf('#EXT-X-MEDIA:') === 0 && line.indexOf('TYPE=AUDIO') >= 0) {
+      audioCount++;
+      if (audioCount === audioIndex) {
+        targetGroup = 'audio_rewrite';
+        var match = line.match(/GROUP-ID="([^"]+)"/);
+        if (match) defaultGroup = match[1];
+        result.push(line.replace(/GROUP-ID="[^"]+"/, 'GROUP-ID="' + targetGroup + '"').replace(/DEFAULT=\w+/, 'DEFAULT=YES').replace(/AUTOSELECT=\w+/, 'AUTOSELECT=YES'));
+      }
+      continue;
+    }
+    result.push(line);
+  }
+
+  if (!targetGroup) return manifest;
+
+  // rewrite STREAM-INF lines to use our audio group
+  for (var j = 0; j < result.length; j++) {
+    if (result[j].indexOf('#EXT-X-STREAM-INF:') === 0 && result[j].indexOf('AUDIO=') >= 0) {
+      result[j] = result[j].replace(/AUDIO="[^"]+"/, 'AUDIO="' + targetGroup + '"');
+    }
+  }
+
+  return result.join('\n');
+}
+
+function fetchRewrittenHls(url: string, audioIndex: number, cb: (blobUrl: string | null) => void): void {
+  $.ajax({
+    url: url,
+    dataType: 'text',
+    success: function (data: string) {
+      var baseUrl = getBaseUrl(url);
+      var rewritten = rewriteHlsManifest(data, audioIndex);
+      rewritten = makeUrlsAbsolute(rewritten, baseUrl);
+      var blob = new Blob([rewritten], { type: 'application/vnd.apple.mpegurl' });
+      cb(URL.createObjectURL(blob));
+    },
+    error: function () {
+      cb(null);
+    }
+  });
+}
+
 // --- Subtitles ---
 
 function srtToVtt(srt: string): string {
@@ -779,8 +859,24 @@ function applyAudioSwitch(idx: number): void {
   if (useHls && hlsInstance) {
     if (hlsAudioTracks.length > 1) {
       hlsInstance.audioTrack = idx;
-    } else if (currentAudios.length > 1) {
-      showToast('Аудио: ' + buildAudioLabel(currentAudios[idx]));
+      return;
+    }
+    if (currentAudios.length > 1 && currentHlsUrl) {
+      var audioIndex = currentAudios[idx].index;
+      var pos = videoEl ? videoEl.currentTime : 0;
+      var paused = videoEl ? videoEl.paused : false;
+      fetchRewrittenHls(currentHlsUrl, audioIndex, function (blobUrl) {
+        if (!blobUrl || !videoEl) {
+          showToast('Не удалось переключить аудио');
+          return;
+        }
+        if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+        resumeTime = pos;
+        resumePaused = paused;
+        qualitySwitching = true;
+        playSource(blobUrl);
+      });
+      return;
     }
     return;
   }
@@ -861,6 +957,7 @@ function switchQuality(): void {
 function playSource(url: string): void {
   if (!videoEl) return;
   useHls = false;
+  if (url.indexOf('blob:') !== 0) currentHlsUrl = '';
   hlsAudioTracks = [];
   hlsSubTracks = [];
 
@@ -870,6 +967,7 @@ function playSource(url: string): void {
       if (Hls.default) Hls = Hls.default;
       if (Hls.isSupported()) {
         useHls = true;
+        if (url.indexOf('blob:') !== 0) currentHlsUrl = url;
         hlsInstance = new Hls({
           enableWorker: false,
           renderTextTracksNatively: true,
@@ -1088,6 +1186,7 @@ function destroyPlayer(): void {
   barValueEl = null;
   barDurationEl = null;
   barSeekEl = null;
+  currentHlsUrl = '';
 }
 
 // --- Keys ---
