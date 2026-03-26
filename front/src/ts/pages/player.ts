@@ -5,7 +5,7 @@ import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey } from '../utils/platform';
-import { getStreamingType } from '../utils/storage';
+import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 import { tplPlayer } from './player/template';
@@ -267,6 +267,7 @@ function startWithAudio(title: string): void {
   if (selectedAudio > 0 && currentAudios.length > 1) {
     var hlsUrl = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
     if (hlsUrl) {
+      if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       var audioIndex = currentAudios[selectedAudio].index;
       fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
         if (blobUrl) {
@@ -335,6 +336,7 @@ function applyAudioSwitch(idx: number): void {
     var f = currentFiles[selectedQuality];
     var hlsUrl = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
     if (hlsUrl) {
+      if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       switchToRewrittenHls(hlsUrl, idx);
       return;
     }

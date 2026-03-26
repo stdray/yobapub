@@ -1,0 +1,6 @@
+front/node_modules
+front/dist
+front/tmp
+back/YobaPub.Proxy/bin
+back/YobaPub.Proxy/obj
+.git

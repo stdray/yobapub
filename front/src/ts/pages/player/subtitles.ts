@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import { Subtitle } from '../../types/api';
-import { getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX } from '../../utils/storage';
+import { getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, proxyUrl } from '../../utils/storage';
 
 var subStyleEl: HTMLStyleElement | null = null;
 
@@ -53,8 +53,10 @@ export function loadSubtitleTrack(videoEl: HTMLVideoElement, $root: JQuery, subs
     }
   }
 
+  var subUrl = proxyUrl(sub.url);
+
   $.ajax({
-    url: sub.url,
+    url: subUrl,
     dataType: 'text',
     success: function (data: string) {
       if (!v || !v.parentNode) return;
@@ -64,7 +66,7 @@ export function loadSubtitleTrack(videoEl: HTMLVideoElement, $root: JQuery, subs
     },
     error: function () {
       if (!v || !v.parentNode) return;
-      addTrackFromUrl(sub.url);
+      addTrackFromUrl(subUrl);
     }
   });
 }

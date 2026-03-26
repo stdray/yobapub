@@ -4,7 +4,9 @@ var KEYS = {
   TOKEN_EXPIRES: 'kp_token_expires',
   DEFAULT_QUALITY: 'kp_default_quality',
   SUB_SIZE: 'kp_sub_size',
-  STREAMING_TYPE: 'kp_streaming_type'
+  STREAMING_TYPE: 'kp_streaming_type',
+  PROXY_BASE: 'kp_proxy_base',
+  PROXY_ALL: 'kp_proxy_all'
 };
 
 export function getAccessToken(): string | null {
@@ -123,4 +125,37 @@ export function saveTitlePrefs(prefs: TitlePrefs): void {
   filtered.unshift(prefs);
   if (filtered.length > TITLE_PREFS_MAX) filtered.length = TITLE_PREFS_MAX;
   saveTitlePrefsArr(filtered);
+}
+
+// --- Proxy ---
+
+export function isProxyEnabled(): boolean {
+  return localStorage.getItem(KEYS.PROXY_BASE) === '1';
+}
+
+export function setProxyEnabled(on: boolean): void {
+  if (on) {
+    localStorage.setItem(KEYS.PROXY_BASE, '1');
+  } else {
+    localStorage.removeItem(KEYS.PROXY_BASE);
+  }
+}
+
+export function isProxyAll(): boolean {
+  return localStorage.getItem(KEYS.PROXY_ALL) === '1';
+}
+
+export function setProxyAll(on: boolean): void {
+  if (on) {
+    localStorage.setItem(KEYS.PROXY_ALL, '1');
+  } else {
+    localStorage.removeItem(KEYS.PROXY_ALL);
+  }
+}
+
+export function proxyUrl(url: string): string {
+  if (!isProxyEnabled() || !url) return url;
+  var m = url.match(/^(https?):\/\/(.*)$/);
+  if (!m) return url;
+  return '/proxy/' + m[1] + '/' + m[2];
 }

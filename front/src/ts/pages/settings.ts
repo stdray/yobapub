@@ -4,7 +4,7 @@ import { Page, RouteParams } from '../types/app';
 import { getDeviceSettings, saveDeviceSettings } from '../api/device';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, isProxyEnabled, setProxyEnabled, isProxyAll, setProxyAll } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-settings');
@@ -133,6 +133,14 @@ function buildSubSizeSetting(): SettingItem {
   return { key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: getSubSize() };
 }
 
+function buildProxySetting(): SettingItem {
+  return { key: '_proxy', label: 'Прокси', type: 'checkbox', value: isProxyEnabled() ? 1 : 0 };
+}
+
+function buildProxyAllSetting(): SettingItem {
+  return { key: '_proxyAll', label: 'Проксировать видео', type: 'checkbox', value: isProxyAll() ? 1 : 0 };
+}
+
 function getDisplayValue(item: SettingItem): string {
   if (item.type === 'stepper') {
     var v = item.value as number;
@@ -206,6 +214,20 @@ function applyOption(): void {
       }
       setDefaultQuality(item.options[focusedOptionIndex].id);
     }
+    closeOptions();
+    return;
+  }
+
+  if (item.key === '_proxy') {
+    item.value = focusedOptionIndex === 1 ? 1 : 0;
+    setProxyEnabled(!!item.value);
+    closeOptions();
+    return;
+  }
+
+  if (item.key === '_proxyAll') {
+    item.value = focusedOptionIndex === 1 ? 1 : 0;
+    setProxyAll(!!item.value);
     closeOptions();
     return;
   }
@@ -335,6 +357,8 @@ export var settingsPage: Page = {
             }
           }
         }
+        allSettings.unshift(buildProxyAllSetting());
+        allSettings.unshift(buildProxySetting());
         allSettings.unshift(buildSubSizeSetting());
         allSettings.unshift(buildQualitySetting());
         render();
