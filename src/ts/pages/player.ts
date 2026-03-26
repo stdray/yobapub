@@ -546,13 +546,13 @@ function updateProgress(): void {
     barValueEl.style.width = pct + '%';
   }
   if (barPctEl) {
-    barPctEl.textContent = pct.toFixed(1) + '%';
+    barPctEl.innerHTML = pct.toFixed(1) + '%';
   }
   if (barDurationEl) {
-    barDurationEl.textContent = formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : '');
+    barDurationEl.innerHTML = formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : '');
   }
   if (barSeekEl) {
-    barSeekEl.textContent = seeking ? formatTime(seekPos) : '';
+    barSeekEl.innerHTML = seeking ? formatTime(seekPos) : '';
   }
 }
 
@@ -1042,6 +1042,7 @@ function onSourceReady(): void {
     v.addEventListener('playing', doApply);
     v.addEventListener('canplay', doApply);
   }
+  hideSpinner();
   startMarkTimer();
   showBar();
   updateInfoBadge();
