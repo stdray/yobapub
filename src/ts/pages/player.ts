@@ -23,6 +23,10 @@ var resumeTime = 0;
 
 var currentFiles: VideoFile[] = [];
 var currentAudios: AudioTrack[] = [];
+
+var barValueEl: HTMLElement | null = null;
+var barDurationEl: HTMLElement | null = null;
+var barSeekEl: HTMLElement | null = null;
 var currentSubs: Subtitle[] = [];
 var selectedQuality = 0;
 var selectedAudio = 0;
@@ -409,6 +413,7 @@ var progressTimer: number | null = null;
 function showBar(): void {
   $root.find('.player__header, .player__gradient, .player__bar').removeClass('hidden');
   showInfo();
+  updateProgress();
   clearBarTimer();
   if (!panelOpen && !seeking) {
     barTimer = window.setTimeout(hideBar, 4000);
@@ -424,21 +429,30 @@ function clearBarTimer(): void {
   if (barTimer !== null) { clearTimeout(barTimer); barTimer = null; }
 }
 
+function cacheBarElements(): void {
+  if (!barValueEl) barValueEl = $root.find('.player__bar-value')[0] || null;
+  if (!barDurationEl) barDurationEl = $root.find('.player__bar-duration')[0] || null;
+  if (!barSeekEl) barSeekEl = $root.find('.player__bar-seek')[0] || null;
+}
+
 function updateProgress(): void {
   if (!videoEl) return;
+  cacheBarElements();
   var cur = seeking ? seekPos : videoEl.currentTime;
   var dur = getVideoDuration();
   if (cur < 0) cur = 0;
   var pct = dur > 0 ? (cur / dur) * 100 : 0;
   if (pct > 100) pct = 100;
-  var $val = $root.find('.player__bar-value');
-  var el = $val[0];
-  if (el) el.style.width = pct + '%';
-  $root.find('.player__bar-duration').text(formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : ''));
-  if (seeking) {
-    $root.find('.player__bar-seek').text(formatTime(seekPos));
-  } else {
-    $root.find('.player__bar-seek').text('');
+  if (barValueEl) {
+    barValueEl.style.width = pct + '%';
+    /* force reflow on legacy browsers */
+    barValueEl.offsetWidth;
+  }
+  if (barDurationEl) {
+    barDurationEl.textContent = formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : '');
+  }
+  if (barSeekEl) {
+    barSeekEl.textContent = seeking ? formatTime(seekPos) : '';
   }
 }
 
@@ -989,6 +1003,9 @@ function destroyPlayer(): void {
     try { videoEl.load(); } catch (e) { /* ignore */ }
     videoEl = null;
   }
+  barValueEl = null;
+  barDurationEl = null;
+  barSeekEl = null;
 }
 
 // --- Keys ---
