@@ -836,15 +836,28 @@ function stopProgressTimer(): void {
 
 function onSourceReady(): void {
   if (!videoEl) return;
-  var pos = resumeTime;
-  resumeTime = 0;
-  if (pos > 0) {
-    videoEl.currentTime = pos;
+  if (resumeTime > 0) {
+    var pos = resumeTime;
+    resumeTime = 0;
+    var v = videoEl;
+    var done = false;
+    var doSeek = function () {
+      if (done) return;
+      done = true;
+      v.removeEventListener('playing', doSeek);
+      v.currentTime = pos;
+    };
+    if (resumePaused) {
+      resumePaused = false;
+      v.currentTime = pos;
+    } else {
+      v.addEventListener('playing', doSeek);
+      v.play();
+    }
+  } else {
+    if (resumePaused) { resumePaused = false; }
+    else { videoEl.play(); }
   }
-  if (!resumePaused) {
-    videoEl.play();
-  }
-  resumePaused = false;
   playbackStarted = true;
   qualitySwitching = false;
   startMarkTimer();
