@@ -1034,10 +1034,9 @@ function onSourceReady(): void {
     if (resumePaused) { resumePaused = false; }
     else { videoEl.play(); }
   }
-  var wasQualitySwitch = qualitySwitching;
   playbackStarted = true;
   qualitySwitching = false;
-  if (!wasQualitySwitch && selectedSub >= 0) {
+  if (selectedSub >= 0) {
     var restoreSub = selectedSub;
     var v = videoEl;
     var applied = false;
