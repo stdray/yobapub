@@ -80,3 +80,47 @@ export function getStreamingType(): string {
 export function setStreamingType(type: string): void {
   localStorage.setItem(KEYS.STREAMING_TYPE, type);
 }
+
+// --- Per-title playback preferences (LRU, max 100) ---
+
+var TITLE_PREFS_KEY = 'kp_title_prefs';
+var TITLE_PREFS_MAX = 100;
+
+export interface TitlePrefs {
+  id: number;
+  quality?: string;
+  audioLang?: string;
+  audioAuthorId?: number;
+  subLang?: string;
+}
+
+function loadTitlePrefsArr(): TitlePrefs[] {
+  try {
+    var raw = localStorage.getItem(TITLE_PREFS_KEY);
+    if (raw) return JSON.parse(raw) as TitlePrefs[];
+  } catch (e) { /* ignore */ }
+  return [];
+}
+
+function saveTitlePrefsArr(arr: TitlePrefs[]): void {
+  localStorage.setItem(TITLE_PREFS_KEY, JSON.stringify(arr));
+}
+
+export function getTitlePrefs(itemId: number): TitlePrefs | null {
+  var arr = loadTitlePrefsArr();
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].id === itemId) return arr[i];
+  }
+  return null;
+}
+
+export function saveTitlePrefs(prefs: TitlePrefs): void {
+  var arr = loadTitlePrefsArr();
+  var filtered: TitlePrefs[] = [];
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].id !== prefs.id) filtered.push(arr[i]);
+  }
+  filtered.unshift(prefs);
+  if (filtered.length > TITLE_PREFS_MAX) filtered.length = TITLE_PREFS_MAX;
+  saveTitlePrefsArr(filtered);
+}

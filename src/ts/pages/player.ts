@@ -7,7 +7,7 @@ import { apiGet } from '../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, getStreamingType } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, getStreamingType, getTitlePrefs, saveTitlePrefs, TitlePrefs } from '../utils/storage';
 
 var $root = $('#page-player');
 var keyHandler: ((e: JQuery.Event) => void) | null = null;
@@ -99,6 +99,53 @@ function loadMediaLinks(mid: number, cb: (files: VideoFile[], subs: Subtitle[]) 
     },
     function () { cb([], []); }
   );
+}
+
+function saveCurrentPrefs(): void {
+  if (!currentItem) return;
+  var prefs: TitlePrefs = { id: currentItem.id };
+  if (currentFiles.length > 0 && selectedQuality < currentFiles.length) {
+    prefs.quality = currentFiles[selectedQuality].quality;
+  }
+  if (currentAudios.length > 0 && selectedAudio < currentAudios.length) {
+    var a = currentAudios[selectedAudio];
+    prefs.audioLang = a.lang;
+    if (a.author) prefs.audioAuthorId = a.author.id;
+  }
+  if (selectedSub >= 0 && selectedSub < currentSubs.length) {
+    prefs.subLang = currentSubs[selectedSub].lang;
+  }
+  saveTitlePrefs(prefs);
+}
+
+function restoreQualityIndex(files: VideoFile[], prefs: TitlePrefs | null): number {
+  if (prefs && prefs.quality) {
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].quality === prefs.quality) return i;
+    }
+  }
+  return pickDefaultQualityIndex(files);
+}
+
+function restoreAudioIndex(audios: AudioTrack[], prefs: TitlePrefs | null): number {
+  if (!prefs || !prefs.audioLang || audios.length === 0) return 0;
+  if (prefs.audioAuthorId) {
+    for (var i = 0; i < audios.length; i++) {
+      if (audios[i].lang === prefs.audioLang && audios[i].author && audios[i].author.id === prefs.audioAuthorId) return i;
+    }
+  }
+  for (var j = 0; j < audios.length; j++) {
+    if (audios[j].lang === prefs.audioLang) return j;
+  }
+  return 0;
+}
+
+function restoreSubIndex(subs: Subtitle[], prefs: TitlePrefs | null): number {
+  if (!prefs || !prefs.subLang || subs.length === 0) return -1;
+  for (var i = 0; i < subs.length; i++) {
+    if (subs[i].lang === prefs.subLang) return i;
+  }
+  return -1;
 }
 
 function pickDefaultQualityIndex(files: VideoFile[]): number {
@@ -411,13 +458,14 @@ function remountTrack(): void {
   currentTitle = media.title;
 
   currentAudios = media.audios;
+  var prefs = currentItem ? getTitlePrefs(currentItem.id) : null;
 
   loadMediaLinks(media.mid, function (files, subs) {
     currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
     currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-    selectedQuality = pickDefaultQualityIndex(currentFiles);
-    selectedAudio = 0;
-    selectedSub = -1;
+    selectedQuality = restoreQualityIndex(currentFiles, prefs);
+    selectedAudio = restoreAudioIndex(currentAudios, prefs);
+    selectedSub = restoreSubIndex(currentSubs, prefs);
 
     if (currentFiles.length === 0) return;
     var url = getUrlFromFile(currentFiles[selectedQuality]);
@@ -716,6 +764,7 @@ function applyPanelSelection(): void {
       switchQuality();
     }
   }
+  saveCurrentPrefs();
   updatePanelButtons();
   renderPanelList();
 }
@@ -888,6 +937,8 @@ function onSourceReady(): void {
   }
   playbackStarted = true;
   qualitySwitching = false;
+  if (selectedAudio > 0) applyAudioSwitch(selectedAudio);
+  if (selectedSub >= 0) loadSubtitleTrack(selectedSub);
   startMarkTimer();
   showBar();
   updateInfoBadge();
@@ -1128,11 +1179,14 @@ export var playerPage: Page = {
         currentTitle = media.title;
         currentAudios = media.audios;
         var itemTitle = currentItem.title.split(' / ')[0];
+        var prefs = getTitlePrefs(currentItem.id);
 
         loadMediaLinks(media.mid, function (files, subs) {
           currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
           currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-          selectedQuality = pickDefaultQualityIndex(currentFiles);
+          selectedQuality = restoreQualityIndex(currentFiles, prefs);
+          selectedAudio = restoreAudioIndex(currentAudios, prefs);
+          selectedSub = restoreSubIndex(currentSubs, prefs);
 
           if (currentFiles.length === 0) {
             $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
