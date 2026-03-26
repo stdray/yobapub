@@ -396,81 +396,145 @@ html, body {
   z-index: 5;
 }
 
-.player__overlay {
+/* Gradient overlay top */
+.player__gradient {
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 0;
-  right: 0;
-  padding: 30px 60px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  width: 100%;
+  height: 370px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+  pointer-events: none;
+  z-index: 4;
   transition: opacity 0.3s;
 }
 
-.player__overlay.hidden {
+.player__gradient.hidden {
   opacity: 0;
-  pointer-events: none;
+}
+
+/* Header: title + episode top-left */
+.player__header {
+  position: absolute;
+  top: 80px;
+  left: 140px;
+  max-width: 1400px;
+  z-index: 6;
+  transition: opacity 0.3s;
+}
+
+.player__header.hidden {
+  opacity: 0;
 }
 
 .player__title {
-  font-size: 32px;
-  margin-bottom: 10px;
+  font-size: 52px;
+  font-weight: bold;
 }
 
-.player__progress {
+.player__episode {
+  font-size: 30px;
+  color: #ccc;
+  margin-top: 8px;
+}
+
+/* OSD action icon (center) */
+.player__osd {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 120px;
+  color: rgba(255,255,255,0.7);
+  pointer-events: none;
+  z-index: 7;
+  text-shadow: 0 0 20px rgba(0,0,0,0.5);
+  transition: opacity 0.3s;
+}
+
+.player__osd.hidden {
+  opacity: 0;
+}
+
+/* Progress bar (bottom gradient + bar) */
+.player__bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
-  height: 6px;
-  background: #444;
-  border-radius: 3px;
-  margin-bottom: 10px;
+  height: 370px;
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  pointer-events: none;
+  z-index: 4;
+  transition: opacity 0.3s;
 }
 
-.player__progress-bar {
-  height: 100%;
+.player__bar.hidden {
+  opacity: 0;
+}
+
+.player__bar-wrap {
+  position: absolute;
+  bottom: 150px;
+  left: 5%;
+  width: 90%;
+}
+
+.player__bar-progress {
+  position: absolute;
+  left: 0;
+  right: 140px;
+  height: 14px;
+  top: 28px;
+  background: rgba(255,255,255,0.4);
+  border-radius: 4px;
+}
+
+.player__bar-value {
   background: #e94560;
-  border-radius: 3px;
+  border-radius: 4px;
+  height: 100%;
+  position: relative;
+  width: 0;
 }
 
-.player__controls-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.player__bar-dot {
+  position: absolute;
+  right: -12px;
+  top: -9px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #e94560;
+  border: 2px solid #fff;
+  box-shadow: 0 0 5px #000;
 }
 
-.player__time {
+.player__bar-seek {
+  position: absolute;
+  top: -55px;
+  left: -50px;
+  width: 130px;
+  font-size: 28px;
+  text-align: center;
+  color: #fff;
+}
+
+.player__bar-duration {
+  position: absolute;
+  right: 0;
+  line-height: 70px;
+  font-size: 28px;
+  color: #ccc;
+}
+
+.player__bar-stream {
+  position: absolute;
+  bottom: 50px;
+  left: 5%;
+  width: 90%;
   font-size: 24px;
   color: #aaa;
-}
-
-.player__controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pctl {
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  color: #aaa;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-
-.pctl--play {
-  width: 64px;
-  height: 64px;
-  font-size: 28px;
-}
-
-.pctl.focused {
-  border-color: #e94560;
-  color: #fff;
-  background: rgba(233, 69, 96, 0.25);
 }
 
 /* --- Info badge --- */
@@ -516,73 +580,100 @@ html, body {
   pointer-events: none;
 }
 
-.player__menu {
+/* Settings panel (bottom) */
+.player__panel {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 460px;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.92);
+  bottom: 0;
+  left: 0;
+  width: 100%;
   z-index: 10;
-  transition: opacity 0.2s;
 }
 
-.player__menu.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.pmenu {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 40px 0;
-}
-
-.pmenu__tabs {
-  display: flex;
-  border-bottom: 2px solid #333;
-  padding: 0 24px;
-  margin-bottom: 20px;
-}
-
-.pmenu__tab {
-  padding: 12px 20px;
-  font-size: 24px;
-  color: #888;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-}
-
-.pmenu__tab.active {
-  color: #fff;
-  border-bottom-color: #e94560;
-}
-
-.pmenu__items {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 24px;
-}
-
-.pmenu__items::-webkit-scrollbar {
+.player__panel.hidden {
   display: none;
 }
 
-.pmenu__item {
-  padding: 12px 16px;
+.ppanel__overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+}
+
+.ppanel__buttons {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(105%);
+  display: flex;
+  gap: 20px;
+  padding: 30px;
+  background: rgba(0,0,0,0.9);
+  border-radius: 10px 10px 0 0;
+  transition: transform 0.2s ease-in-out;
+}
+
+.ppanel__buttons.active {
+  transform: translateX(-50%) translateY(0);
+}
+
+.ppanel__btn {
+  width: 380px;
+  background: #555;
+  padding: 0 14px;
   font-size: 24px;
+  line-height: 72px;
+  white-space: nowrap;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ppanel__btn.focused {
+  border-color: #fff;
+  background: #777;
+}
+
+.ppanel__list {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(105%);
+  width: 500px;
+  max-height: 600px;
+  overflow-y: auto;
+  background: rgba(0,0,0,0.9);
+  border-radius: 10px 10px 0 0;
+  padding: 20px 0;
+  transition: transform 0.2s ease-in-out;
+}
+
+.ppanel__list::-webkit-scrollbar {
+  display: none;
+}
+
+.ppanel__list.active {
+  transform: translateX(-50%) translateY(0);
+}
+
+.ppanel__list-item {
+  padding: 14px 30px;
+  font-size: 26px;
   color: #aaa;
   border: 2px solid transparent;
   border-radius: 6px;
-  margin-bottom: 4px;
+  margin: 0 10px 4px 10px;
 }
 
-.pmenu__item.selected {
+.ppanel__list-item.selected {
   color: #e94560;
 }
 
-.pmenu__item.focused {
+.ppanel__list-item.focused {
   border-color: #e94560;
   color: #fff;
   background: #2a2a4a;

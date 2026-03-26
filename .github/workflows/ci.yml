@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - new-player
   pull_request:
 
 jobs:
@@ -38,7 +39,7 @@ jobs:
           path: dist/release/
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/new-player')
     needs: build
     runs-on: ubuntu-latest
 

@@ -12,7 +12,6 @@ import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setS
 var $root = $('#page-player');
 var keyHandler: ((e: JQuery.Event) => void) | null = null;
 var markTimer: number | null = null;
-var overlayTimer: number | null = null;
 var videoEl: HTMLVideoElement | null = null;
 var hlsInstance: any = null;
 
@@ -32,17 +31,6 @@ var currentTitle = '';
 var hlsAudioTracks: any[] = [];
 var hlsSubTracks: any[] = [];
 var useHls = false;
-
-var menuOpen = false;
-var menuSection = 0;
-var menuItemIndex = 0;
-var lastEnterTime = 0;
-
-var controlsOpen = false;
-var controlsFocused = 2; // index of focused control button (default: play/pause in center)
-
-var MENU_SECTIONS = ['Качество', 'Аудио', 'Субтитры'];
-var CONTROLS = ['prev', 'rw', 'playpause', 'ff', 'next'];
 
 function formatTime(sec: number): string {
   var h = Math.floor(sec / 3600);
@@ -134,37 +122,42 @@ var tplPlayer = doT.template(
     '<video></video>' +
     '<div class="player__spinner"><div class="spinner__circle"></div></div>' +
     '<div class="player__info hidden"></div>' +
-    '<div class="player__overlay hidden">' +
+    '<div class="player__osd hidden"></div>' +
+    '<div class="player__gradient hidden"></div>' +
+    '<div class="player__header hidden">' +
       '<div class="player__title">{{=it.title}}</div>' +
-      '<div class="player__progress"><div class="player__progress-bar"></div></div>' +
-      '<div class="player__controls-row">' +
-        '<div class="player__time">00:00 / 00:00</div>' +
-        '<div class="player__controls">' +
-          '<div class="pctl" data-action="prev">&#9198;</div>' +
-          '<div class="pctl" data-action="rw">-15</div>' +
-          '<div class="pctl pctl--play" data-action="playpause">&#9654;</div>' +
-          '<div class="pctl" data-action="ff">+15</div>' +
-          '<div class="pctl" data-action="next">&#9197;</div>' +
+      '<div class="player__episode">{{=it.episode}}</div>' +
+    '</div>' +
+    '<div class="player__bar hidden">' +
+      '<div class="player__bar-wrap">' +
+        '<div class="player__bar-progress">' +
+          '<div class="player__bar-value">' +
+            '<div class="player__bar-dot">' +
+              '<div class="player__bar-seek"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="player__bar-duration"></div>' +
+      '</div>' +
+      '<div class="player__bar-stream"></div>' +
+    '</div>' +
+    '<div class="player__panel hidden">' +
+      '<div class="ppanel__overlay"></div>' +
+      '<div class="ppanel__buttons">' +
+        '<div class="ppanel__btn ppanel__btn--audio">' +
+          '<span class="ppanel__btn-label">&#127911; ...</span>' +
+        '</div>' +
+        '<div class="ppanel__btn ppanel__btn--subs">' +
+          '<span class="ppanel__btn-label">&#128196; ...</span>' +
+        '</div>' +
+        '<div class="ppanel__btn ppanel__btn--quality">' +
+          '<span class="ppanel__btn-label">&#9881; ...</span>' +
         '</div>' +
       '</div>' +
+      '<div class="ppanel__list hidden"></div>' +
     '</div>' +
-    '<div class="player__menu hidden"></div>' +
+    '<div class="player__toast hidden"></div>' +
   '</div>'
-);
-
-var tplMenu = doT.template(
-  '<div class="pmenu">' +
-    '<div class="pmenu__tabs">' +
-      '{{~it.sections :sec:si}}' +
-        '<div class="pmenu__tab{{?si===it.active}} active{{?}}">{{=sec}}</div>' +
-      '{{~}}' +
-    '</div>' +
-    '<div class="pmenu__items">{{=it.items}}</div>' +
-  '</div>'
-);
-
-var tplMenuItem = doT.template(
-  '<div class="pmenu__item{{?it.selected}} selected{{?}}{{?it.focused}} focused{{?}}">{{=it.label}}</div>'
 );
 
 // --- Info badge ---
@@ -265,63 +258,61 @@ function showToast(text: string): void {
   toastTimer = window.setTimeout(function () { $toast.addClass('hidden'); toastTimer = null; }, 1500);
 }
 
-// --- Controls bar ---
+// --- OSD icon ---
 
-function showControls(): void {
-  controlsOpen = true;
-  controlsFocused = 2;
-  showOverlay();
-  clearOverlayTimer();
-  updateControlsPlayState();
-  renderControlsFocus();
+var osdTimer: number | null = null;
+
+function showOsd(icon: string): void {
+  var symbols: Record<string, string> = { play: '\u25B6', pause: '\u275A\u275A', rw: '\u23EA', ff: '\u23E9' };
+  $root.find('.player__osd').text(symbols[icon] || icon).removeClass('hidden');
+  if (osdTimer) clearTimeout(osdTimer);
+  osdTimer = window.setTimeout(function () {
+    $root.find('.player__osd').addClass('hidden');
+    osdTimer = null;
+  }, 700);
 }
 
-function hideControls(): void {
-  controlsOpen = false;
-  $root.find('.pctl').removeClass('focused');
-  showOverlay();
+// --- Accelerating seek ---
+
+var seekPos = -1;
+var seekCount = 0;
+var seekDir = '';
+var seeking = false;
+var seekApplyTimer: number | null = null;
+
+function startSeek(dir: string): void {
+  seeking = true;
+  if (seekDir !== dir) { seekDir = dir; seekCount = 0; }
+  if (seekPos === -1 && videoEl) seekPos = videoEl.currentTime;
+
+  var step = 10 + Math.pow(Math.min(seekCount, 3000), 3) / 1000;
+  var dur = (videoEl && videoEl.duration) || 1;
+  seekPos += dir === 'right' ? step : -step;
+  seekPos = Math.max(0, Math.min(seekPos, dur - 2));
+  seekCount++;
+
+  updateProgress();
+  showOsd(dir === 'right' ? 'ff' : 'rw');
+  showBar();
+
+  if (seekApplyTimer) clearTimeout(seekApplyTimer);
+  seekApplyTimer = window.setTimeout(applySeek, 2000);
 }
 
-function renderControlsFocus(): void {
-  $root.find('.pctl').removeClass('focused');
-  $root.find('.pctl').eq(controlsFocused).addClass('focused');
+function applySeek(): void {
+  if (!seeking || seekPos < 0 || !videoEl) return;
+  videoEl.currentTime = seekPos;
+  resetSeek();
 }
 
-function updateControlsPlayState(): void {
-  var $btn = $root.find('.pctl[data-action="playpause"]');
-  if (videoEl && videoEl.paused) {
-    $btn.html('&#9654;');
-  } else {
-    $btn.html('&#9646;&#9646;');
-  }
+function resetSeek(): void {
+  seekPos = -1; seekCount = 0; seekDir = ''; seeking = false;
+  if (seekApplyTimer) { clearTimeout(seekApplyTimer); seekApplyTimer = null; }
+  $root.find('.player__bar-seek').text('');
 }
 
-function executeControl(action: string): void {
-  if (!videoEl) return;
-  switch (action) {
-    case 'playpause':
-      if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); }
-      updateControlsPlayState();
-      break;
-    case 'rw':
-      videoEl.currentTime = Math.max(0, videoEl.currentTime - 15);
-      showOverlay(); clearOverlayTimer();
-      break;
-    case 'ff':
-      videoEl.currentTime = Math.min(videoEl.duration || 0, videoEl.currentTime + 15);
-      showOverlay(); clearOverlayTimer();
-      break;
-    case 'prev':
-      navigateTrack(-1);
-      break;
-    case 'next':
-      navigateTrack(1);
-      break;
-  }
-}
-
-function navigateTrack(dir: number): void {
-  if (!currentItem) return;
+function navigateTrack(dir: number): boolean {
+  if (!currentItem) return false;
 
   if (currentSeason !== undefined && currentEpisode !== undefined && currentItem.seasons) {
     for (var si = 0; si < currentItem.seasons.length; si++) {
@@ -330,14 +321,12 @@ function navigateTrack(dir: number): void {
       for (var ei = 0; ei < s.episodes.length; ei++) {
         if (s.episodes[ei].number !== currentEpisode) continue;
         var targetIdx = ei + dir;
-        // within same season
         if (targetIdx >= 0 && targetIdx < s.episodes.length) {
           savePosition(); destroyPlayer();
           currentEpisode = s.episodes[targetIdx].number;
           remountTrack();
-          return;
+          return true;
         }
-        // cross-season
         var targetSeason = si + dir;
         if (targetSeason >= 0 && targetSeason < currentItem.seasons.length) {
           var ts = currentItem.seasons[targetSeason];
@@ -347,10 +336,10 @@ function navigateTrack(dir: number): void {
             currentSeason = ts.number;
             currentEpisode = ep.number;
             remountTrack();
-            return;
+            return true;
           }
         }
-        return;
+        return false;
       }
     }
   } else if (currentVideo !== undefined && currentItem.videos) {
@@ -359,8 +348,10 @@ function navigateTrack(dir: number): void {
       savePosition(); destroyPlayer();
       currentVideo = newVideo;
       remountTrack();
+      return true;
     }
   }
+  return false;
 }
 
 function remountTrack(): void {
@@ -392,33 +383,45 @@ function remountTrack(): void {
   }
 }
 
-// --- Overlay ---
+// --- Bar show/hide ---
 
-function showOverlay(): void {
-  $root.find('.player__overlay').removeClass('hidden');
+var barTimer: number | null = null;
+
+function showBar(): void {
+  $root.find('.player__header, .player__gradient, .player__bar').removeClass('hidden');
   showInfo();
-  updateControlsPlayState();
-  clearOverlayTimer();
-  if (!controlsOpen) {
-    overlayTimer = window.setTimeout(hideOverlay, 4000);
+  clearBarTimer();
+  if (!panelOpen && !seeking) {
+    barTimer = window.setTimeout(hideBar, 4000);
   }
 }
 
-function hideOverlay(): void {
-  $root.find('.player__overlay').addClass('hidden');
+function hideBar(): void {
+  $root.find('.player__header, .player__gradient, .player__bar').addClass('hidden');
   hideInfo();
 }
 
-function clearOverlayTimer(): void {
-  if (overlayTimer !== null) { clearTimeout(overlayTimer); overlayTimer = null; }
+function clearBarTimer(): void {
+  if (barTimer !== null) { clearTimeout(barTimer); barTimer = null; }
 }
 
 function updateProgress(): void {
   if (!videoEl) return;
-  var cur = videoEl.currentTime;
+  var cur = seeking ? seekPos : videoEl.currentTime;
   var dur = videoEl.duration || 1;
-  $root.find('.player__progress-bar').css('width', (cur / dur) * 100 + '%');
-  $root.find('.player__time').text(formatTime(cur) + ' / ' + formatTime(dur));
+  if (cur < 0) cur = 0;
+  var pct = (cur / dur) * 100;
+  $root.find('.player__bar-value').css('width', pct + '%');
+  $root.find('.player__bar-duration').text(formatTime(cur) + ' / ' + formatTime(dur));
+  if (seeking) {
+    $root.find('.player__bar-seek').text(formatTime(seekPos));
+  } else {
+    $root.find('.player__bar-seek').text('');
+  }
+}
+
+function updateStreamInfo(): void {
+  $root.find('.player__bar-stream').html(getStreamInfo());
 }
 
 // --- Subtitles ---
@@ -451,7 +454,15 @@ function loadSubtitleTrack(subIdx: number): void {
   }, 100);
 }
 
-// --- Menu ---
+// --- Panel (settings bottom) ---
+
+var panelOpen = false;
+var panelBtnIndex = 0;
+var panelListOpen = false;
+var panelListIndex = 0;
+var panelListSection = 0; // 0=audio, 1=subs, 2=quality
+
+var PANEL_SECTIONS = ['audio', 'subs', 'quality'];
 
 function buildAudioLabel(a: AudioTrack): string {
   var label = a.lang;
@@ -463,42 +474,33 @@ function buildAudioLabel(a: AudioTrack): string {
 
 function getAudioItems(): Array<{ label: string; selected: boolean }> {
   var items: Array<{ label: string; selected: boolean }> = [];
-
-  // Prefer API audios -- they have richer metadata
   if (currentAudios.length > 0) {
     for (var j = 0; j < currentAudios.length; j++) {
       items.push({ label: buildAudioLabel(currentAudios[j]), selected: j === selectedAudio });
     }
     return items;
   }
-
-  // Fallback: HLS audio tracks from manifest (deduplicated)
   if (useHls && hlsAudioTracks.length > 1) {
     var seen: Record<string, boolean> = {};
     for (var i = 0; i < hlsAudioTracks.length; i++) {
       var at = hlsAudioTracks[i];
-      var lbl = at.name || at.lang || ('Дорожка ' + (i + 1));
-      if (seen[lbl]) {
-        lbl += ' #' + (i + 1);
-      }
+      var lbl = at.name || at.lang || ('\u0414\u043E\u0440\u043E\u0436\u043A\u0430 ' + (i + 1));
+      if (seen[lbl]) { lbl += ' #' + (i + 1); }
       seen[lbl] = true;
       items.push({ label: lbl, selected: i === selectedAudio });
     }
     return items;
   }
-
-  // Fallback: native <video> audio tracks
   if (videoEl) {
     var native = (videoEl as any).audioTracks;
     if (native && native.length > 0) {
       for (var k = 0; k < native.length; k++) {
-        items.push({ label: native[k].label || native[k].language || ('Дорожка ' + (k + 1)), selected: native[k].enabled });
+        items.push({ label: native[k].label || native[k].language || ('\u0414\u043E\u0440\u043E\u0436\u043A\u0430 ' + (k + 1)), selected: native[k].enabled });
       }
       return items;
     }
   }
-
-  items.push({ label: 'Нет данных', selected: false });
+  items.push({ label: '\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445', selected: false });
   return items;
 }
 
@@ -511,112 +513,152 @@ function getVideoTextTracks(): TextTrackList | null {
 
 function getSubItems(): Array<{ label: string; selected: boolean }> {
   var items: Array<{ label: string; selected: boolean }> = [];
-
-  // Use native VIDEO.textTracks (populated by HLS.js from manifest)
   var tracks = getVideoTextTracks();
   if (tracks && tracks.length > 0) {
-    items.push({ label: 'Выкл', selected: selectedSub === -1 });
+    items.push({ label: '\u0412\u044B\u043A\u043B', selected: selectedSub === -1 });
     for (var i = 0; i < tracks.length; i++) {
       var t = tracks[i];
-      var label = (t.label || t.language || 'Субтитры ' + (i + 1));
+      var label = (t.label || t.language || '\u0421\u0443\u0431\u0442\u0438\u0442\u0440\u044B ' + (i + 1));
       if (label.length <= 3) label = label.toUpperCase();
       items.push({ label: label, selected: i === selectedSub });
     }
     return items;
   }
-
-  // Fallback: external API subtitles (non-HLS)
   if (currentSubs.length > 0) {
-    items.push({ label: 'Выкл', selected: selectedSub === -1 });
+    items.push({ label: '\u0412\u044B\u043A\u043B', selected: selectedSub === -1 });
     for (var j = 0; j < currentSubs.length; j++) {
       items.push({ label: currentSubs[j].lang.toUpperCase(), selected: j === selectedSub });
     }
     return items;
   }
-
-  items.push({ label: 'Нет субтитров', selected: false });
+  items.push({ label: '\u041D\u0435\u0442 \u0441\u0443\u0431\u0442\u0438\u0442\u0440\u043E\u0432', selected: false });
   return items;
 }
 
-function getMenuItems(): Array<{ label: string; selected: boolean }> {
-  if (menuSection === 0) {
-    var items: Array<{ label: string; selected: boolean }> = [];
-    for (var i = 0; i < currentFiles.length; i++) {
-      var f = currentFiles[i];
-      items.push({ label: f.quality + ' (' + f.w + 'x' + f.h + ')', selected: i === selectedQuality });
+function getQualityItems(): Array<{ label: string; selected: boolean }> {
+  var items: Array<{ label: string; selected: boolean }> = [];
+  for (var i = 0; i < currentFiles.length; i++) {
+    var f = currentFiles[i];
+    items.push({ label: f.quality + ' (' + f.w + 'x' + f.h + ')', selected: i === selectedQuality });
+  }
+  return items;
+}
+
+function getPanelItems(section: number): Array<{ label: string; selected: boolean }> {
+  if (section === 0) return getAudioItems();
+  if (section === 1) return getSubItems();
+  return getQualityItems();
+}
+
+function getSelectedLabel(section: number): string {
+  var items = getPanelItems(section);
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].selected) return items[i].label;
+  }
+  return '...';
+}
+
+function updatePanelButtons(): void {
+  var icons = ['\uD83C\uDFA7', '\uD83D\uDCC4', '\u2699'];
+  for (var i = 0; i < PANEL_SECTIONS.length; i++) {
+    var $btn = $root.find('.ppanel__btn').eq(i);
+    $btn.find('.ppanel__btn-label').html(icons[i] + ' ' + getSelectedLabel(i));
+    if (i === panelBtnIndex && !panelListOpen) {
+      $btn.addClass('focused');
+    } else {
+      $btn.removeClass('focused');
     }
-    return items;
-  } else if (menuSection === 1) {
-    return getAudioItems();
-  } else {
-    return getSubItems();
   }
 }
 
-function renderMenu(): void {
-  var items = getMenuItems();
+function renderPanelList(): void {
+  var items = getPanelItems(panelListSection);
   var html = '';
   for (var i = 0; i < items.length; i++) {
-    html += tplMenuItem({ label: items[i].label, selected: items[i].selected, focused: i === menuItemIndex });
+    html += '<div class="ppanel__list-item' +
+      (items[i].selected ? ' selected' : '') +
+      (i === panelListIndex ? ' focused' : '') +
+      '">' + items[i].label + '</div>';
   }
-  $root.find('.player__menu').html(tplMenu({ sections: MENU_SECTIONS, active: menuSection, items: html })).removeClass('hidden');
+  $root.find('.ppanel__list').html(html);
 }
 
-function openMenu(withPause: boolean): void {
-  if (menuOpen) return;
-  controlsOpen = false;
-  menuOpen = true;
-  if (withPause && videoEl && !videoEl.paused) { videoEl.pause(); }
-  clearOverlayTimer();
-  hideOverlay();
-  menuSection = 0;
-  menuItemIndex = findSelectedIndex();
-  renderMenu();
+function openPanel(): void {
+  if (panelOpen) return;
+  panelOpen = true;
+  panelBtnIndex = 0;
+  panelListOpen = false;
+  clearBarTimer();
+  hideBar();
+  $root.find('.player__panel').removeClass('hidden');
+  updatePanelButtons();
+  setTimeout(function () {
+    $root.find('.ppanel__buttons').addClass('active');
+  }, 20);
 }
 
-function closeMenu(): void {
-  if (!menuOpen) return;
-  menuOpen = false;
-  $root.find('.player__menu').addClass('hidden');
-  showOverlay();
+function closePanel(): void {
+  if (!panelOpen) return;
+  if (panelListOpen) {
+    closePanelList();
+    return;
+  }
+  $root.find('.ppanel__buttons').removeClass('active');
+  setTimeout(function () {
+    panelOpen = false;
+    $root.find('.player__panel').addClass('hidden');
+    showBar();
+  }, 200);
 }
 
-function findSelectedIndex(): number {
-  var items = getMenuItems();
+function openPanelList(): void {
+  panelListOpen = true;
+  panelListSection = panelBtnIndex;
+  var items = getPanelItems(panelListSection);
+  panelListIndex = 0;
   for (var i = 0; i < items.length; i++) {
-    if (items[i].selected) return i;
+    if (items[i].selected) { panelListIndex = i; break; }
   }
-  return 0;
+  renderPanelList();
+  updatePanelButtons();
+  $root.find('.ppanel__buttons').removeClass('active');
+  $root.find('.ppanel__list').removeClass('hidden');
+  setTimeout(function () {
+    $root.find('.ppanel__list').addClass('active');
+  }, 20);
 }
 
-function switchMenuSection(dir: number): void {
-  menuSection = Math.max(0, Math.min(MENU_SECTIONS.length - 1, menuSection + dir));
-  menuItemIndex = findSelectedIndex();
-  renderMenu();
+function closePanelList(): void {
+  $root.find('.ppanel__list').removeClass('active');
+  setTimeout(function () {
+    panelListOpen = false;
+    $root.find('.ppanel__list').addClass('hidden');
+    $root.find('.ppanel__buttons').addClass('active');
+    updatePanelButtons();
+  }, 200);
 }
 
-function applyMenuSelection(): void {
-  if (menuSection === 0) {
-    if (menuItemIndex !== selectedQuality) {
-      selectedQuality = menuItemIndex;
+function applyPanelSelection(): void {
+  if (panelListSection === 0) {
+    applyAudioSwitch(panelListIndex);
+  } else if (panelListSection === 1) {
+    applySubSwitch(panelListIndex);
+  } else {
+    if (panelListIndex !== selectedQuality) {
+      selectedQuality = panelListIndex;
       switchQuality();
     }
-  } else if (menuSection === 1) {
-    applyAudioSwitch(menuItemIndex);
-  } else if (menuSection === 2) {
-    applySubSwitch(menuItemIndex);
   }
-  renderMenu();
+  updatePanelButtons();
+  renderPanelList();
 }
 
 function applyAudioSwitch(idx: number): void {
   selectedAudio = idx;
-
   if (useHls && hlsInstance && hlsAudioTracks.length > 1) {
     hlsInstance.audioTrack = idx;
     return;
   }
-
   if (videoEl) {
     var native = (videoEl as any).audioTracks;
     if (native && native.length > 0) {
@@ -628,11 +670,8 @@ function applyAudioSwitch(idx: number): void {
 }
 
 function applySubSwitch(menuIdx: number): void {
-  // menuIdx 0 = off, 1+ = sub index
   var subIdx = menuIdx - 1;
   selectedSub = subIdx;
-
-  // Use native VIDEO.textTracks (from HLS manifest)
   var tracks = getVideoTextTracks();
   if (tracks && tracks.length > 0) {
     for (var i = 0; i < tracks.length; i++) {
@@ -640,11 +679,41 @@ function applySubSwitch(menuIdx: number): void {
     }
     return;
   }
-
-  // External API subtitles -- load as <track> element
   if (currentSubs.length > 0) {
     loadSubtitleTrack(subIdx);
     return;
+  }
+}
+
+function handlePanelKey(e: JQuery.Event): void {
+  if (panelListOpen) {
+    var items = getPanelItems(panelListSection);
+    switch (e.keyCode) {
+      case TvKey.Up:
+        if (panelListIndex > 0) { panelListIndex--; renderPanelList(); }
+        e.preventDefault(); break;
+      case TvKey.Down:
+        if (panelListIndex < items.length - 1) { panelListIndex++; renderPanelList(); }
+        e.preventDefault(); break;
+      case TvKey.Enter:
+        applyPanelSelection(); e.preventDefault(); break;
+      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
+        closePanelList(); e.preventDefault(); break;
+    }
+    return;
+  }
+
+  switch (e.keyCode) {
+    case TvKey.Left:
+      if (panelBtnIndex > 0) { panelBtnIndex--; updatePanelButtons(); }
+      e.preventDefault(); break;
+    case TvKey.Right:
+      if (panelBtnIndex < PANEL_SECTIONS.length - 1) { panelBtnIndex++; updatePanelButtons(); }
+      e.preventDefault(); break;
+    case TvKey.Enter:
+      openPanelList(); e.preventDefault(); break;
+    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Up:
+      closePanel(); e.preventDefault(); break;
   }
 }
 
@@ -712,8 +781,9 @@ function onSourceReady(): void {
   if (resumeTime > 0) { videoEl.currentTime = resumeTime; resumeTime = 0; }
   videoEl.play();
   startMarkTimer();
-  showOverlay();
+  showBar();
   updateInfoBadge();
+  updateStreamInfo();
   videoEl.removeEventListener('timeupdate', updateProgress);
   videoEl.addEventListener('timeupdate', updateProgress);
 }
@@ -766,11 +836,16 @@ function showPlaybackError(error: MediaError | null, url: string): void {
 }
 
 function playUrl(url: string, title: string): void {
-  $root.html(tplPlayer({ title: title }));
+  var itemTitle = title.split(' - ')[0] || title;
+  var epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
+  $root.html(tplPlayer({ title: itemTitle, episode: epTitle }));
   videoEl = $root.find('video')[0] as HTMLVideoElement;
 
   var sourceUrl = url;
-  videoEl.addEventListener('ended', function () { savePosition(); goBack(); });
+  videoEl.addEventListener('ended', function () {
+    savePosition();
+    if (!navigateTrack(1)) goBack();
+  });
   videoEl.addEventListener('waiting', showSpinner);
   videoEl.addEventListener('seeking', showSpinner);
   videoEl.addEventListener('canplay', hideSpinner);
@@ -821,7 +896,9 @@ function savePosition(): void {
 function destroyPlayer(): void {
   savePosition();
   stopMarkTimer();
-  clearOverlayTimer();
+  clearBarTimer();
+  resetSeek();
+  if (osdTimer) { clearTimeout(osdTimer); osdTimer = null; }
   if (hlsInstance) {
     try { hlsInstance.destroy(); } catch (e) { /* ignore */ }
     hlsInstance = null;
@@ -837,115 +914,46 @@ function destroyPlayer(): void {
 // --- Keys ---
 
 function handleKey(e: JQuery.Event): void {
+  if (!videoEl) {
+    if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace || e.keyCode === TvKey.Escape || e.keyCode === TvKey.Stop) {
+      destroyPlayer(); goBack(); e.preventDefault();
+    }
+    return;
+  }
+
+  if (panelOpen) { handlePanelKey(e); return; }
+
   switch (e.keyCode) {
     case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
-      destroyPlayer(); goBack(); e.preventDefault(); return;
-  }
+      destroyPlayer(); goBack(); break;
 
-  if (!videoEl) return;
+    case TvKey.Enter: case TvKey.PlayPause:
+      if (videoEl.paused) { videoEl.play(); showOsd('play'); }
+      else { videoEl.pause(); showOsd('pause'); }
+      showBar(); break;
 
-  if (menuOpen) { handleMenuKey(e); return; }
-  if (controlsOpen) { handleControlsKey(e); return; }
-
-  switch (e.keyCode) {
-    case TvKey.Enter:
-      showControls(); e.preventDefault(); break;
     case TvKey.Play:
-      if (videoEl.paused) { videoEl.play(); showOverlay(); }
-      e.preventDefault(); break;
+      if (videoEl.paused) { videoEl.play(); showOsd('play'); showBar(); }
+      break;
     case TvKey.Pause:
-      videoEl.pause(); showOverlay(); e.preventDefault(); break;
-    case TvKey.PlayPause:
-      if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); }
-      showOverlay(); e.preventDefault(); break;
-    case TvKey.Up: case TvKey.Down:
-      openMenu(true); e.preventDefault(); break;
-    case TvKey.Right: case TvKey.Ff:
-      videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 15);
-      showOverlay(); e.preventDefault(); break;
+      videoEl.pause(); showOsd('pause'); showBar(); break;
+
     case TvKey.Left: case TvKey.Rw:
-      videoEl.currentTime = Math.max(0, videoEl.currentTime - 15);
-      showOverlay(); e.preventDefault(); break;
-    case TvKey.Green:
-      changeSubSize(1); e.preventDefault(); break;
-    case TvKey.Red:
-      changeSubSize(-1); e.preventDefault(); break;
-  }
-}
+      startSeek('left'); break;
+    case TvKey.Right: case TvKey.Ff:
+      startSeek('right'); break;
 
-function handleControlsKey(e: JQuery.Event): void {
-  switch (e.keyCode) {
-    case TvKey.Left:
-      if (controlsFocused > 0) { controlsFocused--; renderControlsFocus(); }
-      e.preventDefault(); break;
-    case TvKey.Right:
-      if (controlsFocused < CONTROLS.length - 1) { controlsFocused++; renderControlsFocus(); }
-      e.preventDefault(); break;
-    case TvKey.Enter:
-      executeControl(CONTROLS[controlsFocused]);
-      e.preventDefault(); break;
-    case TvKey.Up: case TvKey.Down:
-      hideControls(); openMenu(true); e.preventDefault(); break;
-    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
-      hideControls(); e.preventDefault(); break;
-    case TvKey.Play:
-      if (videoEl && videoEl.paused) { videoEl.play(); updateControlsPlayState(); }
-      e.preventDefault(); break;
-    case TvKey.Pause:
-      if (videoEl) { videoEl.pause(); updateControlsPlayState(); }
-      e.preventDefault(); break;
-    case TvKey.PlayPause:
-      if (videoEl) { if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); } updateControlsPlayState(); }
-      e.preventDefault(); break;
-    case TvKey.Ff:
-      executeControl('ff'); e.preventDefault(); break;
-    case TvKey.Rw:
-      executeControl('rw'); e.preventDefault(); break;
-    case TvKey.Stop:
-      destroyPlayer(); goBack(); e.preventDefault(); break;
-    case TvKey.Green:
-      changeSubSize(1); e.preventDefault(); break;
-    case TvKey.Red:
-      changeSubSize(-1); e.preventDefault(); break;
-  }
-}
-
-function handleMenuKey(e: JQuery.Event): void {
-  var items = getMenuItems();
-
-  switch (e.keyCode) {
     case TvKey.Up:
-      if (menuItemIndex > 0) { menuItemIndex--; renderMenu(); }
-      e.preventDefault(); break;
+      showBar(); break;
     case TvKey.Down:
-      if (menuItemIndex < items.length - 1) { menuItemIndex++; renderMenu(); }
-      e.preventDefault(); break;
-    case TvKey.Left:
-      if (menuSection > 0) { switchMenuSection(-1); }
-      e.preventDefault(); break;
-    case TvKey.Right:
-      if (menuSection < MENU_SECTIONS.length - 1) { switchMenuSection(1); }
-      e.preventDefault(); break;
-    case TvKey.Enter:
-      var now = Date.now();
-      if (now - lastEnterTime < 500) { applyMenuSelection(); closeMenu(); }
-      else { applyMenuSelection(); }
-      lastEnterTime = now;
-      e.preventDefault(); break;
-    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
-      closeMenu(); e.preventDefault(); break;
-    case TvKey.Play:
-      closeMenu(); if (videoEl && videoEl.paused) { videoEl.play(); } showOverlay();
-      e.preventDefault(); break;
-    case TvKey.Pause:
-      if (videoEl) { videoEl.pause(); }
-      e.preventDefault(); break;
-    case TvKey.PlayPause:
-      closeMenu(); if (videoEl) { if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); } } showOverlay();
-      e.preventDefault(); break;
-    case TvKey.Stop:
-      destroyPlayer(); goBack(); e.preventDefault(); break;
+      openPanel(); break;
+
+    case TvKey.Green:
+      changeSubSize(1); break;
+    case TvKey.Red:
+      changeSubSize(-1); break;
   }
+  e.preventDefault();
 }
 
 // --- Page ---
@@ -957,8 +965,8 @@ export var playerPage: Page = {
     currentEpisode = params.episode;
     currentVideo = params.video;
     resumeTime = 0;
-    menuOpen = false;
-    controlsOpen = false;
+    panelOpen = false;
+    panelListOpen = false;
     useHls = false;
     currentFiles = [];
     currentAudios = [];
@@ -1031,6 +1039,7 @@ export var playerPage: Page = {
     destroyPlayer();
     if (keyHandler) { $(window).off('keydown', keyHandler); keyHandler = null; }
     $root.empty();
-    menuOpen = false;
+    panelOpen = false;
+    panelListOpen = false;
   }
 };
