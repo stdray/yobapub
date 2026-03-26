@@ -465,11 +465,29 @@ function remountTrack(): void {
     selectedSub = restoreSubIndex(currentSubs, prefs);
 
     if (currentFiles.length === 0) return;
-    var url = getUrlFromFile(currentFiles[selectedQuality]);
-    if (url) {
-      playUrl(url, itemTitle + ' - ' + currentTitle);
-    }
+    startWithAudio(itemTitle + ' - ' + currentTitle);
   });
+}
+
+function startWithAudio(title: string): void {
+  var f = currentFiles[selectedQuality];
+  if (selectedAudio > 0 && currentAudios.length > 1) {
+    var hlsUrl = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+    if (hlsUrl) {
+      var audioIndex = currentAudios[selectedAudio].index;
+      fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
+        if (blobUrl) {
+          currentHlsUrl = hlsUrl;
+          playUrl(blobUrl, title);
+        } else {
+          playUrl(getUrlFromFile(f), title);
+        }
+      });
+      return;
+    }
+  }
+  var url = getUrlFromFile(f);
+  if (url) playUrl(url, title);
 }
 
 // --- Bar show/hide ---
@@ -841,28 +859,16 @@ function applyAudioSwitch(idx: number): void {
     }
     return;
   }
-  // HTTP stream: get HLS2 URL for current file, then rewrite manifest
+  // HTTP stream: use HLS2 URL from media-links
   if (currentAudios.length > 1 && currentFiles.length > 0) {
     var f = currentFiles[selectedQuality];
-    if (f.urls && f.urls.hls2) {
-      switchToRewrittenHls(f.urls.hls2, idx);
-      return;
-    }
-    if (f.file) {
-      apiGet('/v1/items/media-video-link', { file: f.file, type: 'hls2' }).then(
-        function (res: any) {
-          var data = Array.isArray(res) ? res[0] : res;
-          if (data && data.url) {
-            switchToRewrittenHls(data.url, idx);
-          } else {
-            showToast('Не удалось переключить аудио');
-          }
-        },
-        function () { showToast('Не удалось переключить аудио'); }
-      );
+    var hlsUrl = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+    if (hlsUrl) {
+      switchToRewrittenHls(hlsUrl, idx);
       return;
     }
   }
+  showToast('Смена аудио недоступна');
 }
 
 function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
@@ -1028,8 +1034,7 @@ function onSourceReady(): void {
   var wasQualitySwitch = qualitySwitching;
   playbackStarted = true;
   qualitySwitching = false;
-  if (!wasQualitySwitch && (selectedAudio > 0 || selectedSub >= 0)) {
-    var restoreAudio = selectedAudio;
+  if (!wasQualitySwitch && selectedSub >= 0) {
     var restoreSub = selectedSub;
     var v = videoEl;
     var applied = false;
@@ -1038,8 +1043,7 @@ function onSourceReady(): void {
       applied = true;
       v.removeEventListener('playing', doApply);
       v.removeEventListener('canplay', doApply);
-      if (restoreAudio > 0) applyAudioSwitch(restoreAudio);
-      if (restoreSub >= 0) loadSubtitleTrack(restoreSub);
+      loadSubtitleTrack(restoreSub);
     };
     v.addEventListener('playing', doApply);
     v.addEventListener('canplay', doApply);
@@ -1299,12 +1303,7 @@ export var playerPage: Page = {
             return;
           }
 
-          var url = getUrlFromFile(currentFiles[selectedQuality]);
-          if (url) {
-            playUrl(url, itemTitle + ' - ' + currentTitle);
-          } else {
-            $root.html('<div class="player"><div class="player__title" style="padding:60px;">Не удалось найти видео</div></div>');
-          }
+          startWithAudio(itemTitle + ' - ' + currentTitle);
         });
       },
       function () {
