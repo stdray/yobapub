@@ -508,15 +508,6 @@ html, body {
   color: #ccc;
 }
 
-.player__bar-stream {
-  position: absolute;
-  bottom: 50px;
-  left: 5%;
-  width: 90%;
-  font-size: 24px;
-  color: #aaa;
-}
-
 /* --- Info badge --- */
 .player__info {
   position: absolute;
@@ -546,34 +537,6 @@ html, body {
   color: #fff;
   z-index: 12;
   white-space: nowrap;
-}
-
-/* Resume banner */
-.player__resume {
-  position: absolute;
-  bottom: 120px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0,0,0,0.85);
-  border-radius: 12px;
-  padding: 24px 40px;
-  text-align: center;
-  z-index: 11;
-}
-
-.player__resume-text {
-  font-size: 28px;
-  color: #ccc;
-  margin-bottom: 16px;
-}
-
-.player__resume-btn {
-  font-size: 28px;
-  color: #fff;
-  background: #e94560;
-  border-radius: 8px;
-  padding: 12px 40px;
-  display: inline-block;
 }
 
 /* Settings panel (bottom) */

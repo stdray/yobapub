@@ -140,7 +140,7 @@ var tplPlayer = doT.template(
         '</div>' +
         '<div class="player__bar-duration"></div>' +
       '</div>' +
-      '<div class="player__bar-stream"></div>' +
+
     '</div>' +
     '<div class="player__panel hidden">' +
       '<div class="ppanel__overlay"></div>' +
@@ -158,10 +158,6 @@ var tplPlayer = doT.template(
       '<div class="ppanel__list hidden"></div>' +
     '</div>' +
     '<div class="player__toast hidden"></div>' +
-    '<div class="player__resume hidden">' +
-      '<div class="player__resume-text"></div>' +
-      '<div class="player__resume-btn">\u0421\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0441\u043D\u0430\u0447\u0430\u043B\u0430</div>' +
-    '</div>' +
   '</div>'
 );
 
@@ -285,16 +281,22 @@ var seekDir = '';
 var seeking = false;
 var seekApplyTimer: number | null = null;
 
+function getVideoDuration(): number {
+  if (!videoEl) return 0;
+  var d = videoEl.duration;
+  if (!d || isNaN(d) || !isFinite(d)) return 0;
+  return d;
+}
+
 function startSeek(dir: string): void {
-  if (resumeBannerShown) hideResumeBanner();
   seeking = true;
   if (seekDir !== dir) { seekDir = dir; seekCount = 0; }
   if (seekPos === -1 && videoEl) seekPos = videoEl.currentTime;
 
   var step = 10 + Math.pow(Math.min(seekCount, 3000), 3) / 1000;
-  var dur = (videoEl && videoEl.duration) || 1;
+  var dur = getVideoDuration();
   seekPos += dir === 'right' ? step : -step;
-  seekPos = Math.max(0, Math.min(seekPos, dur - 2));
+  seekPos = Math.max(0, dur > 0 ? Math.min(seekPos, dur - 2) : seekPos);
   seekCount++;
 
   updateProgress();
@@ -307,43 +309,18 @@ function startSeek(dir: string): void {
 
 function applySeek(): void {
   if (!seeking || seekPos < 0 || !videoEl) return;
+  var dur = getVideoDuration();
+  if (dur > 0) seekPos = Math.min(seekPos, dur - 2);
+  seekPos = Math.max(0, seekPos);
   videoEl.currentTime = seekPos;
   resetSeek();
+  showBar();
 }
 
 function resetSeek(): void {
   seekPos = -1; seekCount = 0; seekDir = ''; seeking = false;
   if (seekApplyTimer) { clearTimeout(seekApplyTimer); seekApplyTimer = null; }
   $root.find('.player__bar-seek').text('');
-}
-
-// --- Resume banner ---
-
-var resumeBannerTimer: number | null = null;
-var resumeBannerShown = false;
-
-function showResumeBanner(time: number): void {
-  resumeBannerShown = true;
-  $root.find('.player__resume-text').text('\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C \u0441 ' + formatTime(time));
-  $root.find('.player__resume').removeClass('hidden');
-  if (resumeBannerTimer) clearTimeout(resumeBannerTimer);
-  resumeBannerTimer = window.setTimeout(hideResumeBanner, 15000);
-}
-
-function hideResumeBanner(): void {
-  resumeBannerShown = false;
-  $root.find('.player__resume').addClass('hidden');
-  if (resumeBannerTimer) { clearTimeout(resumeBannerTimer); resumeBannerTimer = null; }
-}
-
-function restartFromBeginning(): void {
-  hideResumeBanner();
-  if (videoEl) {
-    videoEl.currentTime = 0;
-    videoEl.play();
-    showOsd('play');
-    showBar();
-  }
 }
 
 function navigateTrack(dir: number): boolean {
@@ -443,11 +420,12 @@ function clearBarTimer(): void {
 function updateProgress(): void {
   if (!videoEl) return;
   var cur = seeking ? seekPos : videoEl.currentTime;
-  var dur = videoEl.duration || 1;
+  var dur = getVideoDuration();
   if (cur < 0) cur = 0;
-  var pct = (cur / dur) * 100;
+  var pct = dur > 0 ? (cur / dur) * 100 : 0;
+  if (pct > 100) pct = 100;
   $root.find('.player__bar-value').css('width', pct + '%');
-  $root.find('.player__bar-duration').text(formatTime(cur) + ' / ' + formatTime(dur));
+  $root.find('.player__bar-duration').text(formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : ''));
   if (seeking) {
     $root.find('.player__bar-seek').text(formatTime(seekPos));
   } else {
@@ -455,9 +433,7 @@ function updateProgress(): void {
   }
 }
 
-function updateStreamInfo(): void {
-  $root.find('.player__bar-stream').html(getStreamInfo());
-}
+
 
 // --- Subtitles ---
 
@@ -731,7 +707,9 @@ function handlePanelKey(e: JQuery.Event): void {
         if (panelListIndex < items.length - 1) { panelListIndex++; renderPanelList(); }
         e.preventDefault(); break;
       case TvKey.Enter:
-        applyPanelSelection(); e.preventDefault(); break;
+        if (items[panelListIndex] && items[panelListIndex].selected) { closePanelList(); }
+        else { applyPanelSelection(); }
+        e.preventDefault(); break;
       case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
         closePanelList(); e.preventDefault(); break;
     }
@@ -820,21 +798,14 @@ function playSource(url: string): void {
 
 function onSourceReady(): void {
   if (!videoEl) return;
-  var hadResume = resumeTime > 0;
-  if (resumeTime > 0) {
-    var rt = resumeTime;
-    videoEl.currentTime = resumeTime;
-    resumeTime = 0;
-  }
+  if (resumeTime > 0) { videoEl.currentTime = resumeTime; resumeTime = 0; }
   if (resumePaused) { resumePaused = false; }
   else { videoEl.play(); }
   playbackStarted = true;
-  if (hadResume && !qualitySwitching) showResumeBanner(rt!);
   qualitySwitching = false;
   startMarkTimer();
   showBar();
   updateInfoBadge();
-  updateStreamInfo();
   videoEl.removeEventListener('timeupdate', updateProgress);
   videoEl.addEventListener('timeupdate', updateProgress);
 }
@@ -949,7 +920,6 @@ function destroyPlayer(): void {
   stopMarkTimer();
   clearBarTimer();
   resetSeek();
-  hideResumeBanner();
   if (osdTimer) { clearTimeout(osdTimer); osdTimer = null; }
   if (hlsInstance) {
     try { hlsInstance.destroy(); } catch (e) { /* ignore */ }
@@ -981,7 +951,6 @@ function handleKey(e: JQuery.Event): void {
 
     case TvKey.Enter: case TvKey.PlayPause:
       if (!playbackStarted) break;
-      if (resumeBannerShown) { restartFromBeginning(); break; }
       if (videoEl.paused) { videoEl.play(); showOsd('play'); }
       else { videoEl.pause(); showOsd('pause'); }
       showBar(); break;
