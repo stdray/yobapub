@@ -224,13 +224,13 @@ var tplPlayer = doT.template(
       '<div class="ppanel__overlay"></div>' +
       '<div class="ppanel__buttons">' +
         '<div class="ppanel__btn ppanel__btn--audio">' +
-          '<span class="ppanel__btn-label">&#127911; ...</span>' +
+          '<span class="ppanel__btn-label">Аудио: ...</span>' +
         '</div>' +
         '<div class="ppanel__btn ppanel__btn--subs">' +
-          '<span class="ppanel__btn-label">&#128196; ...</span>' +
+          '<span class="ppanel__btn-label">Сабы: ...</span>' +
         '</div>' +
         '<div class="ppanel__btn ppanel__btn--quality">' +
-          '<span class="ppanel__btn-label">&#9881; ...</span>' +
+          '<span class="ppanel__btn-label">Качество: ...</span>' +
         '</div>' +
       '</div>' +
       '<div class="ppanel__list hidden"></div>' +
@@ -762,10 +762,10 @@ function getSelectedLabel(section: number): string {
 }
 
 function updatePanelButtons(): void {
-  var icons = ['\uD83C\uDFA7', '\uD83D\uDCC4', '\u2699'];
+  var labels = ['Аудио: ', 'Сабы: ', 'Качество: '];
   for (var i = 0; i < PANEL_SECTIONS.length; i++) {
     var $btn = $root.find('.ppanel__btn').eq(i);
-    $btn.find('.ppanel__btn-label').html(icons[i] + ' ' + getSelectedLabel(i));
+    $btn.find('.ppanel__btn-label').html(labels[i] + getSelectedLabel(i));
     if (i === panelBtnIndex && !panelListOpen) {
       $btn.addClass('focused');
     } else {
@@ -1033,18 +1033,7 @@ function onSourceReady(): void {
   playbackStarted = true;
   qualitySwitching = false;
   if (selectedSub >= 0) {
-    var restoreSub = selectedSub;
-    var v = videoEl;
-    var applied = false;
-    var doApply = function () {
-      if (applied) return;
-      applied = true;
-      v.removeEventListener('playing', doApply);
-      v.removeEventListener('canplay', doApply);
-      loadSubtitleTrack(restoreSub);
-    };
-    v.addEventListener('playing', doApply);
-    v.addEventListener('canplay', doApply);
+    loadSubtitleTrack(selectedSub);
   }
   hideSpinner();
   startMarkTimer();
