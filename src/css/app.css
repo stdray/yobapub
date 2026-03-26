@@ -145,13 +145,14 @@ html, body {
 .watching__grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 28px;
+  column-gap: 40px;
+  row-gap: 48px;
   margin-bottom: 30px;
 }
 
 /* --- Card --- */
 .card {
-  width: calc((100% - 28px * 4) / 5);
+  width: calc((100% - 40px * 3) / 4);
   cursor: pointer;
   outline: none;
 }
@@ -160,7 +161,6 @@ html, body {
 .card:focus .card__poster {
   border-color: #e94560;
   border-width: 5px;
-  transform: scale(1.05);
   box-shadow:
     0 0 16px rgba(233, 69, 96, 0.7),
     0 0 50px rgba(233, 69, 96, 0.3);
@@ -174,7 +174,7 @@ html, body {
   border: 3px solid transparent;
   border-radius: 8px;
   overflow: hidden;
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .card__poster img {
