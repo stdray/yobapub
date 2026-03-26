@@ -27,7 +27,6 @@ var currentAudios: AudioTrack[] = [];
 var barValueEl: HTMLElement | null = null;
 var barDurationEl: HTMLElement | null = null;
 var barSeekEl: HTMLElement | null = null;
-var barVisible = false;
 var currentSubs: Subtitle[] = [];
 var selectedQuality = 0;
 var selectedAudio = 0;
@@ -409,13 +408,24 @@ function remountTrack(): void {
 // --- Bar show/hide ---
 
 var barTimer: number | null = null;
+
+
 var progressTimer: number | null = null;
 
+function startProgressTimer(): void {
+  stopProgressTimer();
+  progressTimer = window.setInterval(updateProgress, 1000);
+}
+
+function stopProgressTimer(): void {
+  if (progressTimer !== null) { clearInterval(progressTimer); progressTimer = null; }
+}
+
 function showBar(): void {
-  barVisible = true;
   $root.find('.player__header, .player__gradient, .player__bar').removeClass('hidden');
   showInfo();
   updateProgress();
+  startProgressTimer();
   clearBarTimer();
   if (!panelOpen && !seeking) {
     barTimer = window.setTimeout(hideBar, 4000);
@@ -423,7 +433,7 @@ function showBar(): void {
 }
 
 function hideBar(): void {
-  barVisible = false;
+  stopProgressTimer();
   $root.find('.player__header, .player__gradient, .player__bar').addClass('hidden');
   hideInfo();
 }
@@ -440,7 +450,6 @@ function cacheBarElements(): void {
 
 function updateProgress(): void {
   if (!videoEl) return;
-  if (!barVisible && !seeking) return;
   cacheBarElements();
   var cur = seeking ? seekPos : videoEl.currentTime;
   var dur = getVideoDuration();
@@ -848,14 +857,7 @@ function playSource(url: string): void {
   videoEl.addEventListener('loadedmetadata', onMeta);
 }
 
-function startProgressTimer(): void {
-  stopProgressTimer();
-  progressTimer = window.setInterval(updateProgress, 1000);
-}
 
-function stopProgressTimer(): void {
-  if (progressTimer !== null) { clearInterval(progressTimer); progressTimer = null; }
-}
 
 function onSourceReady(): void {
   if (!videoEl) return;
@@ -884,7 +886,6 @@ function onSourceReady(): void {
   playbackStarted = true;
   qualitySwitching = false;
   startMarkTimer();
-  startProgressTimer();
   showBar();
   updateInfoBadge();
 }
@@ -1015,7 +1016,6 @@ function destroyPlayer(): void {
   barValueEl = null;
   barDurationEl = null;
   barSeekEl = null;
-  barVisible = false;
 }
 
 // --- Keys ---
