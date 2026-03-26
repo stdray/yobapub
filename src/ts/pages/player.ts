@@ -34,6 +34,7 @@ var selectedQuality = 0;
 var selectedAudio = 0;
 var selectedSub = -1;
 var currentTitle = '';
+var currentDuration = 0;
 var hlsAudioTracks: any[] = [];
 var hlsSubTracks: any[] = [];
 var useHls = false;
@@ -64,6 +65,7 @@ interface MediaInfo {
   mid: number;
   title: string;
   audios: AudioTrack[];
+  duration: number;
 }
 
 function findEpisodeMedia(item: Item, seasonNum: number, epNum: number): MediaInfo | null {
@@ -74,7 +76,7 @@ function findEpisodeMedia(item: Item, seasonNum: number, epNum: number): MediaIn
       for (var j = 0; j < s.episodes.length; j++) {
         var ep = s.episodes[j];
         if (ep.number === epNum) {
-          return { mid: ep.id, title: ep.title || 'S' + seasonNum + 'E' + epNum, audios: ep.audios || [] };
+          return { mid: ep.id, title: ep.title || 'S' + seasonNum + 'E' + epNum, audios: ep.audios || [], duration: ep.duration || 0 };
         }
       }
     }
@@ -87,7 +89,7 @@ function findVideoMedia(item: Item, videoNum: number): MediaInfo | null {
   var idx = videoNum - 1;
   if (idx >= 0 && idx < item.videos.length) {
     var v = item.videos[idx];
-    return { mid: v.id, title: v.title || 'Видео ' + videoNum, audios: v.audios || [] };
+    return { mid: v.id, title: v.title || 'Видео ' + videoNum, audios: v.audios || [], duration: v.duration || 0 };
   }
   return null;
 }
@@ -353,10 +355,11 @@ var seeking = false;
 var seekApplyTimer: number | null = null;
 
 function getVideoDuration(): number {
-  if (!videoEl) return 0;
-  var d = videoEl.duration;
-  if (!d || isNaN(d) || !isFinite(d)) return 0;
-  return d;
+  if (videoEl) {
+    var d = videoEl.duration;
+    if (d && !isNaN(d) && isFinite(d) && d > 0) return d;
+  }
+  return currentDuration || 0;
 }
 
 function startSeek(dir: string): void {
@@ -453,6 +456,7 @@ function remountTrack(): void {
 
   var itemTitle = currentItem.title.split(' / ')[0];
   currentTitle = media.title;
+  currentDuration = media.duration;
 
   currentAudios = media.audios;
   var prefs = currentItem ? getTitlePrefs(currentItem.id) : null;
@@ -1283,6 +1287,7 @@ export var playerPage: Page = {
         }
 
         currentTitle = media.title;
+        currentDuration = media.duration;
         currentAudios = media.audios;
         var itemTitle = currentItem.title.split(' / ')[0];
         var prefs = getTitlePrefs(currentItem.id);
