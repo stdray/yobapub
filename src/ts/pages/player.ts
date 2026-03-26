@@ -630,6 +630,19 @@ function loadSubtitleTrack(subIdx: number): void {
   var sub = currentSubs[subIdx];
   var v = videoEl;
 
+  function addTrackFromUrl(src: string): void {
+    var track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = sub.lang;
+    track.srclang = sub.lang;
+    track.src = src;
+    track.setAttribute('default', '');
+    v.appendChild(track);
+    if (v.textTracks.length > 0) {
+      v.textTracks[v.textTracks.length - 1].mode = 'showing';
+    }
+  }
+
   $.ajax({
     url: sub.url,
     dataType: 'text',
@@ -637,22 +650,12 @@ function loadSubtitleTrack(subIdx: number): void {
       if (!v || !v.parentNode) return;
       var vtt = srtToVtt(data);
       var blob = new Blob([vtt], { type: 'text/vtt' });
-      var blobUrl = URL.createObjectURL(blob);
-
-      var track = document.createElement('track');
-      track.kind = 'subtitles';
-      track.label = sub.lang;
-      track.srclang = sub.lang;
-      track.src = blobUrl;
-      track.setAttribute('default', '');
-      v.appendChild(track);
-
-      if (v.textTracks.length > 0) {
-        v.textTracks[v.textTracks.length - 1].mode = 'showing';
-      }
+      addTrackFromUrl(URL.createObjectURL(blob));
     },
     error: function () {
-      showToast('Не удалось загрузить субтитры');
+      // fallback: direct URL (works on Tizen, may fail on file://)
+      if (!v || !v.parentNode) return;
+      addTrackFromUrl(sub.url);
     }
   });
 }
