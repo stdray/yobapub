@@ -1128,17 +1128,6 @@ export var playerPage: Page = {
         currentTitle = result.title;
         selectedQuality = pickDefaultQualityIndex(currentFiles);
 
-        // Load subtitles from media-links API if not present
-        if (currentSubs.length === 0 && currentFiles.length > 0 && currentFiles[0].file) {
-          var mid = currentFiles[0].file!;
-          apiGet('/v1/items/media-links', { mid: mid }).then(function (mlRes: any) {
-            var mlData = Array.isArray(mlRes) ? mlRes[0] : mlRes;
-            if (mlData && mlData.subtitles) {
-              currentSubs = mlData.subtitles;
-            }
-          });
-        }
-
         var itemTitle = currentItem.title.split(' / ')[0];
         fetchVideoUrl(currentFiles[selectedQuality], function (url: string) {
           if (url) {
