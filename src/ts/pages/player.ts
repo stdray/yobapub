@@ -1048,7 +1048,7 @@ function startMarkTimer(): void {
     } else if (currentVideo !== undefined) {
       markTime(currentItem.id, currentVideo, time);
     }
-  }, 15000);
+  }, 30000);
 }
 
 function stopMarkTimer(): void {
