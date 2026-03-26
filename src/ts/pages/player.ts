@@ -398,6 +398,7 @@ function remountTrack(): void {
 // --- Bar show/hide ---
 
 var barTimer: number | null = null;
+var progressTimer: number | null = null;
 
 function showBar(): void {
   $root.find('.player__header, .player__gradient, .player__bar').removeClass('hidden');
@@ -424,7 +425,9 @@ function updateProgress(): void {
   if (cur < 0) cur = 0;
   var pct = dur > 0 ? (cur / dur) * 100 : 0;
   if (pct > 100) pct = 100;
-  $root.find('.player__bar-value').css('width', pct + '%');
+  var $val = $root.find('.player__bar-value');
+  var el = $val[0];
+  if (el) el.style.width = pct + '%';
   $root.find('.player__bar-duration').text(formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : ''));
   if (seeking) {
     $root.find('.player__bar-seek').text(formatTime(seekPos));
@@ -796,6 +799,15 @@ function playSource(url: string): void {
   videoEl.addEventListener('loadedmetadata', onMeta);
 }
 
+function startProgressTimer(): void {
+  stopProgressTimer();
+  progressTimer = window.setInterval(updateProgress, 500);
+}
+
+function stopProgressTimer(): void {
+  if (progressTimer !== null) { clearInterval(progressTimer); progressTimer = null; }
+}
+
 function onSourceReady(): void {
   if (!videoEl) return;
   if (resumeTime > 0) { videoEl.currentTime = resumeTime; resumeTime = 0; }
@@ -804,10 +816,9 @@ function onSourceReady(): void {
   playbackStarted = true;
   qualitySwitching = false;
   startMarkTimer();
+  startProgressTimer();
   showBar();
   updateInfoBadge();
-  videoEl.removeEventListener('timeupdate', updateProgress);
-  videoEl.addEventListener('timeupdate', updateProgress);
 }
 
 function showSpinner(): void {
@@ -918,6 +929,7 @@ function savePosition(): void {
 function destroyPlayer(): void {
   savePosition();
   stopMarkTimer();
+  stopProgressTimer();
   clearBarTimer();
   resetSeek();
   if (osdTimer) { clearTimeout(osdTimer); osdTimer = null; }
