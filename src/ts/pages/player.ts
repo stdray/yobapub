@@ -976,7 +976,7 @@ function playSource(url: string): void {
   hlsAudioTracks = [];
   hlsSubTracks = [];
 
-  if (url.indexOf('.m3u8') !== -1 || url.indexOf('/hls') !== -1) {
+  if (url.indexOf('.m3u8') !== -1 || url.indexOf('/hls') !== -1 || url.indexOf('blob:') === 0) {
     try {
       var Hls = require('hls.js');
       if (Hls.default) Hls = Hls.default;
