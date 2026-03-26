@@ -700,9 +700,10 @@ function applySubSwitch(menuIdx: number): void {
 }
 
 function handlePanelKey(e: JQuery.Event): void {
+  var kc = getKeyCode(e);
   if (panelListOpen) {
     var items = getPanelItems(panelListSection);
-    switch (e.keyCode) {
+    switch (kc) {
       case TvKey.Up:
         if (panelListIndex > 0) { panelListIndex--; renderPanelList(); }
         e.preventDefault(); break;
@@ -719,7 +720,7 @@ function handlePanelKey(e: JQuery.Event): void {
     return;
   }
 
-  switch (e.keyCode) {
+  switch (kc) {
     case TvKey.Left:
       if (panelBtnIndex > 0) { panelBtnIndex--; updatePanelButtons(); }
       e.preventDefault(); break;
@@ -880,7 +881,8 @@ function showPlaybackError(error: MediaError | null, url: string): void {
     '</div>'
   );
   keyHandler = function (e: JQuery.Event) {
-    if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace || e.keyCode === TvKey.Escape) {
+    var kc = getKeyCode(e);
+    if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape) {
       goBack();
       e.preventDefault();
     }
@@ -967,9 +969,15 @@ function destroyPlayer(): void {
 
 // --- Keys ---
 
+function getKeyCode(e: JQuery.Event): number {
+  var orig = e.originalEvent as KeyboardEvent;
+  return (orig && orig.keyCode) ? orig.keyCode : (e.keyCode || 0);
+}
+
 function handleKey(e: JQuery.Event): void {
+  var kc = getKeyCode(e);
   if (!videoEl) {
-    if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace || e.keyCode === TvKey.Escape || e.keyCode === TvKey.Stop) {
+    if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
       destroyPlayer(); goBack(); e.preventDefault();
     }
     return;
@@ -977,7 +985,7 @@ function handleKey(e: JQuery.Event): void {
 
   if (panelOpen) { handlePanelKey(e); return; }
 
-  switch (e.keyCode) {
+  switch (kc) {
     case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
       destroyPlayer(); goBack(); break;
 
