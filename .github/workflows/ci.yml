@@ -67,17 +67,9 @@ jobs:
             IMAGE="ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.version }}"
             CONTAINER_NAME="yobapub-proxy"
             PASSWORD="${{ secrets.DEPLOY_PASSWORD }}"
-            GHCR_USERNAME="${{ secrets.GHCR_DEPLOY_USERNAME }}"
-            GHCR_TOKEN="${{ secrets.GHCR_DEPLOY_TOKEN }}"
             run_sudo() {
               printf '%s\n' "$PASSWORD" | sudo -S -p '' "$@"
             }
-            if [ -n "$GHCR_USERNAME" ] && [ -n "$GHCR_TOKEN" ]; then
-              run_sudo bash -c 'printf "%s\n" "$2" | docker login ghcr.io -u "$1" --password-stdin' -- "$GHCR_USERNAME" "$GHCR_TOKEN"
-            else
-              echo "GHCR_DEPLOY_USERNAME/GHCR_DEPLOY_TOKEN secrets are required" >&2
-              exit 1
-            fi
             run_sudo docker pull "$IMAGE"
             run_sudo docker stop "$CONTAINER_NAME" || true
             run_sudo docker rm "$CONTAINER_NAME" || true
