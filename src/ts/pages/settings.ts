@@ -4,7 +4,7 @@ import { Page, RouteParams } from '../types/app';
 import { getDeviceSettings, saveDeviceSettings } from '../api/device';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType } from '../utils/storage';
 
 var $root = $('#page-settings');
 var keyHandler: ((e: JQuery.Event) => void) | null = null;
@@ -227,6 +227,10 @@ function applyOption(): void {
     saveData[item.key] = item.value;
   }
 
+  if (item.key === 'streamingType' && item.options) {
+    setStreamingType(String(item.options[focusedOptionIndex].id));
+  }
+
   saveDeviceSettings(saveData);
   closeOptions();
 }
@@ -307,6 +311,12 @@ export var settingsPage: Page = {
         var data = Array.isArray(res) ? res[0] : res;
         if (data && data.settings) {
           allSettings = parseSettings(data.settings);
+          if (data.settings.streamingType && data.settings.streamingType.value) {
+            var stValues = data.settings.streamingType.value;
+            for (var si = 0; si < stValues.length; si++) {
+              if (stValues[si].selected) { setStreamingType(String(stValues[si].id)); break; }
+            }
+          }
         }
         allSettings.unshift(buildSubSizeSetting());
         allSettings.unshift(buildQualitySetting());

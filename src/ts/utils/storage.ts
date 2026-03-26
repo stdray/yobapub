@@ -3,7 +3,8 @@ var KEYS = {
   REFRESH_TOKEN: 'kp_refresh_token',
   TOKEN_EXPIRES: 'kp_token_expires',
   DEFAULT_QUALITY: 'kp_default_quality',
-  SUB_SIZE: 'kp_sub_size'
+  SUB_SIZE: 'kp_sub_size',
+  STREAMING_TYPE: 'kp_streaming_type'
 };
 
 export function getAccessToken(): string | null {
@@ -62,4 +63,12 @@ export function getSubSize(): number {
 
 export function setSubSize(size: number): void {
   localStorage.setItem(KEYS.SUB_SIZE, String(size));
+}
+
+export function getStreamingType(): string {
+  return localStorage.getItem(KEYS.STREAMING_TYPE) || 'hls4';
+}
+
+export function setStreamingType(type: string): void {
+  localStorage.setItem(KEYS.STREAMING_TYPE, type);
 }

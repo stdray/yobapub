@@ -7,7 +7,7 @@ import { apiGet } from '../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, getStreamingType } from '../utils/storage';
 
 var $root = $('#page-player');
 var keyHandler: ((e: JQuery.Event) => void) | null = null;
@@ -45,6 +45,11 @@ function formatTime(sec: number): string {
 function getUrlFromFile(f: VideoFile): string {
   var urls = f.urls || f.url;
   if (!urls) return '';
+  var pref = getStreamingType();
+  if (pref === 'http' && urls.http) return urls.http;
+  if (pref === 'hls' && urls.hls) return urls.hls;
+  if (pref === 'hls2' && urls.hls2) return urls.hls2;
+  if (pref === 'hls4' && urls.hls4) return urls.hls4;
   return urls.hls4 || urls.hls || urls.http || '';
 }
 
@@ -809,18 +814,6 @@ function stopProgressTimer(): void {
   if (progressTimer !== null) { clearInterval(progressTimer); progressTimer = null; }
 }
 
-function beginPlayback(): void {
-  if (!videoEl) return;
-  if (resumePaused) { resumePaused = false; }
-  else { videoEl.play(); }
-  playbackStarted = true;
-  qualitySwitching = false;
-  startMarkTimer();
-  startProgressTimer();
-  showBar();
-  updateInfoBadge();
-}
-
 function onSourceReady(): void {
   if (!videoEl) return;
   if (resumeTime > 0) {
@@ -828,18 +821,29 @@ function onSourceReady(): void {
     resumeTime = 0;
     var v = videoEl;
     var done = false;
-    var finish = function () {
+    var doSeek = function () {
       if (done) return;
       done = true;
-      v.removeEventListener('seeked', finish);
-      beginPlayback();
+      v.removeEventListener('playing', doSeek);
+      v.currentTime = pos;
     };
-    v.addEventListener('seeked', finish);
-    v.currentTime = pos;
-    setTimeout(finish, 5000);
+    if (resumePaused) {
+      resumePaused = false;
+      v.currentTime = pos;
+    } else {
+      v.addEventListener('playing', doSeek);
+      v.play();
+    }
   } else {
-    beginPlayback();
+    if (resumePaused) { resumePaused = false; }
+    else { videoEl.play(); }
   }
+  playbackStarted = true;
+  qualitySwitching = false;
+  startMarkTimer();
+  startProgressTimer();
+  showBar();
+  updateInfoBadge();
 }
 
 function showSpinner(): void {
