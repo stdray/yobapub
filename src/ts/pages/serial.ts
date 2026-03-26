@@ -6,9 +6,10 @@ import { getWatchingInfo } from '../api/watching';
 import { Item, Season, WatchingInfoItem } from '../types/api';
 import { navigate, goBack } from '../router';
 import { TvKey } from '../utils/platform';
+import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-serial');
-var keyHandler: ((e: JQuery.Event) => void) | null = null;
+var keys = pageKeys();
 var currentItem: Item | null = null;
 var watchingInfo: WatchingInfoItem | null = null;
 
@@ -261,7 +262,7 @@ function handleKey(e: JQuery.Event): void {
 export var serialPage: Page = {
   mount: function (params: RouteParams) {
     currentItem = null; watchingInfo = null; selectedSeason = 0;
-    $root.html('<div class="spinner"><div class="spinner__circle"></div></div>');
+    showSpinnerIn($root);
     var id = params.id!;
 
     $.when(getItem(id), getWatchingInfo(id)).then(
@@ -276,11 +277,11 @@ export var serialPage: Page = {
         $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');
       }
     );
-    keyHandler = handleKey;
-    $(window).on('keydown', keyHandler);
+    keys.bind(handleKey);
   },
   unmount: function () {
-    if (keyHandler) { $(window).off('keydown', keyHandler); keyHandler = null; }
-    $root.empty(); currentItem = null; watchingInfo = null;
+    keys.unbind();
+    clearPage($root);
+    currentItem = null; watchingInfo = null;
   }
 };

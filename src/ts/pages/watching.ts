@@ -7,9 +7,10 @@ import { navigate, setParams } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
 import { clearTokens } from '../utils/storage';
+import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-watching');
-var keyHandler: ((e: JQuery.Event) => void) | null = null;
+var keys = pageKeys();
 
 var MENU_ITEMS = ['Я смотрю', 'Закладки', 'Поиск', 'Настройки', 'Выход'];
 var menuFocused = false;
@@ -226,7 +227,7 @@ export var watchingPage: Page = {
   mount: function (_params: RouteParams) {
     var savedSection = _params.focusedSection;
     var savedIndex = _params.focusedIndex;
-    $root.html('<div class="spinner"><div class="spinner__circle"></div></div>');
+    showSpinnerIn($root);
 
     $.when(getWatchingSerials(), getWatchingMovies()).then(
       function (serialsRes: any, moviesRes: any) {
@@ -258,13 +259,12 @@ export var watchingPage: Page = {
       }
     );
 
-    keyHandler = handleKey;
-    $(window).on('keydown', keyHandler);
+    keys.bind(handleKey);
   },
 
   unmount: function () {
-    if (keyHandler) { $(window).off('keydown', keyHandler); keyHandler = null; }
-    $root.empty();
+    keys.unbind();
+    clearPage($root);
     sections = [];
     serialsData = [];
     moviesData = [];

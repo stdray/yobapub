@@ -8,9 +8,10 @@ import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, getStreamingType, getTitlePrefs, saveTitlePrefs, TitlePrefs } from '../utils/storage';
+import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-player');
-var keyHandler: ((e: JQuery.Event) => void) | null = null;
+var keys = pageKeys();
 var markTimer: number | null = null;
 var videoEl: HTMLVideoElement | null = null;
 var hlsInstance: any = null;
@@ -982,14 +983,14 @@ function showPlaybackError(error: MediaError | null, url: string): void {
       '</div>' +
     '</div>'
   );
-  keyHandler = function (e: JQuery.Event) {
+  keys.unbind();
+  keys.bind(function (e: JQuery.Event) {
     var kc = getKeyCode(e);
     if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape) {
       goBack();
       e.preventDefault();
     }
-  };
-  $(window).off('keydown').on('keydown', keyHandler);
+  });
 }
 
 function playUrl(url: string, title: string): void {
@@ -1152,7 +1153,7 @@ export var playerPage: Page = {
     selectedAudio = 0;
     selectedSub = -1;
 
-    $root.html('<div class="spinner"><div class="spinner__circle"></div></div>');
+    showSpinnerIn($root);
     var id = params.id!;
 
     getItem(id).then(
@@ -1206,14 +1207,13 @@ export var playerPage: Page = {
       }
     );
 
-    keyHandler = handleKey;
-    $(window).on('keydown', keyHandler);
+    keys.bind(handleKey);
   },
 
   unmount: function () {
     destroyPlayer();
-    if (keyHandler) { $(window).off('keydown', keyHandler); keyHandler = null; }
-    $root.empty();
+    keys.unbind();
+    clearPage($root);
     panelOpen = false;
     panelListOpen = false;
   }

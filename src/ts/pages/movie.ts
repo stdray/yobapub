@@ -6,9 +6,10 @@ import { getWatchingInfo } from '../api/watching';
 import { Item, WatchingInfoItem } from '../types/api';
 import { navigate, goBack } from '../router';
 import { TvKey } from '../utils/platform';
+import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-movie');
-var keyHandler: ((e: JQuery.Event) => void) | null = null;
+var keys = pageKeys();
 var focusedBtn = 0;
 var btnCount = 0;
 var currentItem: Item | null = null;
@@ -108,7 +109,7 @@ export var moviePage: Page = {
   mount: function (params: RouteParams) {
     currentItem = null;
     watchingInfo = null;
-    $root.html('<div class="spinner"><div class="spinner__circle"></div></div>');
+    showSpinnerIn($root);
     var id = params.id!;
 
     $.when(getItem(id), getWatchingInfo(id)).then(
@@ -123,12 +124,11 @@ export var moviePage: Page = {
         $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');
       }
     );
-    keyHandler = handleKey;
-    $(window).on('keydown', keyHandler);
+    keys.bind(handleKey);
   },
   unmount: function () {
-    if (keyHandler) { $(window).off('keydown', keyHandler); keyHandler = null; }
-    $root.empty();
+    keys.unbind();
+    clearPage($root);
     currentItem = null;
     watchingInfo = null;
   }

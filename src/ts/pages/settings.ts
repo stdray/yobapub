@@ -5,9 +5,10 @@ import { getDeviceSettings, saveDeviceSettings } from '../api/device';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType } from '../utils/storage';
+import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-settings');
-var keyHandler: ((e: JQuery.Event) => void) | null = null;
+var keys = pageKeys();
 
 interface SettingOption {
   id: number;
@@ -305,7 +306,7 @@ export var settingsPage: Page = {
     allSettings = [];
     focusedIndex = 0;
     optionsOpen = false;
-    $root.html('<div class="spinner"><div class="spinner__circle"></div></div>');
+    showSpinnerIn($root);
 
     getDeviceSettings().then(
       function (res: any) {
@@ -328,13 +329,12 @@ export var settingsPage: Page = {
       }
     );
 
-    keyHandler = handleKey;
-    $(window).on('keydown', keyHandler);
+    keys.bind(handleKey);
   },
 
   unmount: function () {
-    if (keyHandler) { $(window).off('keydown', keyHandler); keyHandler = null; }
-    $root.empty();
+    keys.unbind();
+    clearPage($root);
     allSettings = [];
   }
 };

@@ -5,11 +5,12 @@ import { requestDeviceCode, pollDeviceToken } from '../api/auth';
 import { navigate } from '../router';
 import { TvKey, getDeviceInfo } from '../utils/platform';
 import { apiPost } from '../api/client';
+import { pageKeys, clearPage } from '../utils/page';
 
 var $root = $('#page-login');
+var keys = pageKeys();
 var poller: { stop: () => void } | null = null;
 var countdownTimer: number | null = null;
-var keyHandler: ((e: JQuery.Event) => void) | null = null;
 
 var tplLoading = doT.template(
   '<div class="login">' +
@@ -102,16 +103,15 @@ function startAuth(): void {
 export var loginPage: Page = {
   mount: function (_params: RouteParams) {
     startAuth();
-    keyHandler = function (e: JQuery.Event) {
+    keys.bind(function (e: JQuery.Event) {
       if (e.keyCode === TvKey.Enter) {
         if ($root.find('.login__expired, .login__error').length > 0) { startAuth(); }
       }
-    };
-    $(window).on('keydown', keyHandler);
+    });
   },
   unmount: function () {
     cleanup();
-    if (keyHandler) { $(window).off('keydown', keyHandler); keyHandler = null; }
-    $root.empty();
+    keys.unbind();
+    clearPage($root);
   }
 };
