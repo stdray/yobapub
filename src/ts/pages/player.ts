@@ -13,7 +13,7 @@ import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaL
 import { fetchRewrittenHls } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { formatTime, ProgressState, getVideoDuration, updateProgress } from './player/progress';
-import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey } from './player/panel';
+import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey, clearPanelIdle } from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
 import { InfoState, updateInfoBadge, showInfo, hideInfo } from './player/info';
 
@@ -596,6 +596,7 @@ function destroyPlayer(): void {
   stopMarkTimer();
   stopProgressTimer();
   clearBarTimer();
+  clearPanelIdle();
   resetSeek();
   if (osdTimer) { clearTimeout(osdTimer); osdTimer = null; }
   if (hlsInstance) {
@@ -663,9 +664,9 @@ function handleKey(e: JQuery.Event): void {
       navigateTrack(-1); break;
 
     case TvKey.Up:
-      showBar(); break;
-    case TvKey.Down:
       panelOpen_($root, panelState, panelCallbacks); break;
+    case TvKey.Down:
+      showBar(); break;
 
     case TvKey.Green:
       changeSubSize(1, showToast); break;

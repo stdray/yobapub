@@ -122,7 +122,23 @@ export function renderPanelList($root: JQuery, state: PanelState, data: PanelDat
       (i === state.listIndex ? ' focused' : '') +
       '">' + items[i].label + '</div>';
   }
-  $root.find('.ppanel__list').html(html);
+  var $list = $root.find('.ppanel__list');
+  $list.html(html);
+  scrollToFocused($list);
+}
+
+function scrollToFocused($list: JQuery): void {
+  var el = $list.find('.ppanel__list-item.focused')[0];
+  if (!el) return;
+  var container = $list[0];
+  if (!container) return;
+  var top = el.offsetTop - container.offsetTop;
+  var bot = top + el.offsetHeight;
+  if (top < container.scrollTop) {
+    container.scrollTop = top;
+  } else if (bot > container.scrollTop + container.clientHeight) {
+    container.scrollTop = bot - container.clientHeight;
+  }
 }
 
 export interface PanelCallbacks {
@@ -134,6 +150,31 @@ export interface PanelCallbacks {
   onApplyQuality: (idx: number) => void;
   onSavePrefs: () => void;
   getData: () => PanelData;
+}
+
+var PANEL_IDLE_MS = 40000;
+var panelIdleTimer: number | null = null;
+
+function resetPanelIdle($root: JQuery, state: PanelState, cbs: PanelCallbacks): void {
+  clearPanelIdle();
+  panelIdleTimer = window.setTimeout(function () {
+    panelIdleTimer = null;
+    forceClosePanel($root, state, cbs);
+  }, PANEL_IDLE_MS);
+}
+
+export function clearPanelIdle(): void {
+  if (panelIdleTimer !== null) { clearTimeout(panelIdleTimer); panelIdleTimer = null; }
+}
+
+function forceClosePanel($root: JQuery, state: PanelState, cbs: PanelCallbacks): void {
+  if (!state.open) return;
+  state.listOpen = false;
+  state.open = false;
+  $root.find('.ppanel__list').removeClass('active').addClass('hidden');
+  $root.find('.ppanel__buttons').removeClass('active');
+  $root.find('.player__panel').addClass('hidden');
+  cbs.onShowBar();
 }
 
 export function openPanel($root: JQuery, state: PanelState, cbs: PanelCallbacks): void {
@@ -148,10 +189,12 @@ export function openPanel($root: JQuery, state: PanelState, cbs: PanelCallbacks)
   setTimeout(function () {
     $root.find('.ppanel__buttons').addClass('active');
   }, 20);
+  resetPanelIdle($root, state, cbs);
 }
 
 export function closePanel($root: JQuery, state: PanelState, cbs: PanelCallbacks): void {
   if (!state.open) return;
+  clearPanelIdle();
   if (state.listOpen) {
     closePanelList($root, state, cbs);
     return;
@@ -213,6 +256,8 @@ export function handlePanelKey(
   state: PanelState,
   cbs: PanelCallbacks
 ): void {
+  resetPanelIdle($root, state, cbs);
+
   if (state.listOpen) {
     var data = cbs.getData();
     var items = getPanelItems(data, state.listSection);
@@ -242,7 +287,7 @@ export function handlePanelKey(
       e.preventDefault(); break;
     case TvKey.Enter:
       openPanelList($root, state, cbs); e.preventDefault(); break;
-    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Up:
+    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Down:
       closePanel($root, state, cbs); e.preventDefault(); break;
   }
 }
