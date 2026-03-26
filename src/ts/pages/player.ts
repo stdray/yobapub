@@ -998,6 +998,11 @@ function handleKey(e: JQuery.Event): void {
     case TvKey.Right: case TvKey.Ff:
       startSeek('right'); break;
 
+    case TvKey.TrackNext:
+      navigateTrack(1); break;
+    case TvKey.TrackPrev:
+      navigateTrack(-1); break;
+
     case TvKey.Up:
       showBar(); break;
     case TvKey.Down:

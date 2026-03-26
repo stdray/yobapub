@@ -13,6 +13,8 @@ export enum TvKey {
   Stop = 413,
   Ff = 417,
   Rw = 412,
+  TrackPrev = 10232,
+  TrackNext = 10233,
   Red = 403,
   Green = 404,
   Yellow = 405,
@@ -38,6 +40,7 @@ export function registerTizenKeys(): void {
       var keysToRegister = [
         'MediaPlay', 'MediaPause', 'MediaPlayPause', 'MediaStop',
         'MediaFastForward', 'MediaRewind',
+        'MediaTrackNext', 'MediaTrackPrevious',
         'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue',
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
       ];
