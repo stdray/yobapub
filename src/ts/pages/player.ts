@@ -837,14 +837,17 @@ function destroyPlayer(): void {
 // --- Keys ---
 
 function handleKey(e: JQuery.Event): void {
+  switch (e.keyCode) {
+    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
+      destroyPlayer(); goBack(); e.preventDefault(); return;
+  }
+
   if (!videoEl) return;
 
   if (menuOpen) { handleMenuKey(e); return; }
   if (controlsOpen) { handleControlsKey(e); return; }
 
   switch (e.keyCode) {
-    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
-      destroyPlayer(); goBack(); e.preventDefault(); break;
     case TvKey.Enter:
       showControls(); e.preventDefault(); break;
     case TvKey.Play:
