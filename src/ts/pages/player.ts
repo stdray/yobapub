@@ -718,10 +718,12 @@ function handlePanelKey(e: JQuery.Event): void {
   }
 }
 
+var resumePaused = false;
+
 function switchQuality(): void {
   if (!videoEl || currentFiles.length === 0) return;
   var pos = videoEl.currentTime;
-  var wasPlaying = !videoEl.paused;
+  resumePaused = videoEl.paused;
   var url = getUrlFromFile(currentFiles[selectedQuality]);
   if (!url) return;
 
@@ -729,7 +731,6 @@ function switchQuality(): void {
 
   resumeTime = pos;
   playSource(url);
-  if (!wasPlaying && videoEl) { videoEl.pause(); }
 }
 
 // --- Playback ---
@@ -774,13 +775,18 @@ function playSource(url: string): void {
   }
 
   videoEl.src = url;
-  videoEl.addEventListener('loadedmetadata', function () { onSourceReady(); }, { once: true } as any);
+  var onMeta = function () {
+    if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
+    onSourceReady();
+  };
+  videoEl.addEventListener('loadedmetadata', onMeta);
 }
 
 function onSourceReady(): void {
   if (!videoEl) return;
   if (resumeTime > 0) { videoEl.currentTime = resumeTime; resumeTime = 0; }
-  videoEl.play();
+  if (resumePaused) { resumePaused = false; }
+  else { videoEl.play(); }
   playbackStarted = true;
   startMarkTimer();
   showBar();
@@ -968,6 +974,7 @@ export var playerPage: Page = {
     currentEpisode = params.episode;
     currentVideo = params.video;
     resumeTime = 0;
+    resumePaused = false;
     playbackStarted = false;
     panelOpen = false;
     panelListOpen = false;
