@@ -562,12 +562,15 @@ function loadSubtitleTrack(subIdx: number): void {
   track.setAttribute('default', '');
   videoEl.appendChild(track);
 
-  // activate after adding
-  setTimeout(function () {
-    if (videoEl && videoEl.textTracks.length > 0) {
-      videoEl.textTracks[videoEl.textTracks.length - 1].mode = 'showing';
+  var v = videoEl;
+  track.addEventListener('load', function () {
+    if (v && v.textTracks.length > 0) {
+      v.textTracks[v.textTracks.length - 1].mode = 'showing';
     }
-  }, 100);
+  });
+  if (v.textTracks.length > 0) {
+    v.textTracks[v.textTracks.length - 1].mode = 'showing';
+  }
 }
 
 // --- Panel (settings bottom) ---
@@ -772,8 +775,12 @@ function applyPanelSelection(): void {
 
 function applyAudioSwitch(idx: number): void {
   selectedAudio = idx;
-  if (useHls && hlsInstance && hlsAudioTracks.length > 1) {
-    hlsInstance.audioTrack = idx;
+  if (useHls && hlsInstance) {
+    if (hlsAudioTracks.length > 1) {
+      hlsInstance.audioTrack = idx;
+    } else if (currentAudios.length > 1) {
+      showToast('\u0410\u0443\u0434\u0438\u043E: ' + buildAudioLabel(currentAudios[idx]));
+    }
     return;
   }
   if (videoEl) {
@@ -782,7 +789,11 @@ function applyAudioSwitch(idx: number): void {
       for (var i = 0; i < native.length; i++) {
         native[i].enabled = (i === idx);
       }
+      return;
     }
+  }
+  if (currentAudios.length > 1) {
+    showToast('\u0421\u043C\u0435\u043D\u0430 \u0430\u0443\u0434\u0438\u043E \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 \u0434\u043B\u044F HTTP');
   }
 }
 
