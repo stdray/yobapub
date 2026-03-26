@@ -69,7 +69,12 @@ var STREAMING_TYPES: Record<string, string> = { 'http': 'http', 'hls': 'hls', 'h
 
 export function getStreamingType(): string {
   var val = localStorage.getItem(KEYS.STREAMING_TYPE) || 'hls4';
-  return STREAMING_TYPES[val] || 'hls4';
+  var code = STREAMING_TYPES[val];
+  if (!code) {
+    code = 'hls4';
+    localStorage.setItem(KEYS.STREAMING_TYPE, code);
+  }
+  return code;
 }
 
 export function setStreamingType(type: string): void {
