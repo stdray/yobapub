@@ -31,6 +31,7 @@ var currentTitle = '';
 var hlsAudioTracks: any[] = [];
 var hlsSubTracks: any[] = [];
 var useHls = false;
+var playbackStarted = false;
 
 function formatTime(sec: number): string {
   var h = Math.floor(sec / 3600);
@@ -780,6 +781,7 @@ function onSourceReady(): void {
   if (!videoEl) return;
   if (resumeTime > 0) { videoEl.currentTime = resumeTime; resumeTime = 0; }
   videoEl.play();
+  playbackStarted = true;
   startMarkTimer();
   showBar();
   updateInfoBadge();
@@ -928,6 +930,7 @@ function handleKey(e: JQuery.Event): void {
       destroyPlayer(); goBack(); break;
 
     case TvKey.Enter: case TvKey.PlayPause:
+      if (!playbackStarted) break;
       if (videoEl.paused) { videoEl.play(); showOsd('play'); }
       else { videoEl.pause(); showOsd('pause'); }
       showBar(); break;
@@ -965,6 +968,7 @@ export var playerPage: Page = {
     currentEpisode = params.episode;
     currentVideo = params.video;
     resumeTime = 0;
+    playbackStarted = false;
     panelOpen = false;
     panelListOpen = false;
     useHls = false;
