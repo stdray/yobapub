@@ -1033,7 +1033,19 @@ function onSourceReady(): void {
   playbackStarted = true;
   qualitySwitching = false;
   if (selectedSub >= 0) {
-    loadSubtitleTrack(selectedSub);
+    var subToRestore = selectedSub;
+    var vv = videoEl;
+    var subLoaded = false;
+    var tryLoadSub = function () {
+      if (subLoaded || !vv || !vv.parentNode) return;
+      subLoaded = true;
+      loadSubtitleTrack(subToRestore);
+    };
+    vv.addEventListener('timeupdate', function onTime() {
+      vv.removeEventListener('timeupdate', onTime);
+      tryLoadSub();
+    });
+    setTimeout(tryLoadSub, 3000);
   }
   hideSpinner();
   startMarkTimer();
