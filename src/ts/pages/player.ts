@@ -862,36 +862,51 @@ function applyAudioSwitch(idx: number): void {
       return;
     }
     if (currentAudios.length > 1 && currentHlsUrl) {
-      var audioIndex = currentAudios[idx].index;
-      var pos = videoEl ? videoEl.currentTime : 0;
-      var paused = videoEl ? videoEl.paused : false;
-      fetchRewrittenHls(currentHlsUrl, audioIndex, function (blobUrl) {
-        if (!blobUrl || !videoEl) {
-          showToast('Не удалось переключить аудио');
-          return;
-        }
-        if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-        resumeTime = pos;
-        resumePaused = paused;
-        qualitySwitching = true;
-        playSource(blobUrl);
-      });
+      switchToRewrittenHls(currentHlsUrl, idx);
       return;
     }
     return;
   }
-  if (videoEl) {
-    var native = (videoEl as any).audioTracks;
-    if (native && native.length > 0) {
-      for (var i = 0; i < native.length; i++) {
-        native[i].enabled = (i === idx);
-      }
+  // HTTP stream: get HLS2 URL for current file, then rewrite manifest
+  if (currentAudios.length > 1 && currentFiles.length > 0) {
+    var f = currentFiles[selectedQuality];
+    if (f.urls && f.urls.hls2) {
+      switchToRewrittenHls(f.urls.hls2, idx);
+      return;
+    }
+    if (f.file) {
+      apiGet('/v1/items/media-video-link', { file: f.file, type: 'hls2' }).then(
+        function (res: any) {
+          var data = Array.isArray(res) ? res[0] : res;
+          if (data && data.url) {
+            switchToRewrittenHls(data.url, idx);
+          } else {
+            showToast('Не удалось переключить аудио');
+          }
+        },
+        function () { showToast('Не удалось переключить аудио'); }
+      );
       return;
     }
   }
-  if (currentAudios.length > 1) {
-    showToast('Смена аудио недоступна для HTTP');
-  }
+}
+
+function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
+  var audioIndex = currentAudios[audioIdx].index;
+  var pos = videoEl ? videoEl.currentTime : 0;
+  var paused = videoEl ? videoEl.paused : false;
+  fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
+    if (!blobUrl || !videoEl) {
+      showToast('Не удалось переключить аудио');
+      return;
+    }
+    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+    currentHlsUrl = hlsUrl;
+    resumeTime = pos;
+    resumePaused = paused;
+    qualitySwitching = true;
+    playSource(blobUrl);
+  });
 }
 
 function applySubSwitch(menuIdx: number): void {
