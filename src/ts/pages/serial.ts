@@ -1,12 +1,13 @@
 import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
-import { getItem } from '../api/items';
-import { getWatchingInfo } from '../api/watching';
+import { loadItemWithWatching } from '../api/items';
 import { Item, Season, WatchingInfoItem } from '../types/api';
 import { navigate, goBack } from '../router';
 import { TvKey } from '../utils/platform';
-import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { renderRatings } from '../utils/templates';
+import { formatTimeShort } from '../utils/format';
 
 var $root = $('#page-serial');
 var keys = pageKeys();
@@ -50,16 +51,6 @@ var tplEpisode = doT.template(
   '</div>'
 );
 
-var tplRating = doT.template(
-  '<span class="detail__rating">{{=it.label}} <span class="detail__rating-value">{{=it.value}}</span></span>'
-);
-
-function formatTime(sec: number): string {
-  var m = Math.floor(sec / 60);
-  var s = sec % 60;
-  return m + ':' + (s < 10 ? '0' : '') + s;
-}
-
 function getEpisodeStatus(seasonNum: number, epNum: number): { time: number; status: number } {
   if (!watchingInfo || !watchingInfo.seasons) return { time: 0, status: -1 };
   for (var i = 0; i < watchingInfo.seasons.length; i++) {
@@ -97,7 +88,7 @@ function buildEpisodes(season: Season | undefined): string {
     var st = getEpisodeStatus(season.number, ep.number);
     var statusText = '';
     if (st.status === 1) statusText = '\u2713';
-    else if (st.status === 0 && st.time > 0) statusText = formatTime(st.time);
+    else if (st.status === 0 && st.time > 0) statusText = formatTimeShort(st.time);
     html += tplEpisode({ idx: j, number: ep.number, title: ep.title || 'Эпизод ' + ep.number, status: statusText });
   }
   return html;
@@ -114,10 +105,7 @@ function render(item: Item): void {
     selectedSeason = resumeEp.seasonIdx;
   }
 
-  var ratings = '';
-  if (item.rating) ratings += tplRating({ label: 'KP', value: item.rating });
-  if (item.kinopoisk_rating) ratings += tplRating({ label: 'КиноПоиск', value: item.kinopoisk_rating });
-  if (item.imdb_rating) ratings += tplRating({ label: 'IMDb', value: item.imdb_rating });
+  var ratings = renderRatings(item);
 
   var seasonTabs = '';
   for (var i = 0; i < seasons.length; i++) {
@@ -163,24 +151,7 @@ function updateFocus(): void {
     if ($eps.length > 0) {
       var $ep = $eps.eq(focusedEpisode);
       $ep.addClass('focused');
-      var container = $root.find('.detail__info')[0];
-      var epEl = $ep[0];
-      if (container && epEl) {
-        var epTop = 0;
-        var el: HTMLElement | null = epEl;
-        while (el && el !== container) {
-          epTop += el.offsetTop;
-          el = el.offsetParent as HTMLElement | null;
-        }
-        var epBottom = epTop + epEl.offsetHeight;
-        var scrollTop = container.scrollTop;
-        var viewH = container.clientHeight;
-        if (epBottom > scrollTop + viewH - 20) {
-          container.scrollTop = epBottom - viewH + 40;
-        } else if (epTop < scrollTop + 20) {
-          container.scrollTop = Math.max(0, epTop - 40);
-        }
-      }
+      scrollIntoView($ep[0], $root.find('.detail__info')[0], 20);
     }
   }
 }
@@ -265,13 +236,11 @@ export var serialPage: Page = {
     showSpinnerIn($root);
     var id = params.id!;
 
-    $.when(getItem(id), getWatchingInfo(id)).then(
-      function (itemRes: any, watchRes: any) {
-        var iData = Array.isArray(itemRes) ? itemRes[0] : itemRes;
-        var wData = Array.isArray(watchRes) ? watchRes[0] : watchRes;
-        currentItem = iData.item;
-        watchingInfo = (wData && wData.item) || null;
-        if (currentItem) { render(currentItem); }
+    loadItemWithWatching(id,
+      function (item, watching) {
+        currentItem = item;
+        watchingInfo = watching;
+        render(currentItem);
       },
       function () {
         $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');

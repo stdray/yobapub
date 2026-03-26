@@ -8,7 +8,9 @@ import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
 import { clearTokens } from '../utils/storage';
 import { unlinkDevice } from '../api/device';
-import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { gridMove, gridPos } from '../utils/grid';
+import { tplCard, tplEmptyText } from '../utils/templates';
 
 var $root = $('#page-watching');
 var keys = pageKeys();
@@ -26,16 +28,6 @@ interface SectionData {
 var sections: SectionData[] = [];
 var serialsData: WatchingSerialItem[] = [];
 var moviesData: WatchingMovieItem[] = [];
-
-var tplCard = doT.template(
-  '<div class="card" data-id="{{=it.id}}">' +
-    '<div class="card__poster">' +
-      '<img src="{{=it.poster}}" alt="">' +
-      '{{?it.extra}}<div class="card__badge">{{=it.extra}}</div>{{?}}' +
-    '</div>' +
-    '<div class="card__title">{{=it.title}}</div>' +
-  '</div>'
-);
 
 var tplMenu = doT.template(
   '<div class="sidebar">' +
@@ -55,10 +47,6 @@ var tplLayout = doT.template(
     '{{=it.menu}}' +
     '<div class="content"><div class="watching">{{=it.rows}}</div></div>' +
   '</div>'
-);
-
-var tplEmpty = doT.template(
-  '<div class="watching__section-title" style="margin-top:200px;text-align:center;">{{=it.text}}</div>'
 );
 
 function buildMenu(): string {
@@ -106,7 +94,7 @@ function buildRows(): string {
   }
 
   if (serialsData.length === 0 && moviesData.length === 0) {
-    html += tplEmpty({ text: 'Список пуст' });
+    html += tplEmptyText({ text: 'Список пуст' });
   }
 
   return html;
@@ -133,22 +121,7 @@ function updateFocus(): void {
   if ($cards.length > 0 && focusedIndex < $cards.length) {
     var $card = $cards.eq(focusedIndex);
     $card.addClass('focused');
-
-    var cardEl = $card[0];
-    var container = $root.find('.watching')[0];
-    if (cardEl && container) {
-      var cardRect = cardEl.getBoundingClientRect();
-      var contRect = container.getBoundingClientRect();
-      var cardTop = cardRect.top - contRect.top + container.scrollTop;
-      var cardBottom = cardTop + cardRect.height;
-      var scrollTop = container.scrollTop;
-      var viewH = container.clientHeight;
-      if (cardBottom > scrollTop + viewH - 40) {
-        container.scrollTop = cardBottom - viewH + 40;
-      } else if (cardTop < scrollTop + 40) {
-        container.scrollTop = Math.max(0, cardTop - 40);
-      }
-    }
+    scrollIntoView($card[0], $root.find('.watching')[0]);
   }
 }
 
@@ -180,40 +153,41 @@ function handleContentKey(e: JQuery.Event): void {
   if (sections.length === 0) return;
 
   var currentItems = sections[focusedSection].items;
-  var col = focusedIndex % CARDS_PER_ROW;
-  var row = Math.floor(focusedIndex / CARDS_PER_ROW);
-  var totalRows = Math.ceil(currentItems.length / CARDS_PER_ROW);
+  var g = gridPos(focusedIndex, currentItems.length);
 
   switch (e.keyCode) {
-    case TvKey.Right:
-      if (focusedIndex < currentItems.length - 1 && col < CARDS_PER_ROW - 1) { focusedIndex++; updateFocus(); }
+    case TvKey.Right: {
+      var nr = gridMove(focusedIndex, currentItems.length, 'right');
+      if (nr >= 0) { focusedIndex = nr; updateFocus(); }
       e.preventDefault(); break;
-    case TvKey.Left:
-      if (col > 0) { focusedIndex--; updateFocus(); }
+    }
+    case TvKey.Left: {
+      var nl = gridMove(focusedIndex, currentItems.length, 'left');
+      if (nl >= 0) { focusedIndex = nl; updateFocus(); }
       else { menuFocused = true; updateFocus(); }
       e.preventDefault(); break;
-    case TvKey.Down:
-      if (row < totalRows - 1) {
-        focusedIndex = Math.min((row + 1) * CARDS_PER_ROW + col, currentItems.length - 1);
-        updateFocus();
-      } else if (focusedSection < sections.length - 1) {
+    }
+    case TvKey.Down: {
+      var nd = gridMove(focusedIndex, currentItems.length, 'down');
+      if (nd >= 0) { focusedIndex = nd; updateFocus(); }
+      else if (focusedSection < sections.length - 1) {
         focusedSection++;
-        focusedIndex = Math.min(col, sections[focusedSection].items.length - 1);
+        focusedIndex = Math.min(g.col, sections[focusedSection].items.length - 1);
         updateFocus();
       }
       e.preventDefault(); break;
-    case TvKey.Up:
-      if (row > 0) {
-        focusedIndex = (row - 1) * CARDS_PER_ROW + col;
-        updateFocus();
-      } else if (focusedSection > 0) {
+    }
+    case TvKey.Up: {
+      var nu = gridMove(focusedIndex, currentItems.length, 'up');
+      if (nu >= 0) { focusedIndex = nu; updateFocus(); }
+      else if (focusedSection > 0) {
         focusedSection--;
-        var prevItems = sections[focusedSection].items;
-        var prevTotalRows = Math.ceil(prevItems.length / CARDS_PER_ROW);
-        focusedIndex = Math.min((prevTotalRows - 1) * CARDS_PER_ROW + col, prevItems.length - 1);
+        var pg = gridPos(0, sections[focusedSection].items.length);
+        focusedIndex = Math.min((pg.totalRows - 1) * CARDS_PER_ROW + g.col, sections[focusedSection].items.length - 1);
         updateFocus();
       }
       e.preventDefault(); break;
+    }
     case TvKey.Enter:
       var item = currentItems[focusedIndex];
       if (item) {
@@ -257,7 +231,7 @@ export var watchingPage: Page = {
         render();
       },
       function () {
-        $root.html(tplLayout({ menu: buildMenu(), rows: tplEmpty({ text: 'Ошибка загрузки' }) }));
+        $root.html(tplLayout({ menu: buildMenu(), rows: tplEmptyText({ text: 'Ошибка загрузки' }) }));
       }
     );
 

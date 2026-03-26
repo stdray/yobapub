@@ -1,13 +1,5 @@
 import $ from 'jquery';
-
-export function formatTime(sec: number): string {
-  var h = Math.floor(sec / 3600);
-  var m = Math.floor((sec % 3600) / 60);
-  var s = Math.floor(sec % 60);
-  var pad = function (n: number) { return n < 10 ? '0' + n : '' + n; };
-  if (h > 0) return h + ':' + pad(m) + ':' + pad(s);
-  return pad(m) + ':' + pad(s);
-}
+import { formatTimecode } from '../../utils/format';
 
 export interface ProgressState {
   videoEl: HTMLVideoElement | null;
@@ -56,9 +48,9 @@ export function updateProgress($root: JQuery, state: ProgressState): void {
     state.barPctEl.innerHTML = pct.toFixed(1) + '%';
   }
   if (state.barDurationEl) {
-    state.barDurationEl.innerHTML = formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : '');
+    state.barDurationEl.innerHTML = formatTimecode(cur) + (dur > 0 ? ' / ' + formatTimecode(dur) : '');
   }
   if (state.barSeekEl) {
-    state.barSeekEl.innerHTML = state.seeking ? formatTime(state.seekPos) : '';
+    state.barSeekEl.innerHTML = state.seeking ? formatTimecode(state.seekPos) : '';
   }
 }

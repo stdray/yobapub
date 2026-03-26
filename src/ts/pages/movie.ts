@@ -1,12 +1,13 @@
 import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
-import { getItem } from '../api/items';
-import { getWatchingInfo } from '../api/watching';
+import { loadItemWithWatching } from '../api/items';
 import { Item, WatchingInfoItem } from '../types/api';
 import { navigate, goBack } from '../router';
 import { TvKey } from '../utils/platform';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+import { renderRatings } from '../utils/templates';
+import { formatDuration } from '../utils/format';
 
 var $root = $('#page-movie');
 var keys = pageKeys();
@@ -31,17 +32,6 @@ var tplDetail = doT.template(
   '</div>'
 );
 
-var tplRating = doT.template(
-  '<span class="detail__rating">{{=it.label}} <span class="detail__rating-value">{{=it.value}}</span></span>'
-);
-
-function formatDuration(sec: number): string {
-  var h = Math.floor(sec / 3600);
-  var m = Math.floor((sec % 3600) / 60);
-  if (h > 0) return h + ' ч ' + m + ' мин';
-  return m + ' мин';
-}
-
 function render(item: Item): void {
   var title = item.title.split(' / ');
   var resumeTime = 0;
@@ -58,10 +48,7 @@ function render(item: Item): void {
     btnCount++;
   }
 
-  var ratings = '';
-  if (item.rating) { ratings += tplRating({ label: 'KP', value: item.rating }); }
-  if (item.kinopoisk_rating) { ratings += tplRating({ label: 'КиноПоиск', value: item.kinopoisk_rating }); }
-  if (item.imdb_rating) { ratings += tplRating({ label: 'IMDb', value: item.imdb_rating }); }
+  var ratings = renderRatings(item);
 
   $root.html(tplDetail({
     poster: item.posters.big,
@@ -112,13 +99,11 @@ export var moviePage: Page = {
     showSpinnerIn($root);
     var id = params.id!;
 
-    $.when(getItem(id), getWatchingInfo(id)).then(
-      function (itemRes: any, watchRes: any) {
-        var iData = Array.isArray(itemRes) ? itemRes[0] : itemRes;
-        var wData = Array.isArray(watchRes) ? watchRes[0] : watchRes;
-        currentItem = iData.item;
-        watchingInfo = (wData && wData.item) || null;
-        if (currentItem) { render(currentItem); }
+    loadItemWithWatching(id,
+      function (item, watching) {
+        currentItem = item;
+        watchingInfo = watching;
+        render(currentItem);
       },
       function () {
         $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');

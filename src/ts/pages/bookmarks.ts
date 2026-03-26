@@ -5,8 +5,9 @@ import { getBookmarkFolders, getBookmarkItems } from '../api/bookmarks';
 import { BookmarkFolder, Item } from '../types/api';
 import { navigate, goBack, setParams } from '../router';
 import { TvKey } from '../utils/platform';
-import { CARDS_PER_ROW } from '../settings';
-import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { gridMove } from '../utils/grid';
+import { tplCard, tplEmptyText } from '../utils/templates';
 
 var $root = $('#page-bookmarks');
 var keys = pageKeys();
@@ -32,15 +33,6 @@ var tplFolderItem = doT.template(
   '</div>'
 );
 
-var tplCard = doT.template(
-  '<div class="card" data-id="{{=it.id}}">' +
-    '<div class="card__poster">' +
-      '<img src="{{=it.poster}}" alt="">' +
-    '</div>' +
-    '<div class="card__title">{{=it.title}}</div>' +
-  '</div>'
-);
-
 var tplFoldersPage = doT.template(
   '<div class="watching">' +
     '<div class="watching__section-title">{{=it.title}}</div>' +
@@ -55,15 +47,9 @@ var tplItemsPage = doT.template(
   '</div>'
 );
 
-var tplEmpty = doT.template(
-  '<div class="watching">' +
-    '<div class="watching__section-title" style="margin-top:200px;text-align:center;">{{=it.text}}</div>' +
-  '</div>'
-);
-
 function renderFolders(): void {
   if (folders.length === 0) {
-    $root.html(tplEmpty({ title: 'Закладки', text: 'Нет папок' }));
+    $root.html('<div class="watching">' + tplEmptyText({ text: 'Нет папок' }) + '</div>');
     return;
   }
   var html = '';
@@ -83,13 +69,13 @@ function updateFolderFocus(): void {
   if (folders.length > 0) {
     var $item = $root.find('.folder-item').eq(folderFocused);
     $item.addClass('focused');
-    scrollIntoView($item, $root.find('.watching'));
+    scrollIntoView($item[0], $root.find('.watching')[0]);
   }
 }
 
 function renderItems(): void {
   if (itemsData.length === 0) {
-    $root.html(tplEmpty({ title: currentFolderTitle, text: 'Папка пуста' }));
+    $root.html('<div class="watching">' + tplEmptyText({ text: 'Папка пуста' }) + '</div>');
     return;
   }
   var cards = '';
@@ -109,24 +95,7 @@ function updateItemFocus(): void {
   if (itemsData.length > 0 && focusedIndex < itemsData.length) {
     var $card = $root.find('.card').eq(focusedIndex);
     $card.addClass('focused');
-    scrollIntoView($card, $root.find('.watching'));
-  }
-}
-
-function scrollIntoView($el: JQuery, $container: JQuery): void {
-  var el = $el[0];
-  var container = $container[0];
-  if (!el || !container) return;
-  var elRect = el.getBoundingClientRect();
-  var contRect = container.getBoundingClientRect();
-  var elTop = elRect.top - contRect.top + container.scrollTop;
-  var elBottom = elTop + elRect.height;
-  var scrollTop = container.scrollTop;
-  var viewH = container.clientHeight;
-  if (elBottom > scrollTop + viewH - 40) {
-    container.scrollTop = elBottom - viewH + 40;
-  } else if (elTop < scrollTop + 40) {
-    container.scrollTop = Math.max(0, elTop - 40);
+    scrollIntoView($card[0], $root.find('.watching')[0]);
   }
 }
 
@@ -162,31 +131,19 @@ function handleFolderKey(e: JQuery.Event): void {
 }
 
 function handleItemKey(e: JQuery.Event): void {
-  var col = focusedIndex % CARDS_PER_ROW;
-  var row = Math.floor(focusedIndex / CARDS_PER_ROW);
-  var totalRows = Math.ceil(itemsData.length / CARDS_PER_ROW);
+  var dir = e.keyCode === TvKey.Right ? 'right' as const
+    : e.keyCode === TvKey.Left ? 'left' as const
+    : e.keyCode === TvKey.Down ? 'down' as const
+    : e.keyCode === TvKey.Up ? 'up' as const
+    : null;
+  if (dir) {
+    var next = gridMove(focusedIndex, itemsData.length, dir);
+    if (next >= 0) { focusedIndex = next; updateItemFocus(); }
+    e.preventDefault();
+    return;
+  }
 
   switch (e.keyCode) {
-    case TvKey.Right:
-      if (focusedIndex < itemsData.length - 1 && col < CARDS_PER_ROW - 1) {
-        focusedIndex++; updateItemFocus();
-      }
-      e.preventDefault(); break;
-    case TvKey.Left:
-      if (col > 0) { focusedIndex--; updateItemFocus(); }
-      e.preventDefault(); break;
-    case TvKey.Down:
-      if (row < totalRows - 1) {
-        focusedIndex = Math.min((row + 1) * CARDS_PER_ROW + col, itemsData.length - 1);
-        updateItemFocus();
-      }
-      e.preventDefault(); break;
-    case TvKey.Up:
-      if (row > 0) {
-        focusedIndex = (row - 1) * CARDS_PER_ROW + col;
-        updateItemFocus();
-      }
-      e.preventDefault(); break;
     case TvKey.Enter:
       if (itemsData.length > 0) {
         var item = itemsData[focusedIndex];
@@ -217,7 +174,7 @@ function openFolder(folderId: number, keepFocus?: boolean): void {
       renderItems();
     },
     function () {
-      $root.html(tplEmpty({ title: currentFolderTitle, text: 'Ошибка загрузки' }));
+      $root.html('<div class="watching">' + tplEmptyText({ text: 'Ошибка загрузки' }) + '</div>');
     }
   );
 }
@@ -254,7 +211,7 @@ export var bookmarksPage: Page = {
         renderFolders();
       },
       function () {
-        $root.html(tplEmpty({ title: 'Закладки', text: 'Ошибка загрузки' }));
+        $root.html('<div class="watching">' + tplEmptyText({ text: 'Ошибка загрузки' }) + '</div>');
       }
     );
   },

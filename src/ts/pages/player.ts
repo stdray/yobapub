@@ -12,7 +12,7 @@ import { tplPlayer } from './player/template';
 import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime } from './player/media';
 import { fetchRewrittenHls } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
-import { formatTime, ProgressState, getVideoDuration, updateProgress } from './player/progress';
+import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
 import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey, clearPanelIdle } from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
 import { InfoState, updateInfoBadge, showInfo, hideInfo } from './player/info';
