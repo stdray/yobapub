@@ -406,11 +406,6 @@ html, body {
   background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
   pointer-events: none;
   z-index: 4;
-  transition: opacity 0.3s;
-}
-
-.player__gradient.hidden {
-  opacity: 0;
 }
 
 /* Header: title + episode top-left */
@@ -420,11 +415,6 @@ html, body {
   left: 140px;
   max-width: 1400px;
   z-index: 6;
-  transition: opacity 0.3s;
-}
-
-.player__header.hidden {
-  opacity: 0;
 }
 
 .player__title {
@@ -449,11 +439,6 @@ html, body {
   pointer-events: none;
   z-index: 7;
   text-shadow: 0 0 20px rgba(0,0,0,0.5);
-  transition: opacity 0.3s;
-}
-
-.player__osd.hidden {
-  opacity: 0;
 }
 
 /* Progress bar (bottom gradient + bar) */
@@ -466,11 +451,6 @@ html, body {
   background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
   pointer-events: none;
   z-index: 4;
-  transition: opacity 0.3s;
-}
-
-.player__bar.hidden {
-  opacity: 0;
 }
 
 .player__bar-wrap {
@@ -551,12 +531,6 @@ html, body {
   max-width: 700px;
   text-align: right;
   line-height: 1.4;
-  transition: opacity 0.3s;
-}
-
-.player__info.hidden {
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* --- Toast --- */
@@ -572,12 +546,6 @@ html, body {
   color: #fff;
   z-index: 12;
   white-space: nowrap;
-  transition: opacity 0.3s;
-}
-
-.player__toast.hidden {
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* Resume banner */
@@ -591,12 +559,6 @@ html, body {
   padding: 24px 40px;
   text-align: center;
   z-index: 11;
-  transition: opacity 0.3s;
-}
-
-.player__resume.hidden {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .player__resume-text {
