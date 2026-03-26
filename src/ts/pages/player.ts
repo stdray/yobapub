@@ -744,16 +744,15 @@ var qualitySwitching = false;
 
 function switchQuality(): void {
   if (!videoEl || currentFiles.length === 0) return;
-  var f = currentFiles[selectedQuality];
-  var url = getUrlFromFile(f);
-  if (!url) return;
-
   var pos = videoEl.currentTime;
   resumePaused = videoEl.paused;
-  resumeTime = pos;
-  qualitySwitching = true;
+  var url = getUrlFromFile(currentFiles[selectedQuality]);
+  if (!url) return;
 
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+
+  resumeTime = pos;
+  qualitySwitching = true;
   playSource(url);
 }
 
@@ -818,11 +817,27 @@ function stopProgressTimer(): void {
 function onSourceReady(): void {
   if (!videoEl) return;
   if (resumeTime > 0) {
-    videoEl.currentTime = resumeTime;
+    var pos = resumeTime;
     resumeTime = 0;
+    var v = videoEl;
+    var done = false;
+    var doSeek = function () {
+      if (done) return;
+      done = true;
+      v.removeEventListener('playing', doSeek);
+      v.currentTime = pos;
+    };
+    if (resumePaused) {
+      resumePaused = false;
+      v.currentTime = pos;
+    } else {
+      v.addEventListener('playing', doSeek);
+      v.play();
+    }
+  } else {
+    if (resumePaused) { resumePaused = false; }
+    else { videoEl.play(); }
   }
-  if (resumePaused) { resumePaused = false; }
-  else { videoEl.play(); }
   playbackStarted = true;
   qualitySwitching = false;
   startMarkTimer();
