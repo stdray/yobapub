@@ -478,22 +478,27 @@ html, body {
   width: 0;
 }
 
-.player__bar-dot {
+.player__bar-pct {
   position: absolute;
-  right: -12px;
-  top: -9px;
-  width: 30px;
-  height: 30px;
+  right: -38px;
+  top: -38px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
-  background: #e94560;
-  border: 2px solid #fff;
-  box-shadow: 0 0 5px #000;
+  background: rgba(0,0,0,0.75);
+  border: 3px solid #e94560;
+  color: #fff;
+  font-size: 20px;
+  line-height: 76px;
+  text-align: center;
+  font-weight: bold;
 }
 
 .player__bar-seek {
   position: absolute;
-  top: -55px;
-  left: -50px;
+  top: -50px;
+  left: 50%;
+  margin-left: -65px;
   width: 130px;
   font-size: 28px;
   text-align: center;

@@ -26,6 +26,7 @@ var currentFiles: VideoFile[] = [];
 var currentAudios: AudioTrack[] = [];
 
 var barValueEl: HTMLElement | null = null;
+var barPctEl: HTMLElement | null = null;
 var barDurationEl: HTMLElement | null = null;
 var barSeekEl: HTMLElement | null = null;
 var currentSubs: Subtitle[] = [];
@@ -209,10 +210,9 @@ var tplPlayer = doT.template(
       '<div class="player__bar-wrap">' +
         '<div class="player__bar-progress">' +
           '<div class="player__bar-value">' +
-            '<div class="player__bar-dot">' +
-              '<div class="player__bar-seek"></div>' +
-            '</div>' +
+            '<div class="player__bar-pct"></div>' +
           '</div>' +
+          '<div class="player__bar-seek"></div>' +
         '</div>' +
         '<div class="player__bar-duration"></div>' +
       '</div>' +
@@ -529,6 +529,7 @@ function clearBarTimer(): void {
 
 function cacheBarElements(): void {
   if (!barValueEl) barValueEl = $root.find('.player__bar-value')[0] || null;
+  if (!barPctEl) barPctEl = $root.find('.player__bar-pct')[0] || null;
   if (!barDurationEl) barDurationEl = $root.find('.player__bar-duration')[0] || null;
   if (!barSeekEl) barSeekEl = $root.find('.player__bar-seek')[0] || null;
 }
@@ -543,6 +544,9 @@ function updateProgress(): void {
   if (pct > 100) pct = 100;
   if (barValueEl) {
     barValueEl.style.width = pct + '%';
+  }
+  if (barPctEl) {
+    barPctEl.textContent = pct.toFixed(1) + '%';
   }
   if (barDurationEl) {
     barDurationEl.textContent = formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : '');
@@ -1167,6 +1171,7 @@ function destroyPlayer(): void {
     videoEl = null;
   }
   barValueEl = null;
+  barPctEl = null;
   barDurationEl = null;
   barSeekEl = null;
   currentHlsUrl = '';
