@@ -936,10 +936,15 @@ function onSourceReady(): void {
     if (resumePaused) { resumePaused = false; }
     else { videoEl.play(); }
   }
+  var wasQualitySwitch = qualitySwitching;
   playbackStarted = true;
   qualitySwitching = false;
-  if (selectedAudio > 0) applyAudioSwitch(selectedAudio);
-  if (selectedSub >= 0) loadSubtitleTrack(selectedSub);
+  if (!wasQualitySwitch) {
+    setTimeout(function () {
+      if (selectedAudio > 0) applyAudioSwitch(selectedAudio);
+      if (selectedSub >= 0) loadSubtitleTrack(selectedSub);
+    }, 500);
+  }
   startMarkTimer();
   showBar();
   updateInfoBadge();
