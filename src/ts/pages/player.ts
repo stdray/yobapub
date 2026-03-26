@@ -851,18 +851,6 @@ function applyPanelSelection(): void {
 
 function applyAudioSwitch(idx: number): void {
   selectedAudio = idx;
-  if (useHls && hlsInstance) {
-    if (hlsAudioTracks.length > 1) {
-      hlsInstance.audioTrack = idx;
-      return;
-    }
-    if (currentAudios.length > 1 && currentHlsUrl) {
-      switchToRewrittenHls(currentHlsUrl, idx);
-      return;
-    }
-    return;
-  }
-  // HTTP stream: use HLS2 URL from media-links
   if (currentAudios.length > 1 && currentFiles.length > 0) {
     var f = currentFiles[selectedQuality];
     var hlsUrl = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
