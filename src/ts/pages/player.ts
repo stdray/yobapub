@@ -939,11 +939,21 @@ function onSourceReady(): void {
   var wasQualitySwitch = qualitySwitching;
   playbackStarted = true;
   qualitySwitching = false;
-  if (!wasQualitySwitch) {
-    setTimeout(function () {
-      if (selectedAudio > 0) applyAudioSwitch(selectedAudio);
-      if (selectedSub >= 0) loadSubtitleTrack(selectedSub);
-    }, 500);
+  if (!wasQualitySwitch && (selectedAudio > 0 || selectedSub >= 0)) {
+    var restoreAudio = selectedAudio;
+    var restoreSub = selectedSub;
+    var v = videoEl;
+    var applied = false;
+    var doApply = function () {
+      if (applied) return;
+      applied = true;
+      v.removeEventListener('playing', doApply);
+      v.removeEventListener('canplay', doApply);
+      if (restoreAudio > 0) applyAudioSwitch(restoreAudio);
+      if (restoreSub >= 0) loadSubtitleTrack(restoreSub);
+    };
+    v.addEventListener('playing', doApply);
+    v.addEventListener('canplay', doApply);
   }
   startMarkTimer();
   showBar();
