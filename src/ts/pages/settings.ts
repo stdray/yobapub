@@ -228,7 +228,8 @@ function applyOption(): void {
   }
 
   if (item.key === 'streamingType' && item.options) {
-    setStreamingType(String(item.options[focusedOptionIndex].id));
+    var stOpt = item.options[focusedOptionIndex];
+    setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
   }
 
   saveDeviceSettings(saveData);
@@ -314,7 +315,7 @@ export var settingsPage: Page = {
           if (data.settings.streamingType && data.settings.streamingType.value) {
             var stValues = data.settings.streamingType.value;
             for (var si = 0; si < stValues.length; si++) {
-              if (stValues[si].selected) { setStreamingType(String(stValues[si].id)); break; }
+              if (stValues[si].selected) { setStreamingType(String(stValues[si].label || stValues[si].id).toLowerCase()); break; }
             }
           }
         }

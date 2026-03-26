@@ -65,8 +65,11 @@ export function setSubSize(size: number): void {
   localStorage.setItem(KEYS.SUB_SIZE, String(size));
 }
 
+var STREAMING_TYPES: Record<string, string> = { 'http': 'http', 'hls': 'hls', 'hls2': 'hls2', 'hls4': 'hls4' };
+
 export function getStreamingType(): string {
-  return localStorage.getItem(KEYS.STREAMING_TYPE) || 'hls4';
+  var val = localStorage.getItem(KEYS.STREAMING_TYPE) || 'hls4';
+  return STREAMING_TYPES[val] || 'hls4';
 }
 
 export function setStreamingType(type: string): void {
