@@ -1,14 +1,21 @@
 import $ from 'jquery';
-import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { getItem } from '../api/items';
 import { markTime } from '../api/watching';
-import { apiGet } from '../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
-import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, getStreamingType, getTitlePrefs, saveTitlePrefs, TitlePrefs } from '../utils/storage';
+import { TvKey } from '../utils/platform';
+import { getStreamingType } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+
+import { tplPlayer } from './player/template';
+import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime } from './player/media';
+import { fetchRewrittenHls } from './player/hls';
+import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
+import { formatTime, ProgressState, getVideoDuration, updateProgress } from './player/progress';
+import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey } from './player/panel';
+import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
+import { InfoState, updateInfoBadge, showInfo, hideInfo } from './player/info';
 
 var $root = $('#page-player');
 var keys = pageKeys();
@@ -24,11 +31,6 @@ var resumeTime = 0;
 
 var currentFiles: VideoFile[] = [];
 var currentAudios: AudioTrack[] = [];
-
-var barValueEl: HTMLElement | null = null;
-var barPctEl: HTMLElement | null = null;
-var barDurationEl: HTMLElement | null = null;
-var barSeekEl: HTMLElement | null = null;
 var currentSubs: Subtitle[] = [];
 var selectedQuality = 0;
 var selectedAudio = 0;
@@ -40,286 +42,81 @@ var hlsSubTracks: any[] = [];
 var useHls = false;
 var currentHlsUrl = '';
 var playbackStarted = false;
+var resumePaused = false;
+var qualitySwitching = false;
 
-function formatTime(sec: number): string {
-  var h = Math.floor(sec / 3600);
-  var m = Math.floor((sec % 3600) / 60);
-  var s = Math.floor(sec % 60);
-  var pad = function (n: number) { return n < 10 ? '0' + n : '' + n; };
-  if (h > 0) return h + ':' + pad(m) + ':' + pad(s);
-  return pad(m) + ':' + pad(s);
+// --- Progress state ---
+
+var progressState: ProgressState = {
+  videoEl: null,
+  currentDuration: 0,
+  seeking: false,
+  seekPos: -1,
+  barValueEl: null,
+  barPctEl: null,
+  barDurationEl: null,
+  barSeekEl: null
+};
+
+function syncProgressState(): void {
+  progressState.videoEl = videoEl;
+  progressState.currentDuration = currentDuration;
+  progressState.seeking = seeking;
+  progressState.seekPos = seekPos;
 }
 
-function getUrlFromFile(f: VideoFile): string {
-  var urls = f.urls || f.url;
-  if (!urls) return '';
-  var pref = getStreamingType();
-  if (pref === 'http' && urls.http) return urls.http;
-  if (pref === 'hls' && urls.hls) return urls.hls;
-  if (pref === 'hls2' && urls.hls2) return urls.hls2;
-  if (pref === 'hls4' && urls.hls4) return urls.hls4;
-  return urls.hls4 || urls.hls || urls.http || '';
+// --- Panel state ---
+
+var panelState: PanelState = {
+  open: false,
+  btnIndex: 0,
+  listOpen: false,
+  listIndex: 0,
+  listSection: 0
+};
+
+function getInfoState(): InfoState {
+  return {
+    files: currentFiles,
+    audios: currentAudios,
+    subs: currentSubs,
+    selectedQuality: selectedQuality,
+    selectedAudio: selectedAudio,
+    selectedSub: selectedSub,
+    useHls: useHls,
+    hlsInstance: hlsInstance,
+    hlsAudioTracks: hlsAudioTracks
+  };
 }
 
-interface MediaInfo {
-  mid: number;
-  title: string;
-  audios: AudioTrack[];
-  duration: number;
+function getPanelData(): PanelData {
+  return {
+    audioItems: getAudioItems(currentAudios, selectedAudio, useHls, hlsAudioTracks, videoEl),
+    subItems: getSubItems(currentSubs, selectedSub),
+    qualityItems: getQualityItems(currentFiles, selectedQuality)
+  };
 }
 
-function findEpisodeMedia(item: Item, seasonNum: number, epNum: number): MediaInfo | null {
-  if (!item.seasons) return null;
-  for (var i = 0; i < item.seasons.length; i++) {
-    var s = item.seasons[i];
-    if (s.number === seasonNum) {
-      for (var j = 0; j < s.episodes.length; j++) {
-        var ep = s.episodes[j];
-        if (ep.number === epNum) {
-          return { mid: ep.id, title: ep.title || 'S' + seasonNum + 'E' + epNum, audios: ep.audios || [], duration: ep.duration || 0 };
-        }
-      }
+var panelCallbacks: PanelCallbacks = {
+  onShowBar: function () { showBar(); },
+  onHideBar: function () { hideBar(); },
+  onClearBarTimer: function () { clearBarTimer(); },
+  onApplyAudio: function (idx) { applyAudioSwitch(idx); },
+  onApplySub: function (menuIdx) { applySubSwitch(menuIdx); },
+  onApplyQuality: function (idx) {
+    if (idx !== selectedQuality) {
+      selectedQuality = idx;
+      switchQuality();
     }
-  }
-  return null;
-}
+  },
+  onSavePrefs: function () { doSavePrefs(); },
+  getData: getPanelData
+};
 
-function findVideoMedia(item: Item, videoNum: number): MediaInfo | null {
-  if (!item.videos) return null;
-  var idx = videoNum - 1;
-  if (idx >= 0 && idx < item.videos.length) {
-    var v = item.videos[idx];
-    return { mid: v.id, title: v.title || 'Видео ' + videoNum, audios: v.audios || [], duration: v.duration || 0 };
-  }
-  return null;
-}
+// --- Toast / OSD ---
 
-function loadMediaLinks(mid: number, cb: (files: VideoFile[], subs: Subtitle[]) => void): void {
-  apiGet('/v1/items/media-links', { mid: mid }).then(
-    function (res: any) {
-      var data = Array.isArray(res) ? res[0] : res;
-      var files: VideoFile[] = (data && data.files) || [];
-      var subs: Subtitle[] = (data && data.subtitles) || [];
-      cb(files, subs);
-    },
-    function () { cb([], []); }
-  );
-}
-
-function saveCurrentPrefs(): void {
-  if (!currentItem) return;
-  var prefs: TitlePrefs = { id: currentItem.id };
-  if (currentFiles.length > 0 && selectedQuality < currentFiles.length) {
-    prefs.quality = currentFiles[selectedQuality].quality;
-  }
-  if (currentAudios.length > 0 && selectedAudio < currentAudios.length) {
-    var a = currentAudios[selectedAudio];
-    prefs.audioLang = a.lang;
-    if (a.author) prefs.audioAuthorId = a.author.id;
-  }
-  if (selectedSub >= 0 && selectedSub < currentSubs.length) {
-    prefs.subLang = currentSubs[selectedSub].lang;
-  }
-  saveTitlePrefs(prefs);
-}
-
-function restoreQualityIndex(files: VideoFile[], prefs: TitlePrefs | null): number {
-  if (prefs && prefs.quality) {
-    for (var i = 0; i < files.length; i++) {
-      if (files[i].quality === prefs.quality) return i;
-    }
-  }
-  return pickDefaultQualityIndex(files);
-}
-
-function restoreAudioIndex(audios: AudioTrack[], prefs: TitlePrefs | null): number {
-  if (!prefs || !prefs.audioLang || audios.length === 0) return 0;
-  if (prefs.audioAuthorId) {
-    for (var i = 0; i < audios.length; i++) {
-      if (audios[i].lang === prefs.audioLang && audios[i].author && audios[i].author.id === prefs.audioAuthorId) return i;
-    }
-  }
-  for (var j = 0; j < audios.length; j++) {
-    if (audios[j].lang === prefs.audioLang) return j;
-  }
-  return 0;
-}
-
-function restoreSubIndex(subs: Subtitle[], prefs: TitlePrefs | null): number {
-  if (!prefs || !prefs.subLang || subs.length === 0) return -1;
-  for (var i = 0; i < subs.length; i++) {
-    if (subs[i].lang === prefs.subLang) return i;
-  }
-  return -1;
-}
-
-function pickDefaultQualityIndex(files: VideoFile[]): number {
-  var savedId = getDefaultQuality();
-  if (savedId === -1) {
-    savedId = isLegacyTizen() ? 3 : 0;
-    setDefaultQuality(savedId);
-  }
-  if (savedId === 0 || files.length === 0) return 0;
-  var maxH = 0;
-  for (var q = 0; q < QUALITY_OPTIONS.length; q++) {
-    if (QUALITY_OPTIONS[q].id === savedId) { maxH = QUALITY_OPTIONS[q].maxH; break; }
-  }
-  if (maxH === 0) return 0;
-  for (var i = 0; i < files.length; i++) {
-    if (files[i].h <= maxH) return i;
-  }
-  return files.length - 1;
-}
-
-function getResumeTime(item: Item, seasonNum?: number, epNum?: number, videoNum?: number): number {
-  if (seasonNum !== undefined && epNum !== undefined && item.seasons) {
-    for (var i = 0; i < item.seasons.length; i++) {
-      var s = item.seasons[i];
-      if (s.number === seasonNum) {
-        for (var j = 0; j < s.episodes.length; j++) {
-          var ep = s.episodes[j];
-          if (ep.number === epNum && ep.watching) {
-            var t = ep.watching.time;
-            if (t > 0 && ep.duration && t < ep.duration - 10) return t;
-          }
-        }
-      }
-    }
-  } else if (videoNum !== undefined && item.videos) {
-    var vi = videoNum - 1;
-    if (vi >= 0 && vi < item.videos.length) {
-      var v = item.videos[vi];
-      if (v.watching && v.watching.time > 0 && v.duration && v.watching.time < v.duration - 10) return v.watching.time;
-    }
-  }
-  return 0;
-}
-
-// --- Templates ---
-
-var tplPlayer = doT.template(
-  '<div class="player">' +
-    '<video></video>' +
-    '<div class="player__spinner"><div class="spinner__circle"></div></div>' +
-    '<div class="player__info hidden"></div>' +
-    '<div class="player__osd hidden"></div>' +
-    '<div class="player__gradient hidden"></div>' +
-    '<div class="player__header hidden">' +
-      '<div class="player__title">{{=it.title}}</div>' +
-      '<div class="player__episode">{{=it.episode}}</div>' +
-    '</div>' +
-    '<div class="player__bar hidden">' +
-      '<div class="player__bar-wrap">' +
-        '<div class="player__bar-progress">' +
-          '<div class="player__bar-value">' +
-            '<div class="player__bar-pct"></div>' +
-          '</div>' +
-          '<div class="player__bar-seek"></div>' +
-        '</div>' +
-        '<div class="player__bar-duration"></div>' +
-      '</div>' +
-
-    '</div>' +
-    '<div class="player__panel hidden">' +
-      '<div class="ppanel__overlay"></div>' +
-      '<div class="ppanel__buttons">' +
-        '<div class="ppanel__btn ppanel__btn--audio">' +
-          '<span class="ppanel__btn-label">Аудио: ...</span>' +
-        '</div>' +
-        '<div class="ppanel__btn ppanel__btn--subs">' +
-          '<span class="ppanel__btn-label">Сабы: ...</span>' +
-        '</div>' +
-        '<div class="ppanel__btn ppanel__btn--quality">' +
-          '<span class="ppanel__btn-label">Качество: ...</span>' +
-        '</div>' +
-      '</div>' +
-      '<div class="ppanel__list hidden"></div>' +
-    '</div>' +
-    '<div class="player__toast hidden"></div>' +
-  '</div>'
-);
-
-// --- Info badge ---
-
-function getStreamInfo(): string {
-  var parts: string[] = [];
-
-  // stream type
-  parts.push(getStreamingType().toUpperCase());
-
-  // quality
-  if (currentFiles.length > 0 && selectedQuality < currentFiles.length) {
-    var f = currentFiles[selectedQuality];
-    var ql = f.quality || (f.h + 'p');
-    parts.push(ql + ' ' + f.w + '\u00d7' + f.h);
-    if (f.codec) parts.push(f.codec.toUpperCase());
-  }
-
-  // audio
-  if (currentAudios.length > 0 && selectedAudio < currentAudios.length) {
-    var a = currentAudios[selectedAudio];
-    var albl = a.lang;
-    if (a.author && a.author.title) albl += ' (' + a.author.title + ')';
-    albl += ' ' + a.codec + ' ' + a.channels + 'ch';
-    parts.push(albl);
-  } else if (useHls && hlsAudioTracks.length > 0) {
-    var ht = hlsAudioTracks[selectedAudio] || hlsAudioTracks[0];
-    parts.push(ht.name || ht.lang || 'Audio');
-  }
-
-  // subs
-  if (selectedSub >= 0 && selectedSub < currentSubs.length) {
-    parts.push('Sub: ' + currentSubs[selectedSub].lang.toUpperCase());
-  }
-
-  // bitrate from HLS
-  if (useHls && hlsInstance) {
-    var level = hlsInstance.levels && hlsInstance.levels[hlsInstance.currentLevel];
-    if (level && level.bitrate) {
-      var mbps = (level.bitrate / 1000000).toFixed(1);
-      parts.push(mbps + ' Mbps');
-    }
-  }
-
-  return parts.join(' &bull; ');
-}
-
-function updateInfoBadge(): void {
-  var $info = $root.find('.player__info');
-  $info.html(getStreamInfo());
-}
-
-function showInfo(): void {
-  var $info = $root.find('.player__info');
-  updateInfoBadge();
-  $info.removeClass('hidden');
-}
-
-function hideInfo(): void {
-  $root.find('.player__info').addClass('hidden');
-}
-
-// --- Subtitle size ---
-
-var subStyleEl: HTMLStyleElement | null = null;
 var toastTimer: number | null = null;
-
-function applySubSize(): void {
-  var size = getSubSize();
-  if (!subStyleEl) {
-    subStyleEl = document.createElement('style');
-    document.head.appendChild(subStyleEl);
-  }
-  subStyleEl.textContent = 'video::cue { font-size: ' + size + 'px !important; }';
-}
-
-function changeSubSize(dir: number): void {
-  var size = getSubSize();
-  size = Math.max(SUB_SIZE_MIN, Math.min(SUB_SIZE_MAX, size + dir * SUB_SIZE_STEP));
-  setSubSize(size);
-  applySubSize();
-  showToast('Субтитры: ' + size + 'px');
-}
+var osdTimer: number | null = null;
 
 function showToast(text: string): void {
   var $toast = $root.find('.player__toast');
@@ -332,10 +129,6 @@ function showToast(text: string): void {
   toastTimer = window.setTimeout(function () { $toast.addClass('hidden'); toastTimer = null; }, 1500);
 }
 
-// --- OSD icon ---
-
-var osdTimer: number | null = null;
-
 function showOsd(icon: string): void {
   var symbols: Record<string, string> = { play: '\u25B6', pause: '\u275A\u275A', rw: '\u23EA', ff: '\u23E9' };
   $root.find('.player__osd').text(symbols[icon] || icon).removeClass('hidden');
@@ -346,7 +139,7 @@ function showOsd(icon: string): void {
   }, 700);
 }
 
-// --- Accelerating seek ---
+// --- Seek ---
 
 var seekPos = -1;
 var seekCount = 0;
@@ -354,28 +147,20 @@ var seekDir = '';
 var seeking = false;
 var seekApplyTimer: number | null = null;
 
-function getVideoDuration(): number {
-  if (videoEl) {
-    var d = videoEl.duration;
-    if (d && !isNaN(d) && isFinite(d) && d > 0) return d;
-  }
-  var fd = currentDuration || 0;
-  if (fd > 86400) fd = fd / 1000;
-  return fd;
-}
-
 function startSeek(dir: string): void {
   seeking = true;
   if (seekDir !== dir) { seekDir = dir; seekCount = 0; }
   if (seekPos === -1 && videoEl) seekPos = videoEl.currentTime;
 
+  syncProgressState();
   var step = 10 + Math.pow(Math.min(seekCount, 3000), 3) / 1000;
-  var dur = getVideoDuration();
+  var dur = getVideoDuration(progressState);
   seekPos += dir === 'right' ? step : -step;
   seekPos = Math.max(0, dur > 0 ? Math.min(seekPos, dur - 2) : seekPos);
   seekCount++;
 
-  updateProgress();
+  syncProgressState();
+  updateProgress($root, progressState);
   showOsd(dir === 'right' ? 'ff' : 'rw');
   showBar();
 
@@ -385,7 +170,8 @@ function startSeek(dir: string): void {
 
 function applySeek(): void {
   if (!seeking || seekPos < 0 || !videoEl) return;
-  var dur = getVideoDuration();
+  syncProgressState();
+  var dur = getVideoDuration(progressState);
   if (dur > 0) seekPos = Math.min(seekPos, dur - 2);
   seekPos = Math.max(0, seekPos);
   videoEl.currentTime = seekPos;
@@ -398,6 +184,8 @@ function resetSeek(): void {
   if (seekApplyTimer) { clearTimeout(seekApplyTimer); seekApplyTimer = null; }
   $root.find('.player__bar-seek').text('');
 }
+
+// --- Track navigation ---
 
 function navigateTrack(dir: number): boolean {
   if (!currentItem) return false;
@@ -459,7 +247,6 @@ function remountTrack(): void {
   var itemTitle = currentItem.title.split(' / ')[0];
   currentTitle = media.title;
   currentDuration = media.duration;
-
   currentAudios = media.audios;
   var prefs = currentItem ? getTitlePrefs(currentItem.id) : null;
 
@@ -499,13 +286,14 @@ function startWithAudio(title: string): void {
 // --- Bar show/hide ---
 
 var barTimer: number | null = null;
-
-
 var progressTimer: number | null = null;
 
 function startProgressTimer(): void {
   stopProgressTimer();
-  progressTimer = window.setInterval(updateProgress, 1000);
+  progressTimer = window.setInterval(function () {
+    syncProgressState();
+    updateProgress($root, progressState);
+  }, 1000);
 }
 
 function stopProgressTimer(): void {
@@ -514,11 +302,12 @@ function stopProgressTimer(): void {
 
 function showBar(): void {
   $root.find('.player__header, .player__gradient, .player__bar').removeClass('hidden');
-  showInfo();
-  updateProgress();
+  showInfo($root, getInfoState());
+  syncProgressState();
+  updateProgress($root, progressState);
   startProgressTimer();
   clearBarTimer();
-  if (!panelOpen && !seeking) {
+  if (!panelState.open && !seeking) {
     barTimer = window.setTimeout(hideBar, 4000);
   }
 }
@@ -526,337 +315,18 @@ function showBar(): void {
 function hideBar(): void {
   stopProgressTimer();
   $root.find('.player__header, .player__gradient, .player__bar').addClass('hidden');
-  hideInfo();
+  hideInfo($root);
 }
 
 function clearBarTimer(): void {
   if (barTimer !== null) { clearTimeout(barTimer); barTimer = null; }
 }
 
-function cacheBarElements(): void {
-  if (!barValueEl) barValueEl = $root.find('.player__bar-value')[0] || null;
-  if (!barPctEl) barPctEl = $root.find('.player__bar-pct')[0] || null;
-  if (!barDurationEl) barDurationEl = $root.find('.player__bar-duration')[0] || null;
-  if (!barSeekEl) barSeekEl = $root.find('.player__bar-seek')[0] || null;
-}
+// --- Audio / Sub / Quality switching ---
 
-function updateProgress(): void {
-  if (!videoEl) return;
-  cacheBarElements();
-  var cur = seeking ? seekPos : videoEl.currentTime;
-  var dur = getVideoDuration();
-  if (cur < 0) cur = 0;
-  var pct = dur > 0 ? (cur / dur) * 100 : 0;
-  if (pct > 100) pct = 100;
-  if (barValueEl) {
-    barValueEl.style.width = pct + '%';
-  }
-  if (barPctEl) {
-    barPctEl.innerHTML = pct.toFixed(1) + '%';
-  }
-  if (barDurationEl) {
-    barDurationEl.innerHTML = formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : '');
-  }
-  if (barSeekEl) {
-    barSeekEl.innerHTML = seeking ? formatTime(seekPos) : '';
-  }
-}
-
-
-
-// --- HLS manifest rewriting ---
-
-function getBaseUrl(url: string): string {
-  var i = url.indexOf('?');
-  var clean = i >= 0 ? url.substring(0, i) : url;
-  var last = clean.lastIndexOf('/');
-  return last >= 0 ? clean.substring(0, last + 1) : '';
-}
-
-function makeUrlsAbsolute(manifest: string, baseUrl: string): string {
-  if (!baseUrl) return manifest;
-  var lines = manifest.split('\n');
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i].trim();
-    if (line && line.charAt(0) !== '#' && line.indexOf('://') === -1) {
-      lines[i] = baseUrl + line;
-    }
-    if (line.indexOf('URI="') >= 0) {
-      lines[i] = lines[i].replace(/URI="([^"]+)"/g, function (_m: string, uri: string) {
-        if (uri.indexOf('://') === -1) return 'URI="' + baseUrl + uri + '"';
-        return _m;
-      });
-    }
-  }
-  return lines.join('\n');
-}
-
-function rewriteHlsManifest(manifest: string, audioIndex: number): string {
-  // KinoPub HLS2 uses URL pattern: index-v1a1.m3u8, seg-N-v1-a1.ts
-  // Replace a1 with aN in all URLs to switch audio track
-  var target = 'a' + audioIndex;
-  return manifest.replace(/(index-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
-    .replace(/(iframes-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
-    .replace(/(seg-\d+-v\d+)-a\d+(\.ts)/g, '$1-' + target + '$2');
-}
-
-function fetchRewrittenHls(url: string, audioIndex: number, cb: (blobUrl: string | null) => void): void {
-  $.ajax({
-    url: url,
-    dataType: 'text',
-    success: function (data: string) {
-      var baseUrl = getBaseUrl(url);
-      var rewritten = rewriteHlsManifest(data, audioIndex);
-      rewritten = makeUrlsAbsolute(rewritten, baseUrl);
-      var blob = new Blob([rewritten], { type: 'application/vnd.apple.mpegurl' });
-      cb(URL.createObjectURL(blob));
-    },
-    error: function () {
-      cb(null);
-    }
-  });
-}
-
-// --- Subtitles ---
-
-function srtToVtt(srt: string): string {
-  var vtt = 'WEBVTT\n\n' + srt
-    .replace(/\r\n/g, '\n')
-    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-  return vtt;
-}
-
-function loadSubtitleTrack(subIdx: number): void {
-  if (!videoEl) return;
-  // remove existing tracks
-  $root.find('video track').remove();
-  var tracks = videoEl.textTracks;
-  for (var i = 0; i < tracks.length; i++) {
-    tracks[i].mode = 'disabled';
-  }
-
-  if (subIdx < 0 || subIdx >= currentSubs.length) return;
-
-  var sub = currentSubs[subIdx];
-  var v = videoEl;
-
-  function addTrackFromUrl(src: string): void {
-    var track = document.createElement('track');
-    track.kind = 'subtitles';
-    track.label = sub.lang;
-    track.srclang = sub.lang;
-    track.src = src;
-    track.setAttribute('default', '');
-    v.appendChild(track);
-    if (v.textTracks.length > 0) {
-      v.textTracks[v.textTracks.length - 1].mode = 'showing';
-    }
-  }
-
-  $.ajax({
-    url: sub.url,
-    dataType: 'text',
-    success: function (data: string) {
-      if (!v || !v.parentNode) return;
-      var vtt = srtToVtt(data);
-      var blob = new Blob([vtt], { type: 'text/vtt' });
-      addTrackFromUrl(URL.createObjectURL(blob));
-    },
-    error: function () {
-      // fallback: direct URL (works on Tizen, may fail on file://)
-      if (!v || !v.parentNode) return;
-      addTrackFromUrl(sub.url);
-    }
-  });
-}
-
-// --- Panel (settings bottom) ---
-
-var panelOpen = false;
-var panelBtnIndex = 0;
-var panelListOpen = false;
-var panelListIndex = 0;
-var panelListSection = 0; // 0=audio, 1=subs, 2=quality
-
-var PANEL_SECTIONS = ['audio', 'subs', 'quality'];
-
-function buildAudioLabel(a: AudioTrack): string {
-  var label = a.lang;
-  if (a.type && a.type.title) label += ' - ' + a.type.title;
-  if (a.author && a.author.title) label += ' (' + a.author.title + ')';
-  label += ' [' + a.codec + ' ' + a.channels + 'ch]';
-  return label;
-}
-
-function getAudioItems(): Array<{ label: string; selected: boolean }> {
-  var items: Array<{ label: string; selected: boolean }> = [];
-  if (currentAudios.length > 0) {
-    for (var j = 0; j < currentAudios.length; j++) {
-      items.push({ label: buildAudioLabel(currentAudios[j]), selected: j === selectedAudio });
-    }
-    return items;
-  }
-  if (useHls && hlsAudioTracks.length > 1) {
-    var seen: Record<string, boolean> = {};
-    for (var i = 0; i < hlsAudioTracks.length; i++) {
-      var at = hlsAudioTracks[i];
-      var lbl = at.name || at.lang || ('Дорожка ' + (i + 1));
-      if (seen[lbl]) { lbl += ' #' + (i + 1); }
-      seen[lbl] = true;
-      items.push({ label: lbl, selected: i === selectedAudio });
-    }
-    return items;
-  }
-  if (videoEl) {
-    var native = (videoEl as any).audioTracks;
-    if (native && native.length > 0) {
-      for (var k = 0; k < native.length; k++) {
-        items.push({ label: native[k].label || native[k].language || ('Дорожка ' + (k + 1)), selected: native[k].enabled });
-      }
-      return items;
-    }
-  }
-  items.push({ label: 'Нет данных', selected: false });
-  return items;
-}
-
-function getVideoTextTracks(): TextTrackList | null {
-  if (videoEl && videoEl.textTracks && videoEl.textTracks.length > 0) {
-    return videoEl.textTracks;
-  }
-  return null;
-}
-
-function getSubItems(): Array<{ label: string; selected: boolean }> {
-  var items: Array<{ label: string; selected: boolean }> = [];
-  if (currentSubs.length > 0) {
-    items.push({ label: 'Выкл', selected: selectedSub === -1 });
-    for (var j = 0; j < currentSubs.length; j++) {
-      items.push({ label: currentSubs[j].lang.toUpperCase(), selected: j === selectedSub });
-    }
-    return items;
-  }
-  items.push({ label: 'Нет субтитров', selected: false });
-  return items;
-}
-
-function getQualityItems(): Array<{ label: string; selected: boolean }> {
-  var items: Array<{ label: string; selected: boolean }> = [];
-  for (var i = 0; i < currentFiles.length; i++) {
-    var f = currentFiles[i];
-    items.push({ label: f.quality + ' (' + f.w + 'x' + f.h + ')', selected: i === selectedQuality });
-  }
-  return items;
-}
-
-function getPanelItems(section: number): Array<{ label: string; selected: boolean }> {
-  if (section === 0) return getAudioItems();
-  if (section === 1) return getSubItems();
-  return getQualityItems();
-}
-
-function getSelectedLabel(section: number): string {
-  var items = getPanelItems(section);
-  for (var i = 0; i < items.length; i++) {
-    if (items[i].selected) return items[i].label;
-  }
-  return '...';
-}
-
-function updatePanelButtons(): void {
-  var labels = ['Аудио: ', 'Сабы: ', 'Качество: '];
-  for (var i = 0; i < PANEL_SECTIONS.length; i++) {
-    var $btn = $root.find('.ppanel__btn').eq(i);
-    $btn.find('.ppanel__btn-label').html(labels[i] + getSelectedLabel(i));
-    if (i === panelBtnIndex && !panelListOpen) {
-      $btn.addClass('focused');
-    } else {
-      $btn.removeClass('focused');
-    }
-  }
-}
-
-function renderPanelList(): void {
-  var items = getPanelItems(panelListSection);
-  var html = '';
-  for (var i = 0; i < items.length; i++) {
-    html += '<div class="ppanel__list-item' +
-      (items[i].selected ? ' selected' : '') +
-      (i === panelListIndex ? ' focused' : '') +
-      '">' + items[i].label + '</div>';
-  }
-  $root.find('.ppanel__list').html(html);
-}
-
-function openPanel(): void {
-  if (panelOpen) return;
-  panelOpen = true;
-  panelBtnIndex = 0;
-  panelListOpen = false;
-  clearBarTimer();
-  hideBar();
-  $root.find('.player__panel').removeClass('hidden');
-  updatePanelButtons();
-  setTimeout(function () {
-    $root.find('.ppanel__buttons').addClass('active');
-  }, 20);
-}
-
-function closePanel(): void {
-  if (!panelOpen) return;
-  if (panelListOpen) {
-    closePanelList();
-    return;
-  }
-  $root.find('.ppanel__buttons').removeClass('active');
-  setTimeout(function () {
-    panelOpen = false;
-    $root.find('.player__panel').addClass('hidden');
-    showBar();
-  }, 200);
-}
-
-function openPanelList(): void {
-  panelListOpen = true;
-  panelListSection = panelBtnIndex;
-  var items = getPanelItems(panelListSection);
-  panelListIndex = 0;
-  for (var i = 0; i < items.length; i++) {
-    if (items[i].selected) { panelListIndex = i; break; }
-  }
-  renderPanelList();
-  updatePanelButtons();
-  $root.find('.ppanel__buttons').removeClass('active');
-  $root.find('.ppanel__list').removeClass('hidden');
-  setTimeout(function () {
-    $root.find('.ppanel__list').addClass('active');
-  }, 20);
-}
-
-function closePanelList(): void {
-  $root.find('.ppanel__list').removeClass('active');
-  setTimeout(function () {
-    panelListOpen = false;
-    $root.find('.ppanel__list').addClass('hidden');
-    $root.find('.ppanel__buttons').addClass('active');
-    updatePanelButtons();
-  }, 200);
-}
-
-function applyPanelSelection(): void {
-  if (panelListSection === 0) {
-    applyAudioSwitch(panelListIndex);
-  } else if (panelListSection === 1) {
-    applySubSwitch(panelListIndex);
-  } else {
-    if (panelListIndex !== selectedQuality) {
-      selectedQuality = panelListIndex;
-      switchQuality();
-    }
-  }
-  saveCurrentPrefs();
-  updatePanelButtons();
-  renderPanelList();
+function doSavePrefs(): void {
+  if (!currentItem) return;
+  saveCurrentPrefs(currentItem.id, currentFiles, currentAudios, currentSubs, selectedQuality, selectedAudio, selectedSub);
 }
 
 function applyAudioSwitch(idx: number): void {
@@ -893,46 +363,8 @@ function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
 function applySubSwitch(menuIdx: number): void {
   var subIdx = menuIdx - 1;
   selectedSub = subIdx;
-  loadSubtitleTrack(subIdx);
+  if (videoEl) loadSubtitleTrack(videoEl, $root, currentSubs, subIdx);
 }
-
-function handlePanelKey(e: JQuery.Event): void {
-  var kc = getKeyCode(e);
-  if (panelListOpen) {
-    var items = getPanelItems(panelListSection);
-    switch (kc) {
-      case TvKey.Up:
-        if (panelListIndex > 0) { panelListIndex--; renderPanelList(); }
-        e.preventDefault(); break;
-      case TvKey.Down:
-        if (panelListIndex < items.length - 1) { panelListIndex++; renderPanelList(); }
-        e.preventDefault(); break;
-      case TvKey.Enter:
-        if (items[panelListIndex] && items[panelListIndex].selected) { closePanelList(); }
-        else { applyPanelSelection(); }
-        e.preventDefault(); break;
-      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
-        closePanelList(); e.preventDefault(); break;
-    }
-    return;
-  }
-
-  switch (kc) {
-    case TvKey.Left:
-      if (panelBtnIndex > 0) { panelBtnIndex--; updatePanelButtons(); }
-      e.preventDefault(); break;
-    case TvKey.Right:
-      if (panelBtnIndex < PANEL_SECTIONS.length - 1) { panelBtnIndex++; updatePanelButtons(); }
-      e.preventDefault(); break;
-    case TvKey.Enter:
-      openPanelList(); e.preventDefault(); break;
-    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Up:
-      closePanel(); e.preventDefault(); break;
-  }
-}
-
-var resumePaused = false;
-var qualitySwitching = false;
 
 function switchQuality(): void {
   if (!videoEl || currentFiles.length === 0) return;
@@ -942,7 +374,6 @@ function switchQuality(): void {
   if (!url) return;
 
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-
   resumeTime = pos;
   qualitySwitching = true;
   playSource(url);
@@ -1006,8 +437,6 @@ function playSource(url: string): void {
   videoEl.addEventListener('loadedmetadata', onMeta);
 }
 
-
-
 function onSourceReady(): void {
   if (!videoEl) return;
   if (resumeTime > 0) {
@@ -1041,7 +470,7 @@ function onSourceReady(): void {
     var tryLoadSub = function () {
       if (subLoaded || !vv || !vv.parentNode) return;
       subLoaded = true;
-      loadSubtitleTrack(subToRestore);
+      loadSubtitleTrack(vv, $root, currentSubs, subToRestore);
     };
     vv.addEventListener('timeupdate', function onTime() {
       vv.removeEventListener('timeupdate', onTime);
@@ -1052,7 +481,7 @@ function onSourceReady(): void {
   hideSpinner();
   startMarkTimer();
   showBar();
-  updateInfoBadge();
+  updateInfoBadge($root, getInfoState());
 }
 
 function showSpinner(): void {
@@ -1108,6 +537,10 @@ function playUrl(url: string, title: string): void {
   var epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
   $root.html(tplPlayer({ title: itemTitle, episode: epTitle }));
   videoEl = $root.find('video')[0] as HTMLVideoElement;
+  progressState.barValueEl = null;
+  progressState.barPctEl = null;
+  progressState.barDurationEl = null;
+  progressState.barSeekEl = null;
 
   var sourceUrl = url;
   videoEl.addEventListener('ended', function () {
@@ -1124,9 +557,6 @@ function playUrl(url: string, title: string): void {
   });
 
   applySubSize();
-
-  // Tizen 2.3: video element needs a tick after innerHTML insertion
-  // before it can accept a source reliably
   setTimeout(function () { playSource(url); }, 0);
 }
 
@@ -1178,10 +608,10 @@ function destroyPlayer(): void {
     try { videoEl.load(); } catch (e) { /* ignore */ }
     videoEl = null;
   }
-  barValueEl = null;
-  barPctEl = null;
-  barDurationEl = null;
-  barSeekEl = null;
+  progressState.barValueEl = null;
+  progressState.barPctEl = null;
+  progressState.barDurationEl = null;
+  progressState.barSeekEl = null;
   currentHlsUrl = '';
 }
 
@@ -1201,7 +631,10 @@ function handleKey(e: JQuery.Event): void {
     return;
   }
 
-  if (panelOpen) { handlePanelKey(e); return; }
+  if (panelState.open) {
+    handlePanelKey(e, kc, $root, panelState, panelCallbacks);
+    return;
+  }
 
   switch (kc) {
     case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
@@ -1232,12 +665,12 @@ function handleKey(e: JQuery.Event): void {
     case TvKey.Up:
       showBar(); break;
     case TvKey.Down:
-      openPanel(); break;
+      panelOpen_($root, panelState, panelCallbacks); break;
 
     case TvKey.Green:
-      changeSubSize(1); break;
+      changeSubSize(1, showToast); break;
     case TvKey.Red:
-      changeSubSize(-1); break;
+      changeSubSize(-1, showToast); break;
   }
   e.preventDefault();
 }
@@ -1253,8 +686,8 @@ export var playerPage: Page = {
     resumeTime = 0;
     resumePaused = false;
     playbackStarted = false;
-    panelOpen = false;
-    panelListOpen = false;
+    panelState.open = false;
+    panelState.listOpen = false;
     useHls = false;
     currentFiles = [];
     currentAudios = [];
@@ -1322,7 +755,7 @@ export var playerPage: Page = {
     destroyPlayer();
     keys.unbind();
     clearPage($root);
-    panelOpen = false;
-    panelListOpen = false;
+    panelState.open = false;
+    panelState.listOpen = false;
   }
 };
