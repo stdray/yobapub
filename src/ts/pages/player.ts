@@ -393,11 +393,12 @@ function remountTrack(): void {
   selectedAudio = 0;
   selectedSub = -1;
 
-  var url = getUrlFromFile(currentFiles[selectedQuality]);
-  if (url) {
-    var itemTitle = currentItem.title.split(' / ')[0];
-    playUrl(url, itemTitle + ' - ' + currentTitle);
-  }
+  var itemTitle = currentItem.title.split(' / ')[0];
+  fetchVideoUrl(currentFiles[selectedQuality], function (url: string) {
+    if (url) {
+      playUrl(url, itemTitle + ' - ' + currentTitle);
+    }
+  });
 }
 
 // --- Bar show/hide ---
@@ -742,18 +743,37 @@ function handlePanelKey(e: JQuery.Event): void {
 var resumePaused = false;
 var qualitySwitching = false;
 
+function fetchVideoUrl(f: VideoFile, cb: (url: string) => void): void {
+  if (f.file) {
+    var stype = getStreamingType();
+    apiGet('/v1/items/media-video-link', { file: f.file, type: stype }).then(
+      function (res: any) {
+        var data = Array.isArray(res) ? res[0] : res;
+        if (data && data.url) { cb(data.url); }
+        else { cb(getUrlFromFile(f)); }
+      },
+      function () { cb(getUrlFromFile(f)); }
+    );
+  } else {
+    cb(getUrlFromFile(f));
+  }
+}
+
 function switchQuality(): void {
   if (!videoEl || currentFiles.length === 0) return;
   var pos = videoEl.currentTime;
   resumePaused = videoEl.paused;
-  var url = getUrlFromFile(currentFiles[selectedQuality]);
-  if (!url) return;
+  var f = currentFiles[selectedQuality];
 
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
 
   resumeTime = pos;
   qualitySwitching = true;
-  playSource(url);
+
+  fetchVideoUrl(f, function (url: string) {
+    if (!url) return;
+    playSource(url);
+  });
 }
 
 // --- Playback ---
@@ -816,28 +836,15 @@ function stopProgressTimer(): void {
 
 function onSourceReady(): void {
   if (!videoEl) return;
-  if (resumeTime > 0) {
-    var pos = resumeTime;
-    resumeTime = 0;
-    var v = videoEl;
-    var done = false;
-    var doSeek = function () {
-      if (done) return;
-      done = true;
-      v.removeEventListener('playing', doSeek);
-      v.currentTime = pos;
-    };
-    if (resumePaused) {
-      resumePaused = false;
-      v.currentTime = pos;
-    } else {
-      v.addEventListener('playing', doSeek);
-      v.play();
-    }
-  } else {
-    if (resumePaused) { resumePaused = false; }
-    else { videoEl.play(); }
+  var pos = resumeTime;
+  resumeTime = 0;
+  if (pos > 0) {
+    videoEl.currentTime = pos;
   }
+  if (!resumePaused) {
+    videoEl.play();
+  }
+  resumePaused = false;
   playbackStarted = true;
   qualitySwitching = false;
   startMarkTimer();
@@ -1092,13 +1099,14 @@ export var playerPage: Page = {
           });
         }
 
-        var url = getUrlFromFile(currentFiles[selectedQuality]);
-        if (url) {
-          var itemTitle = currentItem.title.split(' / ')[0];
-          playUrl(url, itemTitle + ' - ' + currentTitle);
-        } else {
-          $root.html('<div class="player"><div class="player__title" style="padding:60px;">Не удалось найти видео</div></div>');
-        }
+        var itemTitle = currentItem.title.split(' / ')[0];
+        fetchVideoUrl(currentFiles[selectedQuality], function (url: string) {
+          if (url) {
+            playUrl(url, itemTitle + ' - ' + currentTitle);
+          } else {
+            $root.html('<div class="player"><div class="player__title" style="padding:60px;">Не удалось найти видео</div></div>');
+          }
+        });
       },
       function () {
         $root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка загрузки</div></div>');
