@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { apiGet, apiPost, apiGetWithRefresh } from './client';
+import { apiGet, apiPost, apiGetWithRefresh, apiPostWithRefresh } from './client';
 
 var cachedDeviceId: number | null = null;
 
@@ -40,6 +40,10 @@ export function getDeviceSettings(): JQueryDeferred<any> {
     function () { d.reject(); }
   );
   return d;
+}
+
+export function unlinkDevice(): JQueryDeferred<any> {
+  return apiPostWithRefresh('/v1/device/unlink');
 }
 
 export function saveDeviceSettings(settings: Record<string, any>): JQueryDeferred<any> {

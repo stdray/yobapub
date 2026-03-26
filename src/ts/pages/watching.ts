@@ -7,6 +7,7 @@ import { navigate, setParams } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
 import { clearTokens } from '../utils/storage';
+import { unlinkDevice } from '../api/device';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-watching');
@@ -170,7 +171,7 @@ function handleMenuKey(e: JQuery.Event): void {
     case TvKey.Enter:
       if (menuIndex === 1) { navigate('bookmarks'); }
       else if (menuIndex === 3) { navigate('settings'); }
-      else if (menuIndex === 4) { clearTokens(); navigate('login'); }
+      else if (menuIndex === 4) { unlinkDevice().always(function () { clearTokens(); navigate('login'); }); }
       e.preventDefault(); break;
   }
 }

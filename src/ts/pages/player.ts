@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import { Page, RouteParams } from '../types/app';
 import { getItem } from '../api/items';
-import { markTime } from '../api/watching';
+import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey } from '../utils/platform';
@@ -544,7 +544,7 @@ function playUrl(url: string, title: string): void {
 
   var sourceUrl = url;
   videoEl.addEventListener('ended', function () {
-    savePosition();
+    if (!markedWatched) markWatched();
     if (!navigateTrack(1)) goBack();
   });
   videoEl.addEventListener('waiting', showSpinner);
@@ -562,8 +562,11 @@ function playUrl(url: string, title: string): void {
 
 // --- Mark time ---
 
+var markedWatched = false;
+
 function startMarkTimer(): void {
   stopMarkTimer();
+  markedWatched = false;
   markTimer = window.setInterval(function () {
     if (!videoEl || !currentItem) return;
     var time = Math.floor(videoEl.currentTime);
@@ -572,6 +575,18 @@ function startMarkTimer(): void {
       markTime(currentItem.id, currentEpisode, time, currentSeason);
     } else if (currentVideo !== undefined) {
       markTime(currentItem.id, currentVideo, time);
+    }
+    if (!markedWatched) {
+      syncProgressState();
+      var dur = getVideoDuration(progressState);
+      if (dur > 0) {
+        var isSerial = currentSeason !== undefined;
+        var threshold = isSerial ? 120 : 420;
+        if (dur - time <= threshold) {
+          markedWatched = true;
+          markWatched();
+        }
+      }
     }
   }, 30000);
 }
@@ -588,6 +603,15 @@ function savePosition(): void {
     markTime(currentItem.id, currentEpisode, time, currentSeason);
   } else if (currentVideo !== undefined) {
     markTime(currentItem.id, currentVideo, time);
+  }
+}
+
+function markWatched(): void {
+  if (!currentItem) return;
+  if (currentSeason !== undefined && currentEpisode !== undefined) {
+    toggleWatched(currentItem.id, currentEpisode, currentSeason);
+  } else if (currentVideo !== undefined) {
+    toggleWatched(currentItem.id, currentVideo);
   }
 }
 

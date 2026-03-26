@@ -19,3 +19,11 @@ export function markTime(id: number, video: number, time: number, season?: numbe
   }
   return apiGetWithRefresh('/v1/watching/marktime', params);
 }
+
+export function toggleWatched(id: number, video: number, season?: number): JQueryDeferred<any> {
+  var params: Record<string, any> = { id: id, video: video };
+  if (season !== undefined) {
+    params.season = season;
+  }
+  return apiGetWithRefresh('/v1/watching/toggle', params);
+}
