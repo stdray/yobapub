@@ -57,7 +57,13 @@ function getUrlFromFile(f: VideoFile): string {
   return urls.hls4 || urls.hls || urls.http || '';
 }
 
-function findEpisodeData(item: Item, seasonNum: number, epNum: number): { files: VideoFile[]; audios: AudioTrack[]; subs: Subtitle[]; title: string } | null {
+interface MediaInfo {
+  mid: number;
+  title: string;
+  audios: AudioTrack[];
+}
+
+function findEpisodeMedia(item: Item, seasonNum: number, epNum: number): MediaInfo | null {
   if (!item.seasons) return null;
   for (var i = 0; i < item.seasons.length; i++) {
     var s = item.seasons[i];
@@ -65,7 +71,7 @@ function findEpisodeData(item: Item, seasonNum: number, epNum: number): { files:
       for (var j = 0; j < s.episodes.length; j++) {
         var ep = s.episodes[j];
         if (ep.number === epNum) {
-          return { files: ep.files || [], audios: ep.audios || [], subs: ep.subtitles || [], title: ep.title || 'S' + seasonNum + 'E' + epNum };
+          return { mid: ep.id, title: ep.title || 'S' + seasonNum + 'E' + epNum, audios: ep.audios || [] };
         }
       }
     }
@@ -73,14 +79,26 @@ function findEpisodeData(item: Item, seasonNum: number, epNum: number): { files:
   return null;
 }
 
-function findVideoData(item: Item, videoNum: number): { files: VideoFile[]; audios: AudioTrack[]; subs: Subtitle[]; title: string } | null {
+function findVideoMedia(item: Item, videoNum: number): MediaInfo | null {
   if (!item.videos) return null;
   var idx = videoNum - 1;
   if (idx >= 0 && idx < item.videos.length) {
     var v = item.videos[idx];
-    return { files: v.files || [], audios: v.audios || [], subs: v.subtitles || [], title: v.title || 'Видео ' + videoNum };
+    return { mid: v.id, title: v.title || 'Видео ' + videoNum, audios: v.audios || [] };
   }
   return null;
+}
+
+function loadMediaLinks(mid: number, cb: (files: VideoFile[], subs: Subtitle[]) => void): void {
+  apiGet('/v1/items/media-links', { mid: mid }).then(
+    function (res: any) {
+      var data = Array.isArray(res) ? res[0] : res;
+      var files: VideoFile[] = (data && data.files) || [];
+      var subs: Subtitle[] = (data && data.subtitles) || [];
+      cb(files, subs);
+    },
+    function () { cb([], []); }
+  );
 }
 
 function pickDefaultQualityIndex(files: VideoFile[]): number {
@@ -377,28 +395,32 @@ function navigateTrack(dir: number): boolean {
 
 function remountTrack(): void {
   if (!currentItem) return;
-  var result: { files: VideoFile[]; audios: AudioTrack[]; subs: Subtitle[]; title: string } | null = null;
+  var media: MediaInfo | null = null;
 
   if (currentSeason !== undefined && currentEpisode !== undefined) {
-    result = findEpisodeData(currentItem, currentSeason, currentEpisode);
+    media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
     resumeTime = getResumeTime(currentItem, currentSeason, currentEpisode);
   } else if (currentVideo !== undefined) {
-    result = findVideoData(currentItem, currentVideo);
+    media = findVideoMedia(currentItem, currentVideo);
     resumeTime = getResumeTime(currentItem, undefined, undefined, currentVideo);
   }
 
-  if (!result || result.files.length === 0) return;
-
-  currentFiles = result.files.slice().sort(function (a, b) { return b.w - a.w; });
-  currentAudios = result.audios;
-  currentSubs = result.subs.filter(function (s) { return s.url && !s.embed; });
-  currentTitle = result.title;
-  selectedQuality = pickDefaultQualityIndex(currentFiles);
-  selectedAudio = 0;
-  selectedSub = -1;
+  if (!media) return;
 
   var itemTitle = currentItem.title.split(' / ')[0];
-  fetchVideoUrl(currentFiles[selectedQuality], function (url: string) {
+  currentTitle = media.title;
+
+  currentAudios = media.audios;
+
+  loadMediaLinks(media.mid, function (files, subs) {
+    currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
+    currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
+    selectedQuality = pickDefaultQualityIndex(currentFiles);
+    selectedAudio = 0;
+    selectedSub = -1;
+
+    if (currentFiles.length === 0) return;
+    var url = getUrlFromFile(currentFiles[selectedQuality]);
     if (url) {
       playUrl(url, itemTitle + ' - ' + currentTitle);
     }
@@ -768,37 +790,18 @@ function handlePanelKey(e: JQuery.Event): void {
 var resumePaused = false;
 var qualitySwitching = false;
 
-function fetchVideoUrl(f: VideoFile, cb: (url: string) => void): void {
-  if (f.file) {
-    var stype = getStreamingType();
-    apiGet('/v1/items/media-video-link', { file: f.file, type: stype }).then(
-      function (res: any) {
-        var data = Array.isArray(res) ? res[0] : res;
-        if (data && data.url) { cb(data.url); }
-        else { cb(getUrlFromFile(f)); }
-      },
-      function () { cb(getUrlFromFile(f)); }
-    );
-  } else {
-    cb(getUrlFromFile(f));
-  }
-}
-
 function switchQuality(): void {
   if (!videoEl || currentFiles.length === 0) return;
   var pos = videoEl.currentTime;
   resumePaused = videoEl.paused;
-  var f = currentFiles[selectedQuality];
+  var url = getUrlFromFile(currentFiles[selectedQuality]);
+  if (!url) return;
 
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
 
   resumeTime = pos;
   qualitySwitching = true;
-
-  fetchVideoUrl(f, function (url: string) {
-    if (!url) return;
-    playSource(url);
-  });
+  playSource(url);
 }
 
 // --- Playback ---
@@ -1107,29 +1110,36 @@ export var playerPage: Page = {
         currentItem = data.item;
         if (!currentItem) return;
 
-        var result: { files: VideoFile[]; audios: AudioTrack[]; subs: Subtitle[]; title: string } | null = null;
+        var media: MediaInfo | null = null;
 
         if (currentSeason !== undefined && currentEpisode !== undefined) {
-          result = findEpisodeData(currentItem, currentSeason, currentEpisode);
+          media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
           resumeTime = getResumeTime(currentItem, currentSeason, currentEpisode);
         } else if (currentVideo !== undefined) {
-          result = findVideoData(currentItem, currentVideo);
+          media = findVideoMedia(currentItem, currentVideo);
           resumeTime = getResumeTime(currentItem, undefined, undefined, currentVideo);
         }
 
-        if (!result || result.files.length === 0) {
+        if (!media) {
           $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
           return;
         }
 
-        currentFiles = result.files.slice().sort(function (a, b) { return b.w - a.w; });
-        currentAudios = result.audios;
-        currentSubs = result.subs.filter(function (s) { return s.url && !s.embed; });
-        currentTitle = result.title;
-        selectedQuality = pickDefaultQualityIndex(currentFiles);
-
+        currentTitle = media.title;
+        currentAudios = media.audios;
         var itemTitle = currentItem.title.split(' / ')[0];
-        fetchVideoUrl(currentFiles[selectedQuality], function (url: string) {
+
+        loadMediaLinks(media.mid, function (files, subs) {
+          currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
+          currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
+          selectedQuality = pickDefaultQualityIndex(currentFiles);
+
+          if (currentFiles.length === 0) {
+            $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
+            return;
+          }
+
+          var url = getUrlFromFile(currentFiles[selectedQuality]);
           if (url) {
             playUrl(url, itemTitle + ' - ' + currentTitle);
           } else {

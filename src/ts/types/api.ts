@@ -78,6 +78,7 @@ export interface WatchingStatus {
 }
 
 export interface Video {
+  id: number;
   title: string;
   thumbnail: string;
   duration: number;
@@ -91,6 +92,7 @@ export interface Video {
 }
 
 export interface Episode {
+  id: number;
   title: string;
   thumbnail?: string;
   duration: number;
