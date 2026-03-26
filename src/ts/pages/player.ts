@@ -808,9 +808,8 @@ function stopProgressTimer(): void {
   if (progressTimer !== null) { clearInterval(progressTimer); progressTimer = null; }
 }
 
-function onSourceReady(): void {
+function beginPlayback(): void {
   if (!videoEl) return;
-  if (resumeTime > 0) { videoEl.currentTime = resumeTime; resumeTime = 0; }
   if (resumePaused) { resumePaused = false; }
   else { videoEl.play(); }
   playbackStarted = true;
@@ -819,6 +818,27 @@ function onSourceReady(): void {
   startProgressTimer();
   showBar();
   updateInfoBadge();
+}
+
+function onSourceReady(): void {
+  if (!videoEl) return;
+  if (resumeTime > 0) {
+    var pos = resumeTime;
+    resumeTime = 0;
+    var v = videoEl;
+    var done = false;
+    var finish = function () {
+      if (done) return;
+      done = true;
+      v.removeEventListener('seeked', finish);
+      beginPlayback();
+    };
+    v.addEventListener('seeked', finish);
+    v.currentTime = pos;
+    setTimeout(finish, 5000);
+  } else {
+    beginPlayback();
+  }
 }
 
 function showSpinner(): void {
