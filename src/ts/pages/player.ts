@@ -564,38 +564,12 @@ function makeUrlsAbsolute(manifest: string, baseUrl: string): string {
 }
 
 function rewriteHlsManifest(manifest: string, audioIndex: number): string {
-  var lines = manifest.split('\n');
-  var result: string[] = [];
-  var defaultGroup = '';
-  var targetGroup = '';
-
-  // find audio groups, pick target by index
-  var audioCount = 0;
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    if (line.indexOf('#EXT-X-MEDIA:') === 0 && line.indexOf('TYPE=AUDIO') >= 0) {
-      audioCount++;
-      if (audioCount === audioIndex) {
-        targetGroup = 'audio_rewrite';
-        var match = line.match(/GROUP-ID="([^"]+)"/);
-        if (match) defaultGroup = match[1];
-        result.push(line.replace(/GROUP-ID="[^"]+"/, 'GROUP-ID="' + targetGroup + '"').replace(/DEFAULT=\w+/, 'DEFAULT=YES').replace(/AUTOSELECT=\w+/, 'AUTOSELECT=YES'));
-      }
-      continue;
-    }
-    result.push(line);
-  }
-
-  if (!targetGroup) return manifest;
-
-  // rewrite STREAM-INF lines to use our audio group
-  for (var j = 0; j < result.length; j++) {
-    if (result[j].indexOf('#EXT-X-STREAM-INF:') === 0 && result[j].indexOf('AUDIO=') >= 0) {
-      result[j] = result[j].replace(/AUDIO="[^"]+"/, 'AUDIO="' + targetGroup + '"');
-    }
-  }
-
-  return result.join('\n');
+  // KinoPub HLS2 uses URL pattern: index-v1a1.m3u8, seg-N-v1-a1.ts
+  // Replace a1 with aN in all URLs to switch audio track
+  var target = 'a' + audioIndex;
+  return manifest.replace(/(index-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
+    .replace(/(iframes-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
+    .replace(/(seg-\d+-v\d+)-a\d+(\.ts)/g, '$1-' + target + '$2');
 }
 
 function fetchRewrittenHls(url: string, audioIndex: number, cb: (blobUrl: string | null) => void): void {
