@@ -716,6 +716,36 @@ video::cue {
 .sitem.focused .sitem__value {
   color: #e94560;
 }
+.sitem__stepper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sitem__step-btn {
+  width: 48px;
+  height: 48px;
+  line-height: 44px;
+  text-align: center;
+  font-size: 30px;
+  color: #888;
+  border: 2px solid #555;
+  border-radius: 8px;
+  background: #222;
+}
+.sitem.focused .sitem__step-btn {
+  color: #fff;
+  border-color: #e94560;
+  background: #1a1a2e;
+}
+.sitem__step-val {
+  min-width: 140px;
+  text-align: center;
+  color: #888;
+  font-size: 26px;
+}
+.sitem.focused .sitem__step-val {
+  color: #e94560;
+}
 
 .soptions-overlay {
   position: fixed;

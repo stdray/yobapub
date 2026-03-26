@@ -63,9 +63,17 @@ var tplPage = doT.template(
 );
 
 var tplSettingItem = doT.template(
-  '<div class="sitem{{?it.focused}} focused{{?}}" data-idx="{{=it.idx}}">' +
+  '<div class="sitem{{?it.focused}} focused{{?}}{{?it.stepper}} sitem--stepper{{?}}" data-idx="{{=it.idx}}">' +
     '<span class="sitem__label">{{=it.label}}</span>' +
-    '<span class="sitem__value">{{=it.value}}</span>' +
+    '{{?it.stepper}}' +
+      '<span class="sitem__stepper">' +
+        '<span class="sitem__step-btn sitem__step-btn--minus">&minus;</span>' +
+        '<span class="sitem__step-val">{{=it.value}}</span>' +
+        '<span class="sitem__step-btn sitem__step-btn--plus">+</span>' +
+      '</span>' +
+    '{{??}}' +
+      '<span class="sitem__value">{{=it.value}}</span>' +
+    '{{?}}' +
   '</div>'
 );
 
@@ -122,19 +130,16 @@ function buildQualitySetting(): SettingItem {
 }
 
 function buildSubSizeSetting(): SettingItem {
-  var current = getSubSize();
-  var opts: SettingOption[] = [];
-  var id = 0;
-  for (var s = SUB_SIZE_MIN; s <= SUB_SIZE_MAX; s += SUB_SIZE_STEP) {
-    var label = s + 'px';
-    if (s === DEFAULT_SUB_SIZE) label += ' (стандарт)';
-    opts.push({ id: id, label: label, description: '', selected: s === current ? 1 : 0 });
-    id++;
-  }
-  return { key: '_subSize', label: 'Размер субтитров', type: 'list', value: null, options: opts };
+  return { key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: getSubSize() };
 }
 
 function getDisplayValue(item: SettingItem): string {
+  if (item.type === 'stepper') {
+    var v = item.value as number;
+    var lbl = v + 'px';
+    if (v === DEFAULT_SUB_SIZE) lbl += ' (стандарт)';
+    return lbl;
+  }
   if (item.type === 'list' && item.options) {
     for (var i = 0; i < item.options.length; i++) {
       if (item.options[i].selected) return item.options[i].label;
@@ -151,7 +156,8 @@ function render(): void {
       idx: i,
       label: allSettings[i].label,
       value: getDisplayValue(allSettings[i]),
-      focused: !optionsOpen && i === focusedIndex
+      focused: !optionsOpen && i === focusedIndex,
+      stepper: allSettings[i].type === 'stepper'
     });
   }
   $root.html(tplPage({ items: html, version: __APP_VERSION__ }));
@@ -204,17 +210,7 @@ function applyOption(): void {
     return;
   }
 
-  if (item.key === '_subSize') {
-    if (item.options) {
-      for (var k = 0; k < item.options.length; k++) {
-        item.options[k].selected = (k === focusedOptionIndex) ? 1 : 0;
-      }
-      var size = SUB_SIZE_MIN + focusedOptionIndex * SUB_SIZE_STEP;
-      setSubSize(size);
-    }
-    closeOptions();
-    return;
-  }
+
 
   var saveData: Record<string, any> = {};
 
@@ -237,11 +233,23 @@ function applyOption(): void {
   closeOptions();
 }
 
+function stepSubSize(dir: number): void {
+  var item = allSettings[focusedIndex];
+  if (!item || item.key !== '_subSize') return;
+  var size = item.value as number;
+  size = Math.max(SUB_SIZE_MIN, Math.min(SUB_SIZE_MAX, size + dir * SUB_SIZE_STEP));
+  item.value = size;
+  setSubSize(size);
+  render();
+}
+
 function handleKey(e: JQuery.Event): void {
   if (optionsOpen) {
     handleOptionsKey(e);
     return;
   }
+
+  var item = allSettings[focusedIndex];
 
   switch (e.keyCode) {
     case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
@@ -252,7 +260,14 @@ function handleKey(e: JQuery.Event): void {
     case TvKey.Down:
       if (focusedIndex < allSettings.length - 1) { focusedIndex++; render(); }
       e.preventDefault(); break;
+    case TvKey.Left:
+      if (item && item.type === 'stepper') { stepSubSize(-1); e.preventDefault(); }
+      break;
+    case TvKey.Right:
+      if (item && item.type === 'stepper') { stepSubSize(1); e.preventDefault(); }
+      break;
     case TvKey.Enter:
+      if (item && item.type === 'stepper') { e.preventDefault(); break; }
       openOptions(); e.preventDefault(); break;
   }
 }
