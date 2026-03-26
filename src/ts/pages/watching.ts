@@ -3,7 +3,7 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { getWatchingMovies, getWatchingSerials } from '../api/watching';
 import { WatchingSerialItem, WatchingMovieItem } from '../types/api';
-import { navigate } from '../router';
+import { navigate, setParams } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
 import { clearTokens } from '../utils/storage';
@@ -27,9 +27,11 @@ var moviesData: WatchingMovieItem[] = [];
 
 var tplCard = doT.template(
   '<div class="card" data-id="{{=it.id}}">' +
-    '<div class="card__poster"><img src="{{=it.poster}}" alt=""></div>' +
+    '<div class="card__poster">' +
+      '<img src="{{=it.poster}}" alt="">' +
+      '{{?it.extra}}<div class="card__badge">{{=it.extra}}</div>{{?}}' +
+    '</div>' +
     '<div class="card__title">{{=it.title}}</div>' +
-    '{{?it.extra}}<div class="card__info">{{=it.extra}}</div>{{?}}' +
   '</div>'
 );
 
@@ -95,7 +97,7 @@ function buildRows(): string {
         id: s.id,
         poster: s.posters.medium,
         title: s.title,
-        extra: s.watched + ' из ' + s.total + (s.new > 0 ? ' +' + s.new : '')
+        extra: s.watched + ' / ' + s.total + (s.new > 0 ? ' +' + s.new : '')
       });
     }
     html += tplSection({ title: 'Сериалы', idx: sIdx, cards: cards });
@@ -212,6 +214,7 @@ function handleContentKey(e: JQuery.Event): void {
     case TvKey.Enter:
       var item = currentItems[focusedIndex];
       if (item) {
+        setParams({ focusedSection: focusedSection, focusedIndex: focusedIndex });
         var isSerial = item.type === 'serial' || item.type === 'docuserial';
         navigate(isSerial ? 'serial' : 'movie', { id: item.id });
       }
@@ -221,6 +224,8 @@ function handleContentKey(e: JQuery.Event): void {
 
 export var watchingPage: Page = {
   mount: function (_params: RouteParams) {
+    var savedSection = _params.focusedSection;
+    var savedIndex = _params.focusedIndex;
     $root.html('<div class="spinner"><div class="spinner__circle"></div></div>');
 
     $.when(getWatchingSerials(), getWatchingMovies()).then(
@@ -238,8 +243,13 @@ export var watchingPage: Page = {
           sections.push({ items: serialsData.map(function (s) { return { id: s.id, type: s.type }; }) });
         }
 
-        focusedSection = 0;
-        focusedIndex = 0;
+        if (typeof savedSection === 'number' && typeof savedIndex === 'number' && savedSection < sections.length) {
+          focusedSection = savedSection;
+          focusedIndex = Math.min(savedIndex, sections[savedSection].items.length - 1);
+        } else {
+          focusedSection = 0;
+          focusedIndex = 0;
+        }
         menuFocused = false;
         render();
       },

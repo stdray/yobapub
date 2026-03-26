@@ -5,6 +5,8 @@ export interface RouteParams {
   season?: number;
   episode?: number;
   video?: number;
+  focusedSection?: number;
+  focusedIndex?: number;
 }
 
 export interface Page {

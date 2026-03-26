@@ -38,6 +38,10 @@ export function goBack(): boolean {
   return true;
 }
 
+export function setParams(params: RouteParams): void {
+  currentParams = params;
+}
+
 export function getCurrentRoute(): RouteName | null {
   return currentRoute;
 }

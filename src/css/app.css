@@ -126,11 +126,10 @@ html, body {
 
 /* --- Watching --- */
 .watching {
-  padding: 30px 30px;
+  padding: 30px;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
 }
 
 .watching::-webkit-scrollbar {
@@ -146,20 +145,13 @@ html, body {
 .watching__grid {
   display: flex;
   flex-wrap: wrap;
+  gap: 28px;
   margin-bottom: 30px;
-  margin-left: -14px;
-}
-
-.watching__grid > .card {
-  margin-left: 14px;
-  margin-bottom: 14px;
 }
 
 /* --- Card --- */
 .card {
-  flex-shrink: 0;
-  flex-grow: 0;
-  width: calc((100% - 14px * 5) / 5);
+  width: calc((100% - 28px * 4) / 5);
   cursor: pointer;
   outline: none;
 }
@@ -170,10 +162,8 @@ html, body {
   border-width: 5px;
   transform: scale(1.05);
   box-shadow:
-    0 0 12px rgba(233, 69, 96, 0.8),
-    0 0 30px rgba(233, 69, 96, 0.5),
-    0 0 60px rgba(233, 69, 96, 0.3),
-    0 0 100px rgba(233, 69, 96, 0.15);
+    0 0 16px rgba(233, 69, 96, 0.7),
+    0 0 50px rgba(233, 69, 96, 0.3);
 }
 
 .card__poster {
@@ -184,7 +174,7 @@ html, body {
   border: 3px solid transparent;
   border-radius: 8px;
   overflow: hidden;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .card__poster img {
@@ -199,15 +189,23 @@ html, body {
 .card__title {
   margin-top: 6px;
   font-size: 20px;
+  font-weight: bold;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.card__info {
-  font-size: 16px;
-  color: #888;
-  margin-top: 2px;
+.card__badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 0;
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
 }
 
 /* --- Detail (Movie / Serial) --- */
@@ -336,8 +334,7 @@ html, body {
   color: #fff;
 }
 
-.episodes__list {
-}
+
 
 .episode {
   display: flex;
