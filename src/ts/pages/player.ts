@@ -27,6 +27,7 @@ var currentAudios: AudioTrack[] = [];
 var barValueEl: HTMLElement | null = null;
 var barDurationEl: HTMLElement | null = null;
 var barSeekEl: HTMLElement | null = null;
+var barVisible = false;
 var currentSubs: Subtitle[] = [];
 var selectedQuality = 0;
 var selectedAudio = 0;
@@ -411,6 +412,7 @@ var barTimer: number | null = null;
 var progressTimer: number | null = null;
 
 function showBar(): void {
+  barVisible = true;
   $root.find('.player__header, .player__gradient, .player__bar').removeClass('hidden');
   showInfo();
   updateProgress();
@@ -421,6 +423,7 @@ function showBar(): void {
 }
 
 function hideBar(): void {
+  barVisible = false;
   $root.find('.player__header, .player__gradient, .player__bar').addClass('hidden');
   hideInfo();
 }
@@ -437,6 +440,7 @@ function cacheBarElements(): void {
 
 function updateProgress(): void {
   if (!videoEl) return;
+  if (!barVisible && !seeking) return;
   cacheBarElements();
   var cur = seeking ? seekPos : videoEl.currentTime;
   var dur = getVideoDuration();
@@ -445,8 +449,6 @@ function updateProgress(): void {
   if (pct > 100) pct = 100;
   if (barValueEl) {
     barValueEl.style.width = pct + '%';
-    /* force reflow on legacy browsers */
-    barValueEl.offsetWidth;
   }
   if (barDurationEl) {
     barDurationEl.textContent = formatTime(cur) + (dur > 0 ? ' / ' + formatTime(dur) : '');
@@ -804,7 +806,14 @@ function playSource(url: string): void {
       if (Hls.default) Hls = Hls.default;
       if (Hls.isSupported()) {
         useHls = true;
-        hlsInstance = new Hls({ enableWorker: false, renderTextTracksNatively: true });
+        hlsInstance = new Hls({
+          enableWorker: false,
+          renderTextTracksNatively: true,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          maxBufferSize: 30 * 1000 * 1000,
+          maxBufferHole: 0.5
+        });
         hlsInstance.loadSource(url);
         hlsInstance.attachMedia(videoEl);
         hlsInstance.on(Hls.Events.MANIFEST_PARSED, function (_ev: any, _data: any) {
@@ -841,7 +850,7 @@ function playSource(url: string): void {
 
 function startProgressTimer(): void {
   stopProgressTimer();
-  progressTimer = window.setInterval(updateProgress, 500);
+  progressTimer = window.setInterval(updateProgress, 1000);
 }
 
 function stopProgressTimer(): void {
@@ -1006,6 +1015,7 @@ function destroyPlayer(): void {
   barValueEl = null;
   barDurationEl = null;
   barSeekEl = null;
+  barVisible = false;
 }
 
 // --- Keys ---
