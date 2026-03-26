@@ -9,6 +9,7 @@ export enum TvKey {
   Escape = 27,
   Play = 415,
   Pause = 19,
+  PlayPause = 10252,
   Stop = 413,
   Ff = 417,
   Rw = 412,
@@ -35,7 +36,7 @@ export function registerTizenKeys(): void {
   try {
     if (typeof tizen !== 'undefined' && tizen.tvinputdevice) {
       var keysToRegister = [
-        'MediaPlay', 'MediaPause', 'MediaStop',
+        'MediaPlay', 'MediaPause', 'MediaPlayPause', 'MediaStop',
         'MediaFastForward', 'MediaRewind',
         'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue',
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'

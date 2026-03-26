@@ -4,7 +4,7 @@ import { Page, RouteParams } from '../types/app';
 import { getDeviceSettings, saveDeviceSettings } from '../api/device';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE } from '../utils/storage';
 
 var $root = $('#page-settings');
 var keyHandler: ((e: JQuery.Event) => void) | null = null;
@@ -53,6 +53,10 @@ var tplPage = doT.template(
   '<div class="settings-page">' +
     '<div class="settings-page__title">Настройки</div>' +
     '<div class="settings-page__list">{{=it.items}}</div>' +
+    '<div class="settings-page__hint">' +
+      '<span class="hint-key hint-key--red"></span> Уменьшить субтитры &nbsp;&nbsp; ' +
+      '<span class="hint-key hint-key--green"></span> Увеличить субтитры &nbsp;&nbsp; (во время воспроизведения)' +
+    '</div>' +
     '<div class="settings-page__version">{{=it.version}}</div>' +
   '</div>'
 );
@@ -114,6 +118,19 @@ function buildQualitySetting(): SettingItem {
     opts.push({ id: q.id, label: q.label, description: '', selected: q.id === savedId ? 1 : 0 });
   }
   return { key: '_defaultQuality', label: 'Качество по умолчанию', type: 'list', value: null, options: opts };
+}
+
+function buildSubSizeSetting(): SettingItem {
+  var current = getSubSize();
+  var opts: SettingOption[] = [];
+  var id = 0;
+  for (var s = SUB_SIZE_MIN; s <= SUB_SIZE_MAX; s += SUB_SIZE_STEP) {
+    var label = s + 'px';
+    if (s === DEFAULT_SUB_SIZE) label += ' (стандарт)';
+    opts.push({ id: id, label: label, description: '', selected: s === current ? 1 : 0 });
+    id++;
+  }
+  return { key: '_subSize', label: 'Размер субтитров', type: 'list', value: null, options: opts };
 }
 
 function getDisplayValue(item: SettingItem): string {
@@ -181,6 +198,18 @@ function applyOption(): void {
         item.options[j].selected = (j === focusedOptionIndex) ? 1 : 0;
       }
       setDefaultQuality(item.options[focusedOptionIndex].id);
+    }
+    closeOptions();
+    return;
+  }
+
+  if (item.key === '_subSize') {
+    if (item.options) {
+      for (var k = 0; k < item.options.length; k++) {
+        item.options[k].selected = (k === focusedOptionIndex) ? 1 : 0;
+      }
+      var size = SUB_SIZE_MIN + focusedOptionIndex * SUB_SIZE_STEP;
+      setSubSize(size);
     }
     closeOptions();
     return;
@@ -279,6 +308,7 @@ export var settingsPage: Page = {
         if (data && data.settings) {
           allSettings = parseSettings(data.settings);
         }
+        allSettings.unshift(buildSubSizeSetting());
         allSettings.unshift(buildQualitySetting());
         render();
       },

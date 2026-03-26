@@ -432,9 +432,90 @@ html, body {
   border-radius: 3px;
 }
 
+.player__controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .player__time {
   font-size: 24px;
   color: #aaa;
+}
+
+.player__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pctl {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #aaa;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.pctl--play {
+  width: 64px;
+  height: 64px;
+  font-size: 28px;
+}
+
+.pctl.focused {
+  border-color: #e94560;
+  color: #fff;
+  background: rgba(233, 69, 96, 0.25);
+}
+
+/* --- Info badge --- */
+.player__info {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+  font-size: 20px;
+  color: #ccc;
+  z-index: 8;
+  max-width: 700px;
+  text-align: right;
+  line-height: 1.4;
+  transition: opacity 0.3s;
+}
+
+.player__info.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* --- Toast --- */
+.player__toast {
+  position: absolute;
+  bottom: 160px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 32px;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 8px;
+  font-size: 26px;
+  color: #fff;
+  z-index: 12;
+  white-space: nowrap;
+  transition: opacity 0.3s;
+}
+
+.player__toast.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .player__menu {
@@ -626,6 +707,31 @@ video::cue {
 }
 .soptions__item.selected.focused {
   color: #e94560;
+}
+
+.settings-page__hint {
+  margin-top: 30px;
+  font-size: 22px;
+  color: #666;
+  display: flex;
+  align-items: center;
+}
+
+.hint-key {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.hint-key--red {
+  background: #e94560;
+}
+
+.hint-key--green {
+  background: #4caf50;
 }
 
 .settings-page__version {

@@ -2,7 +2,8 @@ var KEYS = {
   ACCESS_TOKEN: 'kp_access_token',
   REFRESH_TOKEN: 'kp_refresh_token',
   TOKEN_EXPIRES: 'kp_token_expires',
-  DEFAULT_QUALITY: 'kp_default_quality'
+  DEFAULT_QUALITY: 'kp_default_quality',
+  SUB_SIZE: 'kp_sub_size'
 };
 
 export function getAccessToken(): string | null {
@@ -47,4 +48,18 @@ export function getDefaultQuality(): number {
 
 export function setDefaultQuality(id: number): void {
   localStorage.setItem(KEYS.DEFAULT_QUALITY, String(id));
+}
+
+export var DEFAULT_SUB_SIZE = 46;
+export var SUB_SIZE_STEP = 6;
+export var SUB_SIZE_MIN = 22;
+export var SUB_SIZE_MAX = 82;
+
+export function getSubSize(): number {
+  var val = localStorage.getItem(KEYS.SUB_SIZE);
+  return val !== null ? (parseInt(val, 10) || DEFAULT_SUB_SIZE) : DEFAULT_SUB_SIZE;
+}
+
+export function setSubSize(size: number): void {
+  localStorage.setItem(KEYS.SUB_SIZE, String(size));
 }

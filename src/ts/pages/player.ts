@@ -7,7 +7,7 @@ import { apiGet } from '../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX } from '../utils/storage';
 
 var $root = $('#page-player');
 var keyHandler: ((e: JQuery.Event) => void) | null = null;
@@ -38,7 +38,11 @@ var menuSection = 0;
 var menuItemIndex = 0;
 var lastEnterTime = 0;
 
+var controlsOpen = false;
+var controlsFocused = 2; // index of focused control button (default: play/pause in center)
+
 var MENU_SECTIONS = ['Качество', 'Аудио', 'Субтитры'];
+var CONTROLS = ['prev', 'rw', 'playpause', 'ff', 'next'];
 
 function formatTime(sec: number): string {
   var h = Math.floor(sec / 3600);
@@ -129,10 +133,20 @@ var tplPlayer = doT.template(
   '<div class="player">' +
     '<video></video>' +
     '<div class="player__spinner"><div class="spinner__circle"></div></div>' +
+    '<div class="player__info hidden"></div>' +
     '<div class="player__overlay hidden">' +
       '<div class="player__title">{{=it.title}}</div>' +
       '<div class="player__progress"><div class="player__progress-bar"></div></div>' +
-      '<div class="player__time">00:00 / 00:00</div>' +
+      '<div class="player__controls-row">' +
+        '<div class="player__time">00:00 / 00:00</div>' +
+        '<div class="player__controls">' +
+          '<div class="pctl" data-action="prev">&#9198;</div>' +
+          '<div class="pctl" data-action="rw">-15</div>' +
+          '<div class="pctl pctl--play" data-action="playpause">&#9654;</div>' +
+          '<div class="pctl" data-action="ff">+15</div>' +
+          '<div class="pctl" data-action="next">&#9197;</div>' +
+        '</div>' +
+      '</div>' +
     '</div>' +
     '<div class="player__menu hidden"></div>' +
   '</div>'
@@ -153,16 +167,246 @@ var tplMenuItem = doT.template(
   '<div class="pmenu__item{{?it.selected}} selected{{?}}{{?it.focused}} focused{{?}}">{{=it.label}}</div>'
 );
 
+// --- Info badge ---
+
+function getStreamInfo(): string {
+  var parts: string[] = [];
+
+  // stream type
+  parts.push(useHls ? 'HLS' : 'HTTP');
+
+  // quality
+  if (currentFiles.length > 0 && selectedQuality < currentFiles.length) {
+    var f = currentFiles[selectedQuality];
+    var ql = f.quality || (f.h + 'p');
+    parts.push(ql + ' ' + f.w + '\u00d7' + f.h);
+    if (f.codec) parts.push(f.codec.toUpperCase());
+  }
+
+  // audio
+  if (currentAudios.length > 0 && selectedAudio < currentAudios.length) {
+    var a = currentAudios[selectedAudio];
+    var albl = a.lang;
+    if (a.author && a.author.title) albl += ' (' + a.author.title + ')';
+    albl += ' ' + a.codec + ' ' + a.channels + 'ch';
+    parts.push(albl);
+  } else if (useHls && hlsAudioTracks.length > 0) {
+    var ht = hlsAudioTracks[selectedAudio] || hlsAudioTracks[0];
+    parts.push(ht.name || ht.lang || 'Audio');
+  }
+
+  // subs
+  if (selectedSub >= 0) {
+    var tracks = getVideoTextTracks();
+    if (tracks && selectedSub < tracks.length) {
+      parts.push('Sub: ' + (tracks[selectedSub].label || tracks[selectedSub].language || '?'));
+    } else if (selectedSub < currentSubs.length) {
+      parts.push('Sub: ' + currentSubs[selectedSub].lang.toUpperCase());
+    }
+  }
+
+  // bitrate from HLS
+  if (useHls && hlsInstance) {
+    var level = hlsInstance.levels && hlsInstance.levels[hlsInstance.currentLevel];
+    if (level && level.bitrate) {
+      var mbps = (level.bitrate / 1000000).toFixed(1);
+      parts.push(mbps + ' Mbps');
+    }
+  }
+
+  return parts.join(' &bull; ');
+}
+
+function updateInfoBadge(): void {
+  var $info = $root.find('.player__info');
+  $info.html(getStreamInfo());
+}
+
+function showInfo(): void {
+  var $info = $root.find('.player__info');
+  updateInfoBadge();
+  $info.removeClass('hidden');
+}
+
+function hideInfo(): void {
+  $root.find('.player__info').addClass('hidden');
+}
+
+// --- Subtitle size ---
+
+var subStyleEl: HTMLStyleElement | null = null;
+var toastTimer: number | null = null;
+
+function applySubSize(): void {
+  var size = getSubSize();
+  if (!subStyleEl) {
+    subStyleEl = document.createElement('style');
+    document.head.appendChild(subStyleEl);
+  }
+  subStyleEl.textContent = 'video::cue { font-size: ' + size + 'px !important; }';
+}
+
+function changeSubSize(dir: number): void {
+  var size = getSubSize();
+  size = Math.max(SUB_SIZE_MIN, Math.min(SUB_SIZE_MAX, size + dir * SUB_SIZE_STEP));
+  setSubSize(size);
+  applySubSize();
+  showToast('Субтитры: ' + size + 'px');
+}
+
+function showToast(text: string): void {
+  var $toast = $root.find('.player__toast');
+  if ($toast.length === 0) {
+    $root.find('.player').append('<div class="player__toast"></div>');
+    $toast = $root.find('.player__toast');
+  }
+  $toast.text(text).removeClass('hidden');
+  if (toastTimer !== null) clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(function () { $toast.addClass('hidden'); toastTimer = null; }, 1500);
+}
+
+// --- Controls bar ---
+
+function showControls(): void {
+  controlsOpen = true;
+  controlsFocused = 2;
+  showOverlay();
+  clearOverlayTimer();
+  updateControlsPlayState();
+  renderControlsFocus();
+}
+
+function hideControls(): void {
+  controlsOpen = false;
+  $root.find('.pctl').removeClass('focused');
+  showOverlay();
+}
+
+function renderControlsFocus(): void {
+  $root.find('.pctl').removeClass('focused');
+  $root.find('.pctl').eq(controlsFocused).addClass('focused');
+}
+
+function updateControlsPlayState(): void {
+  var $btn = $root.find('.pctl[data-action="playpause"]');
+  if (videoEl && videoEl.paused) {
+    $btn.html('&#9654;');
+  } else {
+    $btn.html('&#9646;&#9646;');
+  }
+}
+
+function executeControl(action: string): void {
+  if (!videoEl) return;
+  switch (action) {
+    case 'playpause':
+      if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); }
+      updateControlsPlayState();
+      break;
+    case 'rw':
+      videoEl.currentTime = Math.max(0, videoEl.currentTime - 15);
+      showOverlay(); clearOverlayTimer();
+      break;
+    case 'ff':
+      videoEl.currentTime = Math.min(videoEl.duration || 0, videoEl.currentTime + 15);
+      showOverlay(); clearOverlayTimer();
+      break;
+    case 'prev':
+      navigateTrack(-1);
+      break;
+    case 'next':
+      navigateTrack(1);
+      break;
+  }
+}
+
+function navigateTrack(dir: number): void {
+  if (!currentItem) return;
+
+  if (currentSeason !== undefined && currentEpisode !== undefined && currentItem.seasons) {
+    for (var si = 0; si < currentItem.seasons.length; si++) {
+      var s = currentItem.seasons[si];
+      if (s.number !== currentSeason) continue;
+      for (var ei = 0; ei < s.episodes.length; ei++) {
+        if (s.episodes[ei].number !== currentEpisode) continue;
+        var targetIdx = ei + dir;
+        // within same season
+        if (targetIdx >= 0 && targetIdx < s.episodes.length) {
+          savePosition(); destroyPlayer();
+          currentEpisode = s.episodes[targetIdx].number;
+          remountTrack();
+          return;
+        }
+        // cross-season
+        var targetSeason = si + dir;
+        if (targetSeason >= 0 && targetSeason < currentItem.seasons.length) {
+          var ts = currentItem.seasons[targetSeason];
+          var ep = dir > 0 ? ts.episodes[0] : ts.episodes[ts.episodes.length - 1];
+          if (ep) {
+            savePosition(); destroyPlayer();
+            currentSeason = ts.number;
+            currentEpisode = ep.number;
+            remountTrack();
+            return;
+          }
+        }
+        return;
+      }
+    }
+  } else if (currentVideo !== undefined && currentItem.videos) {
+    var newVideo = currentVideo + dir;
+    if (newVideo >= 1 && newVideo <= currentItem.videos.length) {
+      savePosition(); destroyPlayer();
+      currentVideo = newVideo;
+      remountTrack();
+    }
+  }
+}
+
+function remountTrack(): void {
+  if (!currentItem) return;
+  var result: { files: VideoFile[]; audios: AudioTrack[]; subs: Subtitle[]; title: string } | null = null;
+
+  if (currentSeason !== undefined && currentEpisode !== undefined) {
+    result = findEpisodeData(currentItem, currentSeason, currentEpisode);
+    resumeTime = getResumeTime(currentItem, currentSeason, currentEpisode);
+  } else if (currentVideo !== undefined) {
+    result = findVideoData(currentItem, currentVideo);
+    resumeTime = getResumeTime(currentItem, undefined, undefined, currentVideo);
+  }
+
+  if (!result || result.files.length === 0) return;
+
+  currentFiles = result.files.slice().sort(function (a, b) { return b.w - a.w; });
+  currentAudios = result.audios;
+  currentSubs = result.subs.filter(function (s) { return s.url && !s.embed; });
+  currentTitle = result.title;
+  selectedQuality = pickDefaultQualityIndex(currentFiles);
+  selectedAudio = 0;
+  selectedSub = -1;
+
+  var url = getUrlFromFile(currentFiles[selectedQuality]);
+  if (url) {
+    var itemTitle = currentItem.title.split(' / ')[0];
+    playUrl(url, itemTitle + ' - ' + currentTitle);
+  }
+}
+
 // --- Overlay ---
 
 function showOverlay(): void {
   $root.find('.player__overlay').removeClass('hidden');
+  showInfo();
+  updateControlsPlayState();
   clearOverlayTimer();
-  overlayTimer = window.setTimeout(hideOverlay, 4000);
+  if (!controlsOpen) {
+    overlayTimer = window.setTimeout(hideOverlay, 4000);
+  }
 }
 
 function hideOverlay(): void {
   $root.find('.player__overlay').addClass('hidden');
+  hideInfo();
 }
 
 function clearOverlayTimer(): void {
@@ -320,6 +564,7 @@ function renderMenu(): void {
 
 function openMenu(withPause: boolean): void {
   if (menuOpen) return;
+  controlsOpen = false;
   menuOpen = true;
   if (withPause && videoEl && !videoEl.paused) { videoEl.pause(); }
   clearOverlayTimer();
@@ -333,7 +578,6 @@ function closeMenu(): void {
   if (!menuOpen) return;
   menuOpen = false;
   $root.find('.player__menu').addClass('hidden');
-  if (videoEl && videoEl.paused) { videoEl.play(); }
   showOverlay();
 }
 
@@ -469,6 +713,7 @@ function onSourceReady(): void {
   videoEl.play();
   startMarkTimer();
   showOverlay();
+  updateInfoBadge();
   videoEl.removeEventListener('timeupdate', updateProgress);
   videoEl.addEventListener('timeupdate', updateProgress);
 }
@@ -535,7 +780,11 @@ function playUrl(url: string, title: string): void {
     if (videoEl) showPlaybackError(videoEl.error, sourceUrl);
   });
 
-  playSource(url);
+  applySubSize();
+
+  // Tizen 2.3: video element needs a tick after innerHTML insertion
+  // before it can accept a source reliably
+  setTimeout(function () { playSource(url); }, 0);
 }
 
 // --- Mark time ---
@@ -591,30 +840,70 @@ function handleKey(e: JQuery.Event): void {
   if (!videoEl) return;
 
   if (menuOpen) { handleMenuKey(e); return; }
+  if (controlsOpen) { handleControlsKey(e); return; }
 
   switch (e.keyCode) {
     case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
       destroyPlayer(); goBack(); e.preventDefault(); break;
     case TvKey.Enter:
-      if (videoEl.paused) { videoEl.play(); showOverlay(); }
-      else { videoEl.pause(); openMenu(false); }
-      e.preventDefault(); break;
+      showControls(); e.preventDefault(); break;
     case TvKey.Play:
       if (videoEl.paused) { videoEl.play(); showOverlay(); }
       e.preventDefault(); break;
     case TvKey.Pause:
       videoEl.pause(); showOverlay(); e.preventDefault(); break;
-    case TvKey.Up:
+    case TvKey.PlayPause:
+      if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); }
+      showOverlay(); e.preventDefault(); break;
+    case TvKey.Up: case TvKey.Down:
       openMenu(true); e.preventDefault(); break;
     case TvKey.Right: case TvKey.Ff:
-      videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 10);
+      videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 15);
       showOverlay(); e.preventDefault(); break;
     case TvKey.Left: case TvKey.Rw:
-      videoEl.currentTime = Math.max(0, videoEl.currentTime - 10);
+      videoEl.currentTime = Math.max(0, videoEl.currentTime - 15);
       showOverlay(); e.preventDefault(); break;
-    case TvKey.Down:
-      videoEl.currentTime = Math.max(0, videoEl.currentTime - 60);
-      showOverlay(); e.preventDefault(); break;
+    case TvKey.Green:
+      changeSubSize(1); e.preventDefault(); break;
+    case TvKey.Red:
+      changeSubSize(-1); e.preventDefault(); break;
+  }
+}
+
+function handleControlsKey(e: JQuery.Event): void {
+  switch (e.keyCode) {
+    case TvKey.Left:
+      if (controlsFocused > 0) { controlsFocused--; renderControlsFocus(); }
+      e.preventDefault(); break;
+    case TvKey.Right:
+      if (controlsFocused < CONTROLS.length - 1) { controlsFocused++; renderControlsFocus(); }
+      e.preventDefault(); break;
+    case TvKey.Enter:
+      executeControl(CONTROLS[controlsFocused]);
+      e.preventDefault(); break;
+    case TvKey.Up: case TvKey.Down:
+      hideControls(); openMenu(true); e.preventDefault(); break;
+    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
+      hideControls(); e.preventDefault(); break;
+    case TvKey.Play:
+      if (videoEl && videoEl.paused) { videoEl.play(); updateControlsPlayState(); }
+      e.preventDefault(); break;
+    case TvKey.Pause:
+      if (videoEl) { videoEl.pause(); updateControlsPlayState(); }
+      e.preventDefault(); break;
+    case TvKey.PlayPause:
+      if (videoEl) { if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); } updateControlsPlayState(); }
+      e.preventDefault(); break;
+    case TvKey.Ff:
+      executeControl('ff'); e.preventDefault(); break;
+    case TvKey.Rw:
+      executeControl('rw'); e.preventDefault(); break;
+    case TvKey.Stop:
+      destroyPlayer(); goBack(); e.preventDefault(); break;
+    case TvKey.Green:
+      changeSubSize(1); e.preventDefault(); break;
+    case TvKey.Red:
+      changeSubSize(-1); e.preventDefault(); break;
   }
 }
 
@@ -642,6 +931,17 @@ function handleMenuKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
       closeMenu(); e.preventDefault(); break;
+    case TvKey.Play:
+      closeMenu(); if (videoEl && videoEl.paused) { videoEl.play(); } showOverlay();
+      e.preventDefault(); break;
+    case TvKey.Pause:
+      if (videoEl) { videoEl.pause(); }
+      e.preventDefault(); break;
+    case TvKey.PlayPause:
+      closeMenu(); if (videoEl) { if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); } } showOverlay();
+      e.preventDefault(); break;
+    case TvKey.Stop:
+      destroyPlayer(); goBack(); e.preventDefault(); break;
   }
 }
 
@@ -655,6 +955,7 @@ export var playerPage: Page = {
     currentVideo = params.video;
     resumeTime = 0;
     menuOpen = false;
+    controlsOpen = false;
     useHls = false;
     currentFiles = [];
     currentAudios = [];
