@@ -2,70 +2,80 @@ name: CI
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - 'v*'
   pull_request:
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
         with:
-          fetch-depth: 0
+          dotnet-version: 10.0.x
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+      - name: Restore & Build
+        run: dotnet build back/YobaPub.Proxy/YobaPub.Proxy.csproj -c Release
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Build release
-        run: npm run build:release
-
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: yobapub-release
-          path: dist/release/
-
-  deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: build
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download release artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: yobapub-release
-          path: release
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Clean remote directory and fix permissions
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract tag
+        id: tag
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push Docker image
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}"
+          TAG="${{ steps.tag.outputs.version }}"
+          docker build \
+            -t "$IMAGE:$TAG" \
+            -t "$IMAGE:latest" \
+            .
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USERNAME }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
           script: |
-            echo "${{ secrets.DEPLOY_PASSWORD }}" | sudo -S rm -rf ${{ secrets.DEPLOY_WORKDIR }}/*
-            echo "${{ secrets.DEPLOY_PASSWORD }}" | sudo -S chown -R ${{ secrets.DEPLOY_USERNAME }}:${{ secrets.DEPLOY_USERNAME }} ${{ secrets.DEPLOY_WORKDIR }}
-
-      - name: Deploy files via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USERNAME }}
-          password: ${{ secrets.DEPLOY_PASSWORD }}
-          source: release/*
-          target: ${{ secrets.DEPLOY_WORKDIR }}
-          strip_components: 1
-          overwrite: true
+            IMAGE="ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.version }}"
+            CONTAINER_NAME="yobapub-proxy"
+            PASSWORD="${{ secrets.DEPLOY_PASSWORD }}"
+            run_sudo() {
+              printf '%s\n' "$PASSWORD" | sudo -S -p '' "$@"
+            }
+            run_sudo docker pull "$IMAGE"
+            run_sudo docker stop "$CONTAINER_NAME" || true
+            run_sudo docker rm "$CONTAINER_NAME" || true
+            run_sudo docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              "$IMAGE"
+            run_sudo docker system prune -a -f

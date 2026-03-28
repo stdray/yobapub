@@ -6,6 +6,8 @@ bower_components/
 dist/
 build/
 .buildResult/
+bin/
+obj/
 
 # IDE
 .idea/
