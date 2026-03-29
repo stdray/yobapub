@@ -431,7 +431,9 @@ function playSource(url: string): void {
     '" hlsOk=' + hlsSupported + ' useHlsJs=' + useHlsJs +
     ' url=' + url.substring(0, 80);
   if (useHlsJs) {
-    var hls = new Hls();
+    var hlsConfig: Partial<Hls['config']> = {};
+    if (resumeTime > 0) (hlsConfig as any).startPosition = resumeTime;
+    var hls = new Hls(hlsConfig as any);
     hlsInstance = hls;
     hls.on(Hls.Events.MANIFEST_PARSED, function () {
       if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
@@ -461,9 +463,10 @@ function onSourceReady(): void {
       if (seekTimer !== null) { clearTimeout(seekTimer); seekTimer = null; }
       v.removeEventListener('playing', doSeek);
       v.removeEventListener('canplay', doSeek);
-      v.currentTime = pos;
+      if (Math.abs(v.currentTime - pos) > 2) {
+        v.currentTime = pos;
+      }
     };
-    // Tizen 2.3: 'playing' may not fire; 'canplay' is more reliable; fallback after 3s
     v.addEventListener('playing', doSeek);
     v.addEventListener('canplay', doSeek);
     seekTimer = window.setTimeout(doSeek, 3000);
