@@ -24,7 +24,7 @@ app.MapReverseProxy();
 app.MapFallbackToFile("index.html");
 app.MapGet("/api/proxy-config", (ProxyConfig cfg) => Results.Json(new { cfg.ProxyAll, cfg.Upstream }));
 
-app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory factory) =>
+app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory factory, HttpContext ctx) =>
 {
     if (string.IsNullOrEmpty(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
         (uri.Scheme != "http" && uri.Scheme != "https"))
@@ -33,10 +33,20 @@ app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory fact
     app.Logger.LogInformation("HLS rewrite: audio={audio} url={url}", audio, url);
 
     using var client = factory.CreateClient("proxy");
+    using var req = new HttpRequestMessage(HttpMethod.Get, uri);
+
+    var skipHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { "Host", "Connection", "Transfer-Encoding" };
+    foreach (var h in ctx.Request.Headers)
+    {
+        if (skipHeaders.Contains(h.Key)) continue;
+        req.Headers.TryAddWithoutValidation(h.Key, h.Value.ToArray());
+    }
+
     HttpResponseMessage response;
     try
     {
-        response = await client.GetAsync(uri);
+        response = await client.SendAsync(req);
     }
     catch (Exception ex)
     {
