@@ -270,7 +270,9 @@ function remountTrack(): void {
 
 function startWithAudio(title: string): void {
   var f = currentFiles[selectedQuality];
-  var hlsUrl = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  var hls4Url = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
+  var hls2Url = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  var hlsUrl = isLegacyTizen() ? (hls2Url || hls4Url) : (hls4Url || hls2Url);
   if (hlsUrl) {
     if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
     currentHlsUrl = hlsUrl;
@@ -337,7 +339,9 @@ function applyAudioSwitch(idx: number): void {
   selectedAudio = idx;
   if (currentFiles.length > 0) {
     var f = currentFiles[selectedQuality];
-    var hlsUrl = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+    var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
+    var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+    var hlsUrl = isLegacyTizen() ? (hls2 || hls4) : (hls4 || hls2);
     if (hlsUrl) {
       if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       switchToRewrittenHls(hlsUrl, idx);
