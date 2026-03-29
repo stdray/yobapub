@@ -391,7 +391,14 @@ function playSource(url: string): void {
   videoEl.addEventListener('loadedmetadata', onMeta);
   var isHls = url.indexOf('.m3u8') >= 0 || url.indexOf('/hls/') >= 0;
   var isTizen = typeof (window as any).tizen !== 'undefined';
-  if (isHls && (isTizen || !videoEl.canPlayType('application/vnd.apple.mpegurl')) && Hls.isSupported()) {
+  var canPlayVnd = videoEl.canPlayType('application/vnd.apple.mpegurl');
+  var canPlayX = videoEl.canPlayType('application/x-mpegurl');
+  var hlsSupported = Hls.isSupported();
+  var useHlsJs = isHls && (isTizen || !canPlayVnd) && hlsSupported;
+  console.log('[playSource] url=' + url + ' isHls=' + isHls + ' isTizen=' + isTizen +
+    ' canPlayVnd="' + canPlayVnd + '" canPlayX="' + canPlayX +
+    '" Hls.isSupported=' + hlsSupported + ' useHlsJs=' + useHlsJs);
+  if (useHlsJs) {
     var hls = new Hls();
     hlsInstance = hls;
     hls.loadSource(url);
@@ -482,6 +489,7 @@ function showPlaybackError(error: MediaError | null, url: string): void {
   var code = error ? error.code : 0;
   var detail = error && (error as any).message ? (error as any).message : '';
   console.error('[Player] Playback error: code=' + code + ' msg=' + msg + (detail ? ' detail=' + detail : '') + ' url=' + url);
+  console.error('[Player] UA=' + navigator.userAgent);
   destroyPlayer();
   $root.html(
     '<div class="player">' +
