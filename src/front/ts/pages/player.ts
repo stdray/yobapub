@@ -10,7 +10,7 @@ import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 import { tplPlayer } from './player/template';
 import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, loadMediaLinksDeferred, getResumeTime } from './player/media';
-import { fetchRewrittenHls, getRewrittenHlsUrl } from './player/hls';
+import { fetchRewrittenHls, getRewrittenHlsUrl, isBackendRewriteAvailable } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
 import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey, clearPanelIdle } from './player/panel';
@@ -269,7 +269,7 @@ function startWithAudio(title: string): void {
     if (hlsUrl) {
       if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       var audioIndex = currentAudios[selectedAudio].index;
-      if (isAndroidWebView()) {
+      if (isBackendRewriteAvailable()) {
         var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
         currentHlsUrl = hlsUrl;
         playUrl(rewriteUrl, title);
@@ -366,7 +366,7 @@ function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
   var audioIndex = currentAudios[audioIdx].index;
   var pos = videoEl ? videoEl.currentTime : 0;
   var paused = videoEl ? videoEl.paused : false;
-  if (isAndroidWebView()) {
+  if (isBackendRewriteAvailable()) {
     var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
     if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
     currentHlsUrl = hlsUrl;

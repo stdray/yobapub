@@ -35,10 +35,16 @@ export function rewriteHlsManifest(manifest: string, audioIndex: number): string
 }
 
 export function getRewrittenHlsUrl(url: string, audioIndex: number): string {
-  var base = getApiBase();
+  // Use window.location.origin when page is served from our backend (Android APK or proxy mode).
+  // getApiBase() returns '' in proxy mode (relative URL) and absolute API_BASE otherwise.
+  var base = getApiBase() === '' ? window.location.origin : '';
   var token = getAccessToken() || '';
   return base + '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
     (token ? '&access_token=' + encodeURIComponent(token) : '');
+}
+
+export function isBackendRewriteAvailable(): boolean {
+  return getApiBase() === '';
 }
 
 export function fetchRewrittenHls(url: string, audioIndex: number, cb: (blobUrl: string | null) => void): void {
