@@ -357,8 +357,9 @@ function applyAudioSwitch(idx: number): void {
 
 function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
   var audioIndex = currentAudios[audioIdx].index;
-  var pos = videoEl ? videoEl.currentTime : 0;
+  var pos = (seeking && seekPos >= 0) ? seekPos : (videoEl ? videoEl.currentTime : 0);
   var paused = videoEl ? videoEl.paused : false;
+  if (seeking) { resetSeek(); }
   var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
   currentHlsUrl = hlsUrl;
   resumeTime = pos;
@@ -381,14 +382,30 @@ function applySubSwitch(menuIdx: number): void {
 
 function switchQuality(): void {
   if (!videoEl || currentFiles.length === 0) return;
-  var pos = videoEl.currentTime;
+  var pos = (seeking && seekPos >= 0) ? seekPos : videoEl.currentTime;
   resumePaused = videoEl.paused;
-  var url = getUrlFromFile(currentFiles[selectedQuality]);
-  if (!url) return;
+  if (seeking) { resetSeek(); }
 
   resumeTime = pos;
   qualitySwitching = true;
-  playSource(url);
+  showSpinner();
+
+  var f = currentFiles[selectedQuality];
+  var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
+  var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  var legacyTizen = isLegacyTizen();
+  var sp = getStreamingType();
+  var hlsUrl = legacyTizen ? hls2 : sp === 'hls4' ? hls4 : sp === 'hls2' ? hls2 : (hls4 || hls2);
+  if (hlsUrl) {
+    if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
+    currentHlsUrl = hlsUrl;
+    var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
+    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+    playSource(rewriteUrl);
+    return;
+  }
+  var url = getUrlFromFile(f);
+  if (url) playSource(url);
 }
 
 // --- Playback ---
@@ -461,20 +478,8 @@ function onSourceReady(): void {
   }
   playbackStarted = true;
   qualitySwitching = false;
-  if (selectedSub >= 0) {
-    var subToRestore = selectedSub;
-    var vv = videoEl;
-    var subLoaded = false;
-    var tryLoadSub = function () {
-      if (subLoaded || !vv || !vv.parentNode) return;
-      subLoaded = true;
-      loadSubtitleTrack(vv, $root, currentSubs, subToRestore);
-    };
-    vv.addEventListener('timeupdate', function onTime() {
-      vv.removeEventListener('timeupdate', onTime);
-      tryLoadSub();
-    });
-    setTimeout(tryLoadSub, 3000);
+  if (selectedSub >= 0 && videoEl) {
+    loadSubtitleTrack(videoEl, $root, currentSubs, selectedSub);
   }
   hideSpinner();
   startMarkTimer();
