@@ -30,14 +30,30 @@ app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory fact
         (uri.Scheme != "http" && uri.Scheme != "https"))
         return Results.BadRequest("Invalid url");
 
+    app.Logger.LogInformation("HLS rewrite: audio={audio} url={url}", audio, url);
+
     using var client = factory.CreateClient("proxy");
-    string manifest;
-    try { manifest = await client.GetStringAsync(uri); }
-    catch (Exception ex) {
-        app.Logger.LogError("HLS rewrite fetch failed: {url} — {msg}", url, ex.Message);
+    HttpResponseMessage response;
+    try
+    {
+        response = await client.GetAsync(uri);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError("HLS rewrite fetch exception: {msg} url={url}", ex.Message, url);
         return Results.StatusCode(502);
     }
 
+    app.Logger.LogInformation("HLS rewrite CDN response: {status} url={url}", (int)response.StatusCode, url);
+
+    if (!response.IsSuccessStatusCode)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        app.Logger.LogWarning("HLS rewrite CDN error body: {body}", body.Length > 500 ? body[..500] : body);
+        return Results.StatusCode((int)response.StatusCode);
+    }
+
+    var manifest = await response.Content.ReadAsStringAsync();
     manifest = HlsRewriter.Rewrite(manifest, url, audio);
 
     return Results.Content(manifest, "application/vnd.apple.mpegurl");
