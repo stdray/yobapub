@@ -33,7 +33,10 @@ app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory fact
     using var client = factory.CreateClient("proxy");
     string manifest;
     try { manifest = await client.GetStringAsync(uri); }
-    catch { return Results.StatusCode(502); }
+    catch (Exception ex) {
+        app.Logger.LogError("HLS rewrite fetch failed: {url} — {msg}", url, ex.Message);
+        return Results.StatusCode(502);
+    }
 
     manifest = HlsRewriter.Rewrite(manifest, url, audio);
 
