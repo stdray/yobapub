@@ -397,9 +397,10 @@ function playSource(url: string): void {
   var canPlayX = videoEl.canPlayType('application/x-mpegurl');
   var hlsSupported = Hls.isSupported();
   var useHlsJs = isHls && !legacyTizen && (isTizen || !canPlayVnd) && hlsSupported;
-  playSourceDebug = 'isHls=' + isHls + ' isTizen=' + isTizen +
+  playSourceDebug = 'isHls=' + isHls + ' isTizen=' + isTizen + ' legacy=' + legacyTizen +
     ' vnd="' + canPlayVnd + '" x="' + canPlayX +
-    '" hlsOk=' + hlsSupported + ' useHlsJs=' + useHlsJs;
+    '" hlsOk=' + hlsSupported + ' useHlsJs=' + useHlsJs +
+    ' url=' + url.substring(0, 80);
   if (useHlsJs) {
     var hls = new Hls();
     hlsInstance = hls;
