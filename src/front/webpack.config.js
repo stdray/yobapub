@@ -85,7 +85,9 @@ module.exports = function (_env, argv) {
         patterns: [
           { from: 'node_modules/jquery/dist/jquery.min.js', to: 'vendor/jquery.min.js' },
           { from: 'node_modules/hls.js/dist/hls.min.js', to: 'vendor/hls.min.js' },
-          { from: 'icon.svg', to: 'icon.svg' }
+          { from: 'favicon-32.png', to: 'favicon-32.png' },
+          { from: 'icon-192.png', to: 'icon-192.png' },
+          { from: 'icon-512.png', to: 'icon-512.png' }
         ]
       })
     ]
