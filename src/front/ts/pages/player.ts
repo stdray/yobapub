@@ -424,19 +424,12 @@ function playSource(url: string): void {
       // Native HLS on Android WebView or Tizen proxy mode — no hls.js overhead
       currentHlsUrl = url;
       useHls = true;
-      var nativeVel = videoEl;
-      var nativeFired = false;
-      var onNativeReady = function () {
-        if (nativeFired) return;
-        nativeFired = true;
-        nativeVel.removeEventListener('loadedmetadata', onNativeReady);
-        nativeVel.removeEventListener('canplay', onNativeReady);
+      var onMetaNative = function () {
+        if (videoEl) videoEl.removeEventListener('loadedmetadata', onMetaNative);
         onSourceReady();
       };
-      nativeVel.addEventListener('loadedmetadata', onNativeReady);
-      nativeVel.addEventListener('canplay', onNativeReady);
-      nativeVel.src = url;
-      nativeVel.load();
+      videoEl.addEventListener('loadedmetadata', onMetaNative);
+      videoEl.src = url;
       return;
     }
     try {
@@ -479,19 +472,12 @@ function playSource(url: string): void {
     } catch (e) { /* fallback */ }
   }
 
-  var plainVel = videoEl;
-  var plainFired = false;
-  var onPlainReady = function () {
-    if (plainFired) return;
-    plainFired = true;
-    plainVel.removeEventListener('loadedmetadata', onPlainReady);
-    plainVel.removeEventListener('canplay', onPlainReady);
+  var onMeta = function () {
+    if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
     onSourceReady();
   };
-  plainVel.addEventListener('loadedmetadata', onPlainReady);
-  plainVel.addEventListener('canplay', onPlainReady);
-  plainVel.src = url;
-  plainVel.load();
+  videoEl.addEventListener('loadedmetadata', onMeta);
+  videoEl.src = url;
 }
 
 function onSourceReady(): void {
