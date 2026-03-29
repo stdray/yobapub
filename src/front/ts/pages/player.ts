@@ -390,8 +390,8 @@ function playSource(url: string): void {
   };
   videoEl.addEventListener('loadedmetadata', onMeta);
   var isHls = url.indexOf('.m3u8') >= 0 || url.indexOf('/hls/') >= 0;
-  var canPlayHlsNative = !!(videoEl.canPlayType('application/vnd.apple.mpegurl') || videoEl.canPlayType('application/x-mpegurl'));
-  if (isHls && !canPlayHlsNative && Hls.isSupported()) {
+  var isTizen = typeof (window as any).tizen !== 'undefined';
+  if (isHls && (isTizen || !videoEl.canPlayType('application/vnd.apple.mpegurl')) && Hls.isSupported()) {
     var hls = new Hls();
     hlsInstance = hls;
     hls.loadSource(url);
