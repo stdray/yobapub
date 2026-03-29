@@ -40,6 +40,7 @@ var currentTitle = '';
 var currentDuration = 0;
 var currentHlsUrl = '';
 var hlsInstance: Hls | null = null;
+var playSourceDebug = '';
 var playbackStarted = false;
 var resumePaused = false;
 var qualitySwitching = false;
@@ -395,9 +396,9 @@ function playSource(url: string): void {
   var canPlayX = videoEl.canPlayType('application/x-mpegurl');
   var hlsSupported = Hls.isSupported();
   var useHlsJs = isHls && (isTizen || !canPlayVnd) && hlsSupported;
-  console.log('[playSource] url=' + url + ' isHls=' + isHls + ' isTizen=' + isTizen +
-    ' canPlayVnd="' + canPlayVnd + '" canPlayX="' + canPlayX +
-    '" Hls.isSupported=' + hlsSupported + ' useHlsJs=' + useHlsJs);
+  playSourceDebug = 'isHls=' + isHls + ' isTizen=' + isTizen +
+    ' vnd="' + canPlayVnd + '" x="' + canPlayX +
+    '" hlsOk=' + hlsSupported + ' useHlsJs=' + useHlsJs;
   if (useHlsJs) {
     var hls = new Hls();
     hlsInstance = hls;
@@ -496,6 +497,8 @@ function showPlaybackError(error: MediaError | null, url: string): void {
       '<div class="player__title" style="padding:60px;">' +
         '<div>' + msg + '</div>' +
         '<div style="font-size:0.7em;margin-top:20px;opacity:0.6;">Код ошибки: ' + code + '</div>' +
+        '<div style="font-size:0.55em;margin-top:12px;opacity:0.5;word-break:break-all;">' + playSourceDebug + '</div>' +
+        '<div style="font-size:0.45em;margin-top:8px;opacity:0.4;word-break:break-all;">' + navigator.userAgent + '</div>' +
       '</div>' +
     '</div>'
   );
