@@ -258,30 +258,14 @@ function remountTrack(): void {
 
 function startWithAudio(title: string): void {
   var f = currentFiles[selectedQuality];
-  if (selectedAudio > 0 && currentAudios.length > 1) {
-    var hlsUrl = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
-    if (hlsUrl) {
-      if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-      var audioIndex = currentAudios[selectedAudio].index;
-      var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-      currentHlsUrl = hlsUrl;
-      playUrl(rewriteUrl, title);
-      // if (isBackendRewriteAvailable()) {
-      //   var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-      //   currentHlsUrl = hlsUrl;
-      //   playUrl(rewriteUrl, title);
-      // } else {
-      //   fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
-      //     if (blobUrl) {
-      //       currentHlsUrl = hlsUrl;
-      //       playUrl(blobUrl, title);
-      //     } else {
-      //       playUrl(getUrlFromFile(f), title);
-      //     }
-      //   });
-      // }
-      return;
-    }
+  var hlsUrl = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  if (hlsUrl) {
+    if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
+    var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
+    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+    currentHlsUrl = hlsUrl;
+    playUrl(rewriteUrl, title);
+    return;
   }
   var url = getUrlFromFile(f);
   if (url) playUrl(url, title);
@@ -335,17 +319,6 @@ function doSavePrefs(): void {
 
 function applyAudioSwitch(idx: number): void {
   selectedAudio = idx;
-  if (idx === 0 || currentAudios.length <= 1) {
-    var pos = videoEl ? videoEl.currentTime : 0;
-    var paused = videoEl ? videoEl.paused : false;
-    currentHlsUrl = '';
-    resumeTime = pos;
-    resumePaused = paused;
-    qualitySwitching = true;
-    var url = getUrlFromFile(currentFiles[selectedQuality]);
-    if (url) { showSpinner(); playSource(url); }
-    return;
-  }
   if (currentFiles.length > 0) {
     var f = currentFiles[selectedQuality];
     var hlsUrl = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';

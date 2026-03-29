@@ -8,11 +8,11 @@ flowchart TD
     B --> C[getItem id]
     C --> D[findEpisodeMedia / findVideoMedia\ngetResumeTime]
     D --> E[loadMediaLinks mid]
-    E --> F[sort files by width\nrestoreQuality/Audio/Sub из prefs]
+    E --> F[sort files by width\nкачество: дефолт из настроек или последнее для тайтла\nаудио/субтитры: последние для тайтла]
     F --> G[startWithAudio]
 
-    G --> H{selectedAudio > 0\nи есть hls4/hls2 URL?}
-    H -- да --> I[getRewrittenHlsUrl\n/hls/rewrite?url=...&audio=N]
+    G --> H{есть hls4/hls2 URL?}
+    H -- да --> I[getRewrittenHlsUrl\n/hls/rewrite?url=...&audio=N\nвсегда, для любой дорожки]
     H -- нет --> J[getUrlFromFile\nhls4 / hls / http]
     I --> K[playUrl rewriteUrl]
     J --> K
@@ -44,20 +44,15 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([onApplyAudio idx]) --> B{idx == 0 или\nодна дорожка?}
+    A([onApplyAudio idx]) --> B{есть hls4/hls2 URL?}
 
-    B -- да --> C[сохранить pos/paused\nplaySource прямой URL]
-    B -- нет --> D{есть hls4/hls2 URL?}
+    B -- да --> C[switchToRewrittenHls]
+    B -- нет --> D([toast: смена недоступна])
 
-    D -- да --> E[switchToRewrittenHls]
-    D -- нет --> F([toast: смена недоступна])
-
-    E --> G[getRewrittenHlsUrl\n/hls/rewrite?url=...&audio=N]
-    G --> H[resumeTime = pos\nresumePaused = paused\nshowSpinner]
-    H --> I[playSource rewriteUrl]
-    I --> J([loadedmetadata → onSourceReady\nвосстановление позиции])
-
-    C --> J
+    C --> E[getRewrittenHlsUrl\n/hls/rewrite?url=...&audio=N]
+    E --> F[resumeTime = pos\nresumePaused = paused\nshowSpinner]
+    F --> G[playSource rewriteUrl]
+    G --> H([loadedmetadata → onSourceReady\nвосстановление позиции])
 ```
 
 ## Переключение качества
