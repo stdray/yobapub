@@ -10,7 +10,7 @@ import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 import { tplPlayer } from './player/template';
 import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, loadMediaLinksDeferred, getResumeTime } from './player/media';
-import { getRewrittenHlsUrl, isBackendRewriteAvailable } from './player/hls';
+import { getRewrittenHlsUrl } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
 import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey, clearPanelIdle } from './player/panel';
@@ -21,7 +21,7 @@ var $root = $('#page-player');
 var keys = pageKeys();
 var markTimer: number | null = null;
 var videoEl: HTMLVideoElement | null = null;
-var hlsInstance: any = null;
+
 
 var currentItem: Item | null = null;
 var currentSeason: number | undefined;
@@ -37,7 +37,6 @@ var selectedAudio = 0;
 var selectedSub = -1;
 var currentTitle = '';
 var currentDuration = 0;
-var useHls = false;
 var currentHlsUrl = '';
 var playbackStarted = false;
 var resumePaused = false;
@@ -80,9 +79,7 @@ function getInfoState(): InfoState {
     subs: currentSubs,
     selectedQuality: selectedQuality,
     selectedAudio: selectedAudio,
-    selectedSub: selectedSub,
-    useHls: useHls,
-    hlsInstance: hlsInstance
+    selectedSub: selectedSub
   };
 }
 
@@ -341,7 +338,6 @@ function applyAudioSwitch(idx: number): void {
   if (idx === 0 || currentAudios.length <= 1) {
     var pos = videoEl ? videoEl.currentTime : 0;
     var paused = videoEl ? videoEl.paused : false;
-    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
     currentHlsUrl = '';
     resumeTime = pos;
     resumePaused = paused;
@@ -367,7 +363,6 @@ function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
   var pos = videoEl ? videoEl.currentTime : 0;
   var paused = videoEl ? videoEl.paused : false;
   var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   currentHlsUrl = hlsUrl;
   resumeTime = pos;
   resumePaused = paused;
@@ -394,7 +389,6 @@ function switchQuality(): void {
   var url = getUrlFromFile(currentFiles[selectedQuality]);
   if (!url) return;
 
-  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   resumeTime = pos;
   qualitySwitching = true;
   playSource(url);
@@ -404,53 +398,17 @@ function switchQuality(): void {
 
 function playSource(url: string): void {
   if (!videoEl) return;
-  useHls = false;
   if (url.indexOf('blob:') !== 0) currentHlsUrl = '';
 
-  if (url.indexOf('.m3u8') !== -1 || url.indexOf('/hls') !== -1 || url.indexOf('blob:') === 0) {
-    if (isBackendRewriteAvailable() && url.indexOf('blob:') !== 0) {
-      // Native HLS on Android WebView or Tizen proxy mode — no hls.js overhead
-      currentHlsUrl = url;
-      useHls = true;
-      var onMetaNative = function () {
-        if (videoEl) videoEl.removeEventListener('loadedmetadata', onMetaNative);
-        onSourceReady();
-      };
-      videoEl.addEventListener('loadedmetadata', onMetaNative);
-      videoEl.src = url;
-      return;
-    }
-    try {
-      var Hls = require('hls.js');
-      if (Hls.default) Hls = Hls.default;
-      if (Hls.isSupported()) {
-        useHls = true;
-        if (url.indexOf('blob:') !== 0) currentHlsUrl = url;
-        hlsInstance = new Hls({
-          enableWorker: false,
-          renderTextTracksNatively: true,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          maxBufferSize: 30 * 1000 * 1000,
-          maxBufferHole: 0.5
-        });
-        hlsInstance.loadSource(url);
-        hlsInstance.attachMedia(videoEl);
-        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function (_ev: any, _data: any) {
-          onSourceReady();
-        });
-        hlsInstance.on(Hls.Events.ERROR, function (_ev: any, data: any) {
-          if (data.fatal) {
-            console.error('[Player] HLS fatal error: type=' + data.type + ' details=' + data.details);
-            showPlaybackError(
-              { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED, message: 'HLS: ' + data.details } as any,
-              url
-            );
-          }
-        });
-        return;
-      }
-    } catch (e) { /* fallback */ }
+  if (url.indexOf('.m3u8') !== -1 || url.indexOf('/hls') !== -1) {
+    currentHlsUrl = url;
+    var onMetaNative = function () {
+      if (videoEl) videoEl.removeEventListener('loadedmetadata', onMetaNative);
+      onSourceReady();
+    };
+    videoEl.addEventListener('loadedmetadata', onMetaNative);
+    videoEl.src = url;
+    return;
   }
 
   var onMeta = function () {
@@ -652,10 +610,6 @@ function destroyPlayer(): void {
   clearPanelIdle();
   resetSeek();
   if (osdTimer) { clearTimeout(osdTimer); osdTimer = null; }
-  if (hlsInstance) {
-    try { hlsInstance.destroy(); } catch (e) { /* ignore */ }
-    hlsInstance = null;
-  }
   if (videoEl) {
     try { videoEl.pause(); } catch (e) { /* ignore */ }
     videoEl.removeAttribute('src');
@@ -742,7 +696,6 @@ export var playerPage: Page = {
     playbackStarted = false;
     panelState.open = false;
     panelState.listOpen = false;
-    useHls = false;
     currentFiles = [];
     currentAudios = [];
     currentSubs = [];

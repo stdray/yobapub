@@ -1,4 +1,3 @@
-import $ from 'jquery';
 import { getAccessToken } from '../../utils/storage';
 
 export function getBaseUrl(url: string): string {
@@ -48,10 +47,6 @@ export function getRewrittenHlsUrl(url: string, audioIndex: number): string {
     (token ? '&access_token=' + encodeURIComponent(token) : '');
 }
 
-export function isBackendRewriteAvailable(): boolean {
-  // Available when served from our own server (not localhost/file://)
-  var h = window.location.hostname;
-  return h !== 'localhost' && h !== '127.0.0.1' && h !== '' && window.location.protocol !== 'file:';
-}
+
 
 

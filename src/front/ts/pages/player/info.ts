@@ -9,8 +9,6 @@ export interface InfoState {
   selectedQuality: number;
   selectedAudio: number;
   selectedSub: number;
-  useHls: boolean;
-  hlsInstance: any;
 }
 
 export function getStreamInfo(state: InfoState): string {
@@ -35,14 +33,6 @@ export function getStreamInfo(state: InfoState): string {
 
   if (state.selectedSub >= 0 && state.selectedSub < state.subs.length) {
     parts.push('Sub: ' + state.subs[state.selectedSub].lang.toUpperCase());
-  }
-
-  if (state.useHls && state.hlsInstance) {
-    var level = state.hlsInstance.levels && state.hlsInstance.levels[state.hlsInstance.currentLevel];
-    if (level && level.bitrate) {
-      var mbps = (level.bitrate / 1000000).toFixed(1);
-      parts.push(mbps + ' Mbps');
-    }
   }
 
   return parts.join(' &bull; ');
