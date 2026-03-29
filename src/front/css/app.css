@@ -314,19 +314,22 @@ html, body {
 
 .episodes__seasons {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px 0;
   margin-bottom: 20px;
 }
 
 .episodes__season-tab {
-  padding: 8px 24px;
-  font-size: 24px;
+  padding: 6px 16px;
+  font-size: 22px;
   background: #2a2a4a;
   border: 2px solid transparent;
   border-radius: 6px;
   color: #aaa;
   cursor: pointer;
   outline: none;
-  margin-right: 16px;
+  margin-right: 12px;
+  white-space: nowrap;
 }
 
 .episodes__season-tab.active,
