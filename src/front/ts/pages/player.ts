@@ -4,13 +4,13 @@ import { getItem } from '../api/items';
 import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
-import { TvKey } from '../utils/platform';
+import { TvKey, isAndroidWebView } from '../utils/platform';
 import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 import { tplPlayer } from './player/template';
 import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, loadMediaLinksDeferred, getResumeTime } from './player/media';
-import { fetchRewrittenHls } from './player/hls';
+import { fetchRewrittenHls, getRewrittenHlsUrl } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
 import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey, clearPanelIdle } from './player/panel';
@@ -269,14 +269,20 @@ function startWithAudio(title: string): void {
     if (hlsUrl) {
       if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       var audioIndex = currentAudios[selectedAudio].index;
-      fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
-        if (blobUrl) {
-          currentHlsUrl = hlsUrl;
-          playUrl(blobUrl, title);
-        } else {
-          playUrl(getUrlFromFile(f), title);
-        }
-      });
+      if (isAndroidWebView()) {
+        var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+        currentHlsUrl = hlsUrl;
+        playUrl(rewriteUrl, title);
+      } else {
+        fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
+          if (blobUrl) {
+            currentHlsUrl = hlsUrl;
+            playUrl(blobUrl, title);
+          } else {
+            playUrl(getUrlFromFile(f), title);
+          }
+        });
+      }
       return;
     }
   }
@@ -360,6 +366,16 @@ function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
   var audioIndex = currentAudios[audioIdx].index;
   var pos = videoEl ? videoEl.currentTime : 0;
   var paused = videoEl ? videoEl.paused : false;
+  if (isAndroidWebView()) {
+    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+    currentHlsUrl = hlsUrl;
+    resumeTime = pos;
+    resumePaused = paused;
+    qualitySwitching = true;
+    playSource(rewriteUrl);
+    return;
+  }
   fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
     if (!blobUrl || !videoEl) {
       showToast('Не удалось переключить аудио');
@@ -403,6 +419,18 @@ function playSource(url: string): void {
   hlsSubTracks = [];
 
   if (url.indexOf('.m3u8') !== -1 || url.indexOf('/hls') !== -1 || url.indexOf('blob:') === 0) {
+    if (isAndroidWebView() && url.indexOf('blob:') !== 0) {
+      // Native HLS on Android WebView — no hls.js overhead
+      currentHlsUrl = url;
+      useHls = true;
+      videoEl.src = url;
+      var onMetaNative = function () {
+        if (videoEl) videoEl.removeEventListener('loadedmetadata', onMetaNative);
+        onSourceReady();
+      };
+      videoEl.addEventListener('loadedmetadata', onMetaNative);
+      return;
+    }
     try {
       var Hls = require('hls.js');
       if (Hls.default) Hls = Hls.default;

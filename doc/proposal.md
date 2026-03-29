@@ -5,15 +5,15 @@
 | Приоритет | # | Что сделать | Влияние | Сложность | Ratio | Статус |
 |:---------:|:-:|-------------|:-------:|:---------:|:-----:|--------|
 | — | 10 | Back из плеера: `keydown(8)` в WebView | 5 | 2 | 2.50 | **DONE** |
-| 1 | 4 | Убрать лишний `fetchRewrittenHls` при `selectedAudio===0` | 3 | 1 | 3.00 | TODO |
-| 2 | 1 | Scale один раз в `onCreate` через `DisplayMetrics` | 2 | 1 | 2.00 | TODO |
-| 3 | 6 | `preload="auto"` на `<video>` | 2 | 1 | 2.00 | TODO |
-| 4 | 2 | Параллельные `getItem` + `media-links` | 4 | 2 | 2.00 | TODO |
-| 5 | 7 | `http` стриминг по умолчанию на Android | 4 | 2 | 2.00 | TODO |
-| 6 | 5 | Нативный HLS вместо hls.js на Android | 5 | 3 | 1.67 | TODO |
-| 7 | 3 | Кеш `media-links` в `sessionStorage` | 3 | 2 | 1.50 | TODO |
-| 8 | 11 | `fetchRewrittenHls` на бекенд | 4 | 3 | 1.33 | TODO |
-| 9 | 9 | Офлайн-страница | 2 | 2 | 1.00 | TODO |
+| 1 | 4 | Убрать лишний `fetchRewrittenHls` при `selectedAudio===0` | 3 | 1 | 3.00 | **DONE** |
+| 2 | 1 | Scale один раз в `onCreate` через `DisplayMetrics` | 2 | 1 | 2.00 | **DONE** |
+| 3 | 6 | `preload="auto"` на `<video>` | 2 | 1 | 2.00 | **DONE** |
+| 4 | 2 | Параллельные `getItem` + `media-links` | 4 | 2 | 2.00 | **DONE** |
+| 5 | 7 | `http` стриминг по умолчанию на Android | 4 | 2 | 2.00 | **DONE** |
+| 6 | 5 | Нативный HLS вместо hls.js на Android | 5 | 3 | 1.67 | **DONE** |
+| 7 | 3 | ~~Кеш `media-links` в `sessionStorage`~~ | 3 | 2 | 1.50 | ~~SKIP~~ |
+| 8 | 11 | `fetchRewrittenHls` на бекенд | 4 | 3 | 1.33 | **DONE** |
+| 9 | 9 | ~~Офлайн-страница~~ | 2 | 2 | 1.00 | ~~SKIP~~ |
 | 10 | 8 | Overlay Play иконка | 1 | 2 | 0.50 | TODO |
 
 ---
@@ -303,8 +303,8 @@ function getRewrittenHlsUrl(hlsUrl: string, audioIndex: number): string {
 
 **Фаза 3 — Глубокая оптимизация:**
 - #5 (нативный HLS) — требует тестирования на устройстве
-- #3 (кеш media-links) — полезно для сериалов
+- ~~#3 (кеш media-links) — полезно для сериалов~~
 
 **Фаза 4 — Бекенд + UX:**
 - #11 (rewrite на бекенде) — требует доработки серверной части
-- #9 (офлайн) — приятный UX-штрих
+- ~~#9 (офлайн) — приятный UX-штрих~~

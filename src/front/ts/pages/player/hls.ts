@@ -1,4 +1,6 @@
 import $ from 'jquery';
+import { getApiBase } from '../../api/client';
+import { getAccessToken } from '../../utils/storage';
 
 export function getBaseUrl(url: string): string {
   var i = url.indexOf('?');
@@ -30,6 +32,13 @@ export function rewriteHlsManifest(manifest: string, audioIndex: number): string
   return manifest.replace(/(index-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
     .replace(/(iframes-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
     .replace(/(seg-\d+-v\d+)-a\d+(\.ts)/g, '$1-' + target + '$2');
+}
+
+export function getRewrittenHlsUrl(url: string, audioIndex: number): string {
+  var base = getApiBase();
+  var token = getAccessToken() || '';
+  return base + '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
+    (token ? '&access_token=' + encodeURIComponent(token) : '');
 }
 
 export function fetchRewrittenHls(url: string, audioIndex: number, cb: (blobUrl: string | null) => void): void {
