@@ -9,7 +9,7 @@ import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 import { tplPlayer } from './player/template';
-import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime } from './player/media';
+import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, loadMediaLinksDeferred, getResumeTime } from './player/media';
 import { fetchRewrittenHls } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
@@ -739,53 +739,70 @@ export var playerPage: Page = {
 
     showSpinnerIn($root);
     var id = params.id!;
+    var earlyMid = params.mid;
 
-    getItem(id).then(
-      function (res: any) {
-        var data = Array.isArray(res) ? res[0] : res;
-        currentItem = data.item;
-        if (!currentItem) return;
+    function onBothLoaded(itemRes: any, mediaLinksRes: any): void {
+      var data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
+      currentItem = data.item;
+      if (!currentItem) return;
 
-        var media: MediaInfo | null = null;
+      var media: MediaInfo | null = null;
 
-        if (currentSeason !== undefined && currentEpisode !== undefined) {
-          media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
-          resumeTime = getResumeTime(currentItem, currentSeason, currentEpisode);
-        } else if (currentVideo !== undefined) {
-          media = findVideoMedia(currentItem, currentVideo);
-          resumeTime = getResumeTime(currentItem, undefined, undefined, currentVideo);
-        }
+      if (currentSeason !== undefined && currentEpisode !== undefined) {
+        media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
+        resumeTime = getResumeTime(currentItem, currentSeason, currentEpisode);
+      } else if (currentVideo !== undefined) {
+        media = findVideoMedia(currentItem, currentVideo);
+        resumeTime = getResumeTime(currentItem, undefined, undefined, currentVideo);
+      }
 
-        if (!media) {
+      if (!media) {
+        $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
+        return;
+      }
+
+      currentTitle = media.title;
+      currentDuration = media.duration;
+      currentAudios = media.audios;
+      var itemTitle = currentItem.title.split(' / ')[0];
+      var prefs = getTitlePrefs(currentItem.id);
+
+      var applyLinks = function (files: any[], subs: any[]) {
+        currentFiles = files.slice().sort(function (a: any, b: any) { return b.w - a.w; });
+        currentSubs = subs.filter(function (s: any) { return s.url && !s.embed; });
+        selectedQuality = restoreQualityIndex(currentFiles, prefs);
+        selectedAudio = restoreAudioIndex(currentAudios, prefs);
+        selectedSub = restoreSubIndex(currentSubs, prefs);
+
+        if (currentFiles.length === 0) {
           $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
           return;
         }
+        startWithAudio(itemTitle + ' - ' + currentTitle);
+      };
 
-        currentTitle = media.title;
-        currentDuration = media.duration;
-        currentAudios = media.audios;
-        var itemTitle = currentItem.title.split(' / ')[0];
-        var prefs = getTitlePrefs(currentItem.id);
-
-        loadMediaLinks(media.mid, function (files, subs) {
-          currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
-          currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-          selectedQuality = restoreQualityIndex(currentFiles, prefs);
-          selectedAudio = restoreAudioIndex(currentAudios, prefs);
-          selectedSub = restoreSubIndex(currentSubs, prefs);
-
-          if (currentFiles.length === 0) {
-            $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
-            return;
-          }
-
-          startWithAudio(itemTitle + ' - ' + currentTitle);
-        });
-      },
-      function () {
-        $root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка загрузки</div></div>');
+      if (mediaLinksRes) {
+        applyLinks(mediaLinksRes.files, mediaLinksRes.subs);
+      } else {
+        loadMediaLinks(media.mid, applyLinks);
       }
-    );
+    }
+
+    if (earlyMid) {
+      $.when(getItem(id), loadMediaLinksDeferred(earlyMid)).then(
+        function (itemRes: any, mlRes: any) { onBothLoaded(itemRes, mlRes); },
+        function () {
+          $root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка загрузки</div></div>');
+        }
+      );
+    } else {
+      getItem(id).then(
+        function (itemRes: any) { onBothLoaded(itemRes, null); },
+        function () {
+          $root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка загрузки</div></div>');
+        }
+      );
+    }
 
     keys.bind(handleKey);
   },

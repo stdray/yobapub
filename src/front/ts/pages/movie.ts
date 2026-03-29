@@ -84,7 +84,10 @@ function handleKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     case TvKey.Enter:
       var action = $root.find('.btn').eq(focusedBtn).data('action');
-      if (action === 'play' && currentItem) { navigate('player', { id: currentItem.id, video: 1 }); }
+      if (action === 'play' && currentItem) {
+        var firstVideo = currentItem.videos && currentItem.videos[0];
+        navigate('player', { id: currentItem.id, video: 1, mid: firstVideo ? firstVideo.id : undefined });
+      }
       e.preventDefault(); break;
     case TvKey.Return:
     case TvKey.Backspace:

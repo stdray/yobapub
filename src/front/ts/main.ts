@@ -2,8 +2,8 @@ import objectFitImages from 'object-fit-images';
 import '../css/app.css';
 import { configure } from './api/client';
 import { registerPage, navigate, setExitHandler } from './router';
-import { registerTizenKeys, getDeviceInfo } from './utils/platform';
-import { getAccessToken } from './utils/storage';
+import { registerTizenKeys, getDeviceInfo, isAndroidWebView } from './utils/platform';
+import { getAccessToken, setStreamingType } from './utils/storage';
 import { apiPostWithRefresh } from './api/client';
 import { loginPage } from './pages/login';
 import { watchingPage } from './pages/watching';
@@ -17,6 +17,10 @@ import { CLIENT_ID, CLIENT_SECRET } from './config';
 objectFitImages();
 
 configure(CLIENT_ID, CLIENT_SECRET);
+
+if (isAndroidWebView() && !localStorage.getItem('kp_streaming_type')) {
+  setStreamingType('http');
+}
 
 registerTizenKeys();
 

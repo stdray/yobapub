@@ -116,6 +116,10 @@ export function isLegacyTizen(): boolean {
   return v > 0 && v < 3;
 }
 
+export function isAndroidWebView(): boolean {
+  return typeof (window as any).NativeApp !== 'undefined' || /Android.*wv\b/.test(navigator.userAgent);
+}
+
 export function exitApp(): void {
   try {
     if (typeof tizen !== 'undefined' && tizen.application) {

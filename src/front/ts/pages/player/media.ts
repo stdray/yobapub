@@ -1,3 +1,4 @@
+import $ from 'jquery';
 import { apiGet } from '../../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../../types/api';
 import { getStreamingType, isProxyAll, proxyUrl } from '../../utils/storage';
@@ -58,6 +59,20 @@ export function loadMediaLinks(mid: number, cb: (files: VideoFile[], subs: Subti
     },
     function () { cb([], []); }
   );
+}
+
+export interface MediaLinksResult { files: VideoFile[]; subs: Subtitle[]; }
+
+export function loadMediaLinksDeferred(mid: number): JQueryDeferred<MediaLinksResult> {
+  var d = $.Deferred<MediaLinksResult>();
+  apiGet('/v1/items/media-links', { mid: mid }).then(
+    function (res: any) {
+      var data = Array.isArray(res) ? res[0] : res;
+      d.resolve({ files: (data && data.files) || [], subs: (data && data.subtitles) || [] });
+    },
+    function () { d.resolve({ files: [], subs: [] }); }
+  );
+  return d;
 }
 
 export function getResumeTime(item: Item, seasonNum?: number, epNum?: number, videoNum?: number): number {
