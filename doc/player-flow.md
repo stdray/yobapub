@@ -73,7 +73,7 @@ flowchart TD
     B -- нет --> D{streamingType?}
     D -- hls4 --> E[hls4]
     D -- hls2 --> F[hls2]
-    D -- hls / auto --> G[hls4 || hls2]
+    D -- hls / auto --> G["hls4 || hls2"]
 ```
 
 ## Перемотка
