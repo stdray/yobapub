@@ -601,6 +601,11 @@ html, body {
   background: #777;
 }
 
+.ppanel__btn.disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .ppanel__list {
   position: absolute;
   top: 0;
