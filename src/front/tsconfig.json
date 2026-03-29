@@ -9,13 +9,13 @@
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src/ts",
+    "rootDir": "./ts",
     "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["src/ts/**/*"],
+  "include": ["ts/**/*"],
   "exclude": ["node_modules", "dist", "old"]
 }

@@ -1,17 +1,17 @@
 # Stage 1: Build frontend
 FROM node:24-alpine AS frontend
 WORKDIR /src
-COPY front/package.json front/package-lock.json ./
+COPY src/front/package.json src/front/package-lock.json ./
 RUN npm ci
-COPY front/ .
+COPY src/front/ .
 RUN npx webpack --mode production
 
 # Stage 2: Build backend
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 WORKDIR /src
-COPY back/YobaPub.Proxy/YobaPub.Proxy.csproj .
+COPY src/back/YobaPub.Proxy/YobaPub.Proxy.csproj .
 RUN dotnet restore
-COPY back/YobaPub.Proxy/ .
+COPY src/back/YobaPub.Proxy/ .
 RUN dotnet publish -c Release -o /app
 
 # Stage 3: Runtime

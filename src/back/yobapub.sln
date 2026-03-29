@@ -4,7 +4,7 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "back", "back", "{11BF4459-C332-B9BD-164A-F44681F2EC0B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YobaPub.Proxy", "back\YobaPub.Proxy\YobaPub.Proxy.csproj", "{E62C07D8-E063-237F-9B2F-70B25ABDC1BE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YobaPub.Proxy", "YobaPub.Proxy\YobaPub.Proxy.csproj", "{E62C07D8-E063-237F-9B2F-70B25ABDC1BE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

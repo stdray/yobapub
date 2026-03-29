@@ -19,7 +19,7 @@ module.exports = function (_env, argv) {
   var isProd = argv.mode === 'production';
 
   return {
-    entry: './src/ts/main.ts',
+    entry: './ts/main.ts',
     output: {
       path: path.resolve(__dirname, isProd ? 'dist/release' : 'dist/dev'),
       filename: 'app.js',
@@ -70,13 +70,14 @@ module.exports = function (_env, argv) {
         __APP_VERSION__: JSON.stringify(getAppVersion())
       }),
       new HtmlWebpackPlugin({
-        template: './src/index.html',
+        template: './index.html',
         inject: 'body'
       }),
       new CopyWebpackPlugin({
         patterns: [
           { from: 'node_modules/jquery/dist/jquery.min.js', to: 'vendor/jquery.min.js' },
-          { from: 'node_modules/hls.js/dist/hls.min.js', to: 'vendor/hls.min.js' }
+          { from: 'node_modules/hls.js/dist/hls.min.js', to: 'vendor/hls.min.js' },
+          { from: 'icon.svg', to: 'icon.svg' }
         ]
       })
     ]
