@@ -272,12 +272,13 @@ function startWithAudio(title: string): void {
   var f = currentFiles[selectedQuality];
   var hls4Url = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
   var hls2Url = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  var legacyTizen = isLegacyTizen();
   var streamPref = getStreamingType();
   var hlsUrl = '';
-  if (streamPref === 'hls4') hlsUrl = hls4Url;
+  if (legacyTizen) hlsUrl = hls2Url;
+  else if (streamPref === 'hls4') hlsUrl = hls4Url;
   else if (streamPref === 'hls2') hlsUrl = hls2Url;
   else if (streamPref === 'hls') hlsUrl = hls4Url || hls2Url;
-  else if (isLegacyTizen()) hlsUrl = hls2Url || hls4Url;
   else hlsUrl = hls4Url || hls2Url;
   if (hlsUrl) {
     if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
@@ -348,7 +349,7 @@ function applyAudioSwitch(idx: number): void {
     var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
     var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
     var sp = getStreamingType();
-    var hlsUrl = sp === 'hls4' ? hls4 : sp === 'hls2' ? hls2 : isLegacyTizen() ? (hls2 || hls4) : (hls4 || hls2);
+    var hlsUrl = isLegacyTizen() ? hls2 : sp === 'hls4' ? hls4 : sp === 'hls2' ? hls2 : (hls4 || hls2);
     if (hlsUrl) {
       if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       switchToRewrittenHls(hlsUrl, idx);
