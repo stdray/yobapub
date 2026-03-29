@@ -391,7 +391,7 @@ function playSource(url: string): void {
   };
   videoEl.addEventListener('loadedmetadata', onMeta);
   var isHls = url.indexOf('.m3u8') >= 0 || url.indexOf('/hls/') >= 0;
-  var isTizen = typeof (window as any).tizen !== 'undefined';
+  var isTizen = typeof (window as any).tizen !== 'undefined' || /Tizen/i.test(navigator.userAgent);
   var canPlayVnd = videoEl.canPlayType('application/vnd.apple.mpegurl');
   var canPlayX = videoEl.canPlayType('application/x-mpegurl');
   var hlsSupported = Hls.isSupported();
