@@ -273,10 +273,14 @@ function startWithAudio(title: string): void {
   var hlsUrl = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
   if (hlsUrl) {
     if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-    var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
-    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
     currentHlsUrl = hlsUrl;
-    playUrl(rewriteUrl, title);
+    if (!isLegacyTizen() || selectedAudio > 0) {
+      var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
+      var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+      playUrl(rewriteUrl, title);
+      return;
+    }
+    playUrl(hlsUrl, title);
     return;
   }
   var url = getUrlFromFile(f);
