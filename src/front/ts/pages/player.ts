@@ -28,22 +28,26 @@ var currentItem: Item | null = null;
 var currentSeason: number | undefined;
 var currentEpisode: number | undefined;
 var currentVideo: number | undefined;
-var resumeTime = 0;
 
 var currentFiles: VideoFile[] = [];
 var currentAudios: AudioTrack[] = [];
 var currentSubs: Subtitle[] = [];
-var selectedQuality = 0;
-var selectedAudio = 0;
-var selectedSub = -1;
 var currentTitle = '';
 var currentDuration = 0;
 var currentHlsUrl = '';
 var hlsInstance: Hls | null = null;
 var playSourceDebug = '';
 var playbackStarted = false;
-var resumePaused = false;
-var qualitySwitching = false;
+
+interface PlayState {
+  quality: number;
+  audio: number;
+  sub: number;
+  position: number;
+  paused: boolean;
+}
+
+var state: PlayState = { quality: 0, audio: 0, sub: -1, position: 0, paused: false };
 
 // --- Progress state ---
 
@@ -80,9 +84,9 @@ function getInfoState(): InfoState {
     files: currentFiles,
     audios: currentAudios,
     subs: currentSubs,
-    selectedQuality: selectedQuality,
-    selectedAudio: selectedAudio,
-    selectedSub: selectedSub
+    selectedQuality: state.quality,
+    selectedAudio: state.audio,
+    selectedSub: state.sub
   };
 }
 
@@ -92,9 +96,9 @@ function hasHlsUrl(): boolean {
 
 function getPanelData(): PanelData {
   return {
-    audioItems: getAudioItems(currentAudios, selectedAudio, videoEl),
-    subItems: getSubItems(currentSubs, selectedSub),
-    qualityItems: getQualityItems(currentFiles, selectedQuality),
+    audioItems: getAudioItems(currentAudios, state.audio, videoEl),
+    subItems: getSubItems(currentSubs, state.sub),
+    qualityItems: getQualityItems(currentFiles, state.quality),
     audioEnabled: currentAudios.length > 1 && hasHlsUrl(),
     subsEnabled: currentSubs.length > 0,
     qualityEnabled: currentFiles.length > 1
@@ -105,12 +109,15 @@ var panelCallbacks: PanelCallbacks = {
   onShowBar: function () { showBar(); },
   onHideBar: function () { hideBar(); },
   onClearBarTimer: function () { clearBarTimer(); },
-  onApplyAudio: function (idx) { applyAudioSwitch(idx); },
-  onApplySub: function (menuIdx) { applySubSwitch(menuIdx); },
+  onApplyAudio: function (idx) {
+    continuePlaying({ quality: state.quality, audio: idx, sub: state.sub, position: currentPosition(), paused: state.paused });
+  },
+  onApplySub: function (menuIdx) {
+    continuePlaying({ quality: state.quality, audio: state.audio, sub: menuIdx - 1, position: currentPosition(), paused: state.paused });
+  },
   onApplyQuality: function (idx) {
-    if (idx !== selectedQuality) {
-      selectedQuality = idx;
-      switchQuality();
+    if (idx !== state.quality) {
+      continuePlaying({ quality: idx, audio: state.audio, sub: state.sub, position: currentPosition(), paused: state.paused });
     }
   },
   onSavePrefs: function () { doSavePrefs(); },
@@ -178,8 +185,9 @@ function applySeek(): void {
   var dur = getVideoDuration(progressState);
   if (dur > 0) seekPos = Math.min(seekPos, dur - 2);
   seekPos = Math.max(0, seekPos);
-  videoEl.currentTime = seekPos;
+  var pos = seekPos;
   resetSeek();
+  continuePlaying({ quality: state.quality, audio: state.audio, sub: state.sub, position: pos, paused: state.paused });
   showBar();
 }
 
@@ -237,13 +245,14 @@ function navigateTrack(dir: number): boolean {
 function remountTrack(): void {
   if (!currentItem) return;
   var media: MediaInfo | null = null;
+  var pos = 0;
 
   if (currentSeason !== undefined && currentEpisode !== undefined) {
     media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
-    resumeTime = getResumeTime(currentItem, currentSeason, currentEpisode);
+    pos = getResumeTime(currentItem, currentSeason, currentEpisode);
   } else if (currentVideo !== undefined) {
     media = findVideoMedia(currentItem, currentVideo);
-    resumeTime = getResumeTime(currentItem, undefined, undefined, currentVideo);
+    pos = getResumeTime(currentItem, undefined, undefined, currentVideo);
   }
 
   if (!media) return;
@@ -257,33 +266,63 @@ function remountTrack(): void {
   loadMediaLinks(media.mid, function (files, subs) {
     currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
     currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-    selectedQuality = restoreQualityIndex(currentFiles, prefs);
-    selectedAudio = restoreAudioIndex(currentAudios, prefs);
-    selectedSub = restoreSubIndex(currentSubs, prefs);
+    var q = restoreQualityIndex(currentFiles, prefs);
+    var a = restoreAudioIndex(currentAudios, prefs);
+    var s = restoreSubIndex(currentSubs, prefs);
 
     if (currentFiles.length === 0) return;
-    startWithAudio(itemTitle + ' - ' + currentTitle);
+    continuePlaying({ quality: q, audio: a, sub: s, position: pos, paused: false }, itemTitle + ' - ' + currentTitle);
   });
 }
 
-function startWithAudio(title: string): void {
-  var f = currentFiles[selectedQuality];
-  var hls4Url = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
-  var hls2Url = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
-  var legacyTizen = isLegacyTizen();
-  var streamPref = getStreamingType();
-  var hlsUrl = '';
-  if (legacyTizen) hlsUrl = hls2Url;
-  else if (streamPref === 'hls4') hlsUrl = hls4Url;
-  else if (streamPref === 'hls2') hlsUrl = hls2Url;
-  else if (streamPref === 'hls') hlsUrl = hls4Url || hls2Url;
-  else hlsUrl = hls4Url || hls2Url;
-  if (!hlsUrl) return;
-  if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-  currentHlsUrl = hlsUrl;
-  var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
-  var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-  playUrl(rewriteUrl, title);
+function getHlsUrl(f: VideoFile): string {
+  var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
+  var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  if (isLegacyTizen()) return hls2;
+  var sp = getStreamingType();
+  if (sp === 'hls4') return hls4;
+  if (sp === 'hls2') return hls2;
+  return hls4 || hls2;
+}
+
+function currentPosition(): number {
+  if (seeking && seekPos >= 0) return seekPos;
+  return videoEl ? videoEl.currentTime : 0;
+}
+
+function continuePlaying(next: PlayState, title?: string): void {
+  var needSource = next.quality !== state.quality || next.audio !== state.audio || !videoEl;
+  var needSub = next.sub !== state.sub;
+  var needSeek = !needSource && Math.abs(next.position - currentPosition()) > 2;
+
+  state = { quality: next.quality, audio: next.audio, sub: next.sub, position: next.position, paused: next.paused };
+  if (seeking) resetSeek();
+
+  if (needSource) {
+    if (currentFiles.length === 0) return;
+    var f = currentFiles[state.quality];
+    var hlsUrl = getHlsUrl(f);
+    if (!hlsUrl) return;
+    if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
+    currentHlsUrl = hlsUrl;
+    var audioIndex = currentAudios.length > 0 ? currentAudios[state.audio].index : 1;
+    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+    if (!videoEl) {
+      playUrl(rewriteUrl, title || currentTitle);
+    } else {
+      showSpinner();
+      playSource(rewriteUrl);
+    }
+    return;
+  }
+
+  if (needSeek && videoEl) {
+    videoEl.currentTime = next.position;
+  }
+
+  if (needSub && videoEl) {
+    loadSubtitleTrack(videoEl, $root, currentSubs, state.sub);
+  }
 }
 
 // --- Bar show/hide ---
@@ -329,70 +368,10 @@ function clearBarTimer(): void {
 
 function doSavePrefs(): void {
   if (!currentItem) return;
-  saveCurrentPrefs(currentItem.id, currentFiles, currentAudios, currentSubs, selectedQuality, selectedAudio, selectedSub);
+  saveCurrentPrefs(currentItem.id, currentFiles, currentAudios, currentSubs, state.quality, state.audio, state.sub);
 }
 
-function applyAudioSwitch(idx: number): void {
-  selectedAudio = idx;
-  if (currentFiles.length === 0) return;
-  var f = currentFiles[selectedQuality];
-  var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
-  var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
-  var sp = getStreamingType();
-  var hlsUrl = isLegacyTizen() ? hls2 : sp === 'hls4' ? hls4 : sp === 'hls2' ? hls2 : (hls4 || hls2);
-  if (!hlsUrl) return;
-  if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-  switchToRewrittenHls(hlsUrl, idx);
-}
 
-function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
-  var audioIndex = currentAudios[audioIdx].index;
-  var pos = (seeking && seekPos >= 0) ? seekPos : (videoEl ? videoEl.currentTime : 0);
-  var paused = videoEl ? videoEl.paused : false;
-  if (seeking) { resetSeek(); }
-  var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-  currentHlsUrl = hlsUrl;
-  resumeTime = pos;
-  resumePaused = paused;
-  qualitySwitching = true;
-  showSpinner();
-  playSource(rewriteUrl);
-  // if (isBackendRewriteAvailable()) {
-  //   ...
-  // } else {
-  //   fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) { ... });
-  // }
-}
-
-function applySubSwitch(menuIdx: number): void {
-  var subIdx = menuIdx - 1;
-  selectedSub = subIdx;
-  if (videoEl) loadSubtitleTrack(videoEl, $root, currentSubs, subIdx);
-}
-
-function switchQuality(): void {
-  if (!videoEl || currentFiles.length === 0) return;
-  var pos = (seeking && seekPos >= 0) ? seekPos : videoEl.currentTime;
-  resumePaused = videoEl.paused;
-  if (seeking) { resetSeek(); }
-
-  resumeTime = pos;
-  qualitySwitching = true;
-  showSpinner();
-
-  var f = currentFiles[selectedQuality];
-  var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
-  var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
-  var legacyTizen = isLegacyTizen();
-  var sp = getStreamingType();
-  var hlsUrl = legacyTizen ? hls2 : sp === 'hls4' ? hls4 : sp === 'hls2' ? hls2 : (hls4 || hls2);
-  if (!hlsUrl) return;
-  if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-  currentHlsUrl = hlsUrl;
-  var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
-  var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-  playSource(rewriteUrl);
-}
 
 // --- Playback ---
 
@@ -402,7 +381,7 @@ function playSource(url: string): void {
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   playSourceDebug = 'url=' + url.substring(0, 120);
   var hlsConfig: Record<string, any> = {};
-  if (resumeTime > 0) hlsConfig.startPosition = resumeTime;
+  if (state.position > 0) hlsConfig.startPosition = state.position;
   var hls = new Hls(hlsConfig);
   hlsInstance = hls;
   hls.on(Hls.Events.MANIFEST_PARSED, function () {
@@ -417,9 +396,8 @@ function playSource(url: string): void {
 
 function onSourceReady(): void {
   if (!videoEl) return;
-  if (resumeTime > 0) {
-    var pos = resumeTime;
-    resumeTime = 0;
+  if (state.position > 0) {
+    var pos = state.position;
     var v = videoEl;
     var seekDone = false;
     var seekTimer: number | null = null;
@@ -436,19 +414,13 @@ function onSourceReady(): void {
     v.addEventListener('playing', doSeek);
     v.addEventListener('canplay', doSeek);
     seekTimer = window.setTimeout(doSeek, 3000);
-    if (resumePaused) {
-      resumePaused = false;
-    } else {
-      v.play();
-    }
+    if (!state.paused) v.play();
   } else {
-    if (resumePaused) { resumePaused = false; }
-    else { videoEl.play(); }
+    if (!state.paused) videoEl.play();
   }
   playbackStarted = true;
-  qualitySwitching = false;
-  if (selectedSub >= 0 && videoEl) {
-    loadSubtitleTrack(videoEl, $root, currentSubs, selectedSub);
+  if (state.sub >= 0 && videoEl) {
+    loadSubtitleTrack(videoEl, $root, currentSubs, state.sub);
   }
   hideSpinner();
   startMarkTimer();
@@ -639,15 +611,15 @@ function handleKey(e: JQuery.Event): void {
 
     case TvKey.Enter: case TvKey.PlayPause:
       if (!playbackStarted) break;
-      if (videoEl.paused) { videoEl.play(); showOsd('play'); }
-      else { videoEl.pause(); showOsd('pause'); }
+      if (videoEl.paused) { videoEl.play(); state.paused = false; showOsd('play'); }
+      else { videoEl.pause(); state.paused = true; showOsd('pause'); }
       showBar(); break;
 
     case TvKey.Play:
-      if (videoEl.paused) { videoEl.play(); showOsd('play'); showBar(); }
+      if (videoEl.paused) { videoEl.play(); state.paused = false; showOsd('play'); showBar(); }
       break;
     case TvKey.Pause:
-      videoEl.pause(); showOsd('pause'); showBar(); break;
+      videoEl.pause(); state.paused = true; showOsd('pause'); showBar(); break;
 
     case TvKey.Left: case TvKey.Rw:
       startSeek('left'); break;
@@ -680,17 +652,13 @@ export var playerPage: Page = {
     currentSeason = params.season;
     currentEpisode = params.episode;
     currentVideo = params.video;
-    resumeTime = 0;
-    resumePaused = false;
     playbackStarted = false;
     panelState.open = false;
     panelState.listOpen = false;
     currentFiles = [];
     currentAudios = [];
     currentSubs = [];
-    selectedQuality = 0;
-    selectedAudio = 0;
-    selectedSub = -1;
+    state = { quality: 0, audio: 0, sub: -1, position: 0, paused: false };
 
     showSpinnerIn($root);
     var id = params.id!;
@@ -702,13 +670,14 @@ export var playerPage: Page = {
         if (!currentItem) return;
 
         var media: MediaInfo | null = null;
+        var pos = 0;
 
         if (currentSeason !== undefined && currentEpisode !== undefined) {
           media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
-          resumeTime = getResumeTime(currentItem, currentSeason, currentEpisode);
+          pos = getResumeTime(currentItem, currentSeason, currentEpisode);
         } else if (currentVideo !== undefined) {
           media = findVideoMedia(currentItem, currentVideo);
-          resumeTime = getResumeTime(currentItem, undefined, undefined, currentVideo);
+          pos = getResumeTime(currentItem, undefined, undefined, currentVideo);
         }
 
         if (!media) {
@@ -725,15 +694,15 @@ export var playerPage: Page = {
         loadMediaLinks(media.mid, function (files, subs) {
           currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
           currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-          selectedQuality = restoreQualityIndex(currentFiles, prefs);
-          selectedAudio = restoreAudioIndex(currentAudios, prefs);
-          selectedSub = restoreSubIndex(currentSubs, prefs);
+          var q = restoreQualityIndex(currentFiles, prefs);
+          var a = restoreAudioIndex(currentAudios, prefs);
+          var s = restoreSubIndex(currentSubs, prefs);
 
           if (currentFiles.length === 0) {
             $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
             return;
           }
-          startWithAudio(itemTitle + ' - ' + currentTitle);
+          continuePlaying({ quality: q, audio: a, sub: s, position: pos, paused: false }, itemTitle + ' - ' + currentTitle);
         });
       },
       function () {
