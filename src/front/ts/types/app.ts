@@ -5,7 +5,6 @@ export interface RouteParams {
   season?: number;
   episode?: number;
   video?: number;
-  mid?: number;
   focusedSection?: number;
   focusedIndex?: number;
   folderId?: number;

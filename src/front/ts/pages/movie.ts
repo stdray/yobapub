@@ -86,7 +86,7 @@ function handleKey(e: JQuery.Event): void {
       var action = $root.find('.btn').eq(focusedBtn).data('action');
       if (action === 'play' && currentItem) {
         var firstVideo = currentItem.videos && currentItem.videos[0];
-        navigate('player', { id: currentItem.id, video: 1, mid: firstVideo ? firstVideo.id : undefined });
+        navigate('player', { id: currentItem.id, video: 1 });
       }
       e.preventDefault(); break;
     case TvKey.Return:

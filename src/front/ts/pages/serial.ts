@@ -187,10 +187,10 @@ function handleKey(e: JQuery.Event): void {
           var resume = findResumeEpisode();
           if (resume) {
             var resumeEpObj = seasons[resume.seasonIdx] && seasons[resume.seasonIdx].episodes[resume.episodeIdx];
-            navigate('player', { id: currentItem.id, season: resume.season, episode: resume.episode, mid: resumeEpObj ? resumeEpObj.id : undefined });
+            navigate('player', { id: currentItem.id, season: resume.season, episode: resume.episode });
           } else if (seasons.length > 0 && seasons[0].episodes.length > 0) {
             var firstEp = seasons[0].episodes[0];
-            navigate('player', { id: currentItem.id, season: seasons[0].number, episode: firstEp.number, mid: firstEp.id });
+            navigate('player', { id: currentItem.id, season: seasons[0].number, episode: firstEp.number });
           }
         }
         e.preventDefault(); break;
@@ -226,7 +226,7 @@ function handleKey(e: JQuery.Event): void {
       case TvKey.Enter:
         if (currentItem && seasons[selectedSeason]) {
           var ep = seasons[selectedSeason].episodes[focusedEpisode];
-          if (ep) { navigate('player', { id: currentItem.id, season: seasons[selectedSeason].number, episode: ep.number, mid: ep.id }); }
+          if (ep) { navigate('player', { id: currentItem.id, season: seasons[selectedSeason].number, episode: ep.number }); }
         }
         e.preventDefault(); break;
     }

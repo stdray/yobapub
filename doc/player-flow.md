@@ -5,48 +5,39 @@
 ```mermaid
 flowchart TD
     A([mount: params]) --> B[showSpinner]
-    B --> C{earlyMid?}
-    C -- да --> D[параллельно:\ngetItem + loadMediaLinksDeferred]
-    C -- нет --> E[getItem]
-    D --> F[onBothLoaded]
-    E --> F
+    B --> C[getItem id]
+    C --> D[findEpisodeMedia / findVideoMedia\ngetResumeTime]
+    D --> E[loadMediaLinks mid]
+    E --> F[sort files by width\nrestoreQuality/Audio/Sub из prefs]
+    F --> G[startWithAudio]
 
-    F --> G[findEpisodeMedia / findVideoMedia\ngetResumeTime]
-    G --> H{earlyMid?}
-    H -- да --> I[applyLinks сразу]
-    H -- нет --> J[loadMediaLinks]
-    J --> I
+    G --> H{selectedAudio > 0\nи есть hls4/hls2 URL?}
+    H -- да --> I[getRewrittenHlsUrl\n/hls/rewrite?url=...&audio=N]
+    H -- нет --> J[getUrlFromFile\nhls4 / hls / http]
+    I --> K[playUrl rewriteUrl]
+    J --> K
 
-    I --> K[sort files by width\nrestoreQuality/Audio/Sub из prefs]
-    K --> L[startWithAudio]
+    K --> L[innerHTML = tplPlayer\nvideoEl = video element]
+    L --> M[addEventListener:\nended / waiting / seeking\ncanplay / playing / seeked / error]
+    M --> N[setTimeout 0: playSource url]
 
-    L --> M{selectedAudio > 0\nи есть hls4/hls2 URL?}
-    M -- да --> N[getRewrittenHlsUrl\n/hls/rewrite?url=...&audio=N]
-    M -- нет --> O[getUrlFromFile\nhls4 / hls / http]
-    N --> P[playUrl rewriteUrl]
-    O --> P
+    N --> O{url содержит\n.m3u8 или /hls?}
+    O -- да --> P[videoEl.src = url\nnative HLS]
+    O -- нет --> Q[videoEl.src = url\nMP4/HTTP]
+    P --> R([loadedmetadata])
+    Q --> R
 
-    P --> Q[innerHTML = tplPlayer\nvideoEl = video element]
-    Q --> R[addEventListener:\nended / waiting / seeking\ncanplay / playing / seeked / error]
-    R --> S[setTimeout 0: playSource url]
+    R --> S[onSourceReady]
 
-    S --> T{url содержит\n.m3u8 или /hls?}
-    T -- да --> U[videoEl.src = url\nnative HLS]
-    T -- нет --> V[videoEl.src = url\nMP4/HTTP]
-    U --> W([loadedmetadata])
-    V --> W
+    S --> T{resumeTime > 0?}
+    T -- да --> U[play\nслушаем playing + canplay\ntimeout 3s → currentTime = pos]
+    T -- нет --> V{resumePaused?}
+    V -- нет --> W[play]
+    V -- да --> X[ничего не делаем]
 
-    W --> X[onSourceReady]
-
-    X --> Y{resumeTime > 0?}
-    Y -- да --> Z[play\nслушаем playing + canplay\ntimeout 3s → currentTime = pos]
-    Y -- нет --> AA{resumePaused?}
-    AA -- нет --> AB[play]
-    AA -- да --> AC[ничего не делаем]
-
-    Z --> AD[hideSpinner\nstartMarkTimer\nshowBar\nupdateInfoBadge]
-    AB --> AD
-    AC --> AD
+    U --> Y[hideSpinner\nstartMarkTimer\nshowBar\nupdateInfoBadge]
+    W --> Y
+    X --> Y
 ```
 
 ## Переключение аудиодорожки
