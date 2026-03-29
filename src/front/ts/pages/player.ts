@@ -402,6 +402,13 @@ function playSource(url: string): void {
   if (useHlsJs) {
     var hls = new Hls();
     hlsInstance = hls;
+    hls.on(Hls.Events.MANIFEST_PARSED, function () {
+      if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
+      onSourceReady();
+    });
+    hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
+      if (data.fatal && videoEl) showPlaybackError(videoEl.error, url);
+    });
     hls.loadSource(url);
     hls.attachMedia(videoEl);
   } else {
