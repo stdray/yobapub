@@ -529,6 +529,15 @@ html, body {
   line-height: 1.4;
 }
 
+/* --- Error debug info --- */
+.player__error-debug {
+  font-size: 0.55em;
+  margin-top: 12px;
+  opacity: 0.5;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
 /* --- Toast --- */
 .player__toast {
   position: absolute;

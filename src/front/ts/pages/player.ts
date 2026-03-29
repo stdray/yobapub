@@ -503,9 +503,9 @@ function showPlaybackError(error: MediaError | null, url: string, debugMsg?: str
     '<div class="player">' +
       '<div class="player__title" style="padding:60px;">' +
         '<div>' + msg + '</div>' +
-        '<div style="font-size:0.7em;margin-top:20px;opacity:0.6;">Код ошибки: ' + code + '</div>' +
-        '<div style="font-size:0.55em;margin-top:12px;opacity:0.5;word-break:break-all;">' + (debugMsg || playSourceDebug) + '</div>' +
-        '<div style="font-size:0.45em;margin-top:8px;opacity:0.4;word-break:break-all;">' + navigator.userAgent + '</div>' +
+        '<div class="player__error-debug">Код ошибки: ' + code + '</div>' +
+        '<div class="player__error-debug">' + (debugMsg || playSourceDebug) + '</div>' +
+        '<div class="player__error-debug">' + navigator.userAgent + '</div>' +
       '</div>' +
     '</div>'
   );
