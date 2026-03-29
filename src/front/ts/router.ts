@@ -45,3 +45,5 @@ export function setParams(params: RouteParams): void {
 export function getCurrentRoute(): RouteName | null {
   return currentRoute;
 }
+
+(window as any).__routerGoBack = goBack;

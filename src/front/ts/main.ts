@@ -47,3 +47,10 @@ if (getAccessToken()) {
 } else {
   navigate('login');
 }
+
+(window as any).appGoBack = function() {
+  var gone = (window as any).__routerGoBack ? (window as any).__routerGoBack() : false;
+  if (!gone && (window as any).NativeApp) {
+    (window as any).NativeApp.exit();
+  }
+};
