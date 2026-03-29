@@ -4,7 +4,7 @@ import { getItem } from '../api/items';
 import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
-import { TvKey } from '../utils/platform';
+import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
@@ -392,10 +392,11 @@ function playSource(url: string): void {
   videoEl.addEventListener('loadedmetadata', onMeta);
   var isHls = url.indexOf('.m3u8') >= 0 || url.indexOf('/hls/') >= 0;
   var isTizen = typeof (window as any).tizen !== 'undefined' || /Tizen/i.test(navigator.userAgent);
+  var legacyTizen = isLegacyTizen();
   var canPlayVnd = videoEl.canPlayType('application/vnd.apple.mpegurl');
   var canPlayX = videoEl.canPlayType('application/x-mpegurl');
   var hlsSupported = Hls.isSupported();
-  var useHlsJs = isHls && (isTizen || !canPlayVnd) && hlsSupported;
+  var useHlsJs = isHls && !legacyTizen && (isTizen || !canPlayVnd) && hlsSupported;
   playSourceDebug = 'isHls=' + isHls + ' isTizen=' + isTizen +
     ' vnd="' + canPlayVnd + '" x="' + canPlayX +
     '" hlsOk=' + hlsSupported + ' useHlsJs=' + useHlsJs;
