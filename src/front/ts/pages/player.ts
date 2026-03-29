@@ -517,7 +517,7 @@ function playUrl(url: string, title: string): void {
   });
 
   applySubSize();
-  setTimeout(function () { playSource(url); }, 0);
+  playSource(url);
 }
 
 // --- Mark time ---
