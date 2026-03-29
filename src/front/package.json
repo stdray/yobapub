@@ -4,7 +4,7 @@
   "description": "Клиент KinoPub для телевизоров Samsung (Tizen 2.3 / 3.0).",
   "main": "dist/app.js",
   "scripts": {
-    "dev": "webpack --mode development --watch",
+    "dev": "webpack serve --mode development",
     "build:dev": "webpack --mode development",
     "build:release": "webpack --mode production",
     "typecheck": "tsc --noEmit",
@@ -37,6 +37,7 @@
     "swc-loader": "^0.2.7",
     "typescript": "^5.9.3",
     "webpack": "^5.105.4",
-    "webpack-cli": "^7.0.2"
+    "webpack-cli": "^7.0.2",
+    "webpack-dev-server": "^5.2.3"
   }
 }

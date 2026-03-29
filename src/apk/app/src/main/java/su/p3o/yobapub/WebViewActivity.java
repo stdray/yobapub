@@ -105,7 +105,7 @@ public class WebViewActivity extends Activity {
                 enterImmersive();
             }
         });
-        webView.loadUrl("http://yobapub.3po.su");
+        webView.loadUrl(BuildConfig.APP_URL);
     }
 
     @Override
@@ -121,9 +121,14 @@ public class WebViewActivity extends Activity {
                 webView.getWebChromeClient().onHideCustomView();
                 return true;
             }
-            // Delegate back to JS router; JS calls NativeApp.exit() if history is empty
+            // Inject keydown(keyCode=8) into WebView so JS page handlers can intercept it first.
+            // JS must call NativeApp.exit() when it wants to exit the app.
             webView.evaluateJavascript(
-                "(function(){ if(window.appGoBack) window.appGoBack(); })()", null);
+                "(function(){" +
+                "  var el = document.activeElement || document.body;" +
+                "  var e = new KeyboardEvent('keydown',{bubbles:true,cancelable:true,keyCode:8,which:8});" +
+                "  el.dispatchEvent(e);" +
+                "})()", null);
             return true;
         }
         return super.onKeyDown(keyCode, event);

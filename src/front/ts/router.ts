@@ -23,8 +23,17 @@ export function navigate(route: RouteName, params?: RouteParams): void {
   pages[route].mount(currentParams);
 }
 
+var exitHandler: (() => void) | null = null;
+
+export function setExitHandler(fn: () => void): void {
+  exitHandler = fn;
+}
+
 export function goBack(): boolean {
-  if (history.length === 0) return false;
+  if (history.length === 0) {
+    if (exitHandler) exitHandler();
+    return false;
+  }
 
   if (currentRoute) {
     pages[currentRoute].unmount();
@@ -46,4 +55,4 @@ export function getCurrentRoute(): RouteName | null {
   return currentRoute;
 }
 
-(window as any).__routerGoBack = goBack;
+

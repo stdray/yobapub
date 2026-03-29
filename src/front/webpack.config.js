@@ -30,6 +30,14 @@ module.exports = function (_env, argv) {
       'jquery': 'jQuery',
       'hls.js': 'Hls'
     },
+    devServer: {
+      host: '0.0.0.0',
+      port: 8080,
+      hot: false,
+      liveReload: false,
+      static: false,
+      allowedHosts: 'all'
+    },
     devtool: isProd ? false : 'source-map',
     resolve: {
       extensions: ['.ts', '.js']

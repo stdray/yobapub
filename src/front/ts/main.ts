@@ -1,7 +1,7 @@
 import objectFitImages from 'object-fit-images';
 import '../css/app.css';
 import { configure } from './api/client';
-import { registerPage, navigate } from './router';
+import { registerPage, navigate, setExitHandler } from './router';
 import { registerTizenKeys, getDeviceInfo } from './utils/platform';
 import { getAccessToken } from './utils/storage';
 import { apiPostWithRefresh } from './api/client';
@@ -48,9 +48,8 @@ if (getAccessToken()) {
   navigate('login');
 }
 
-(window as any).appGoBack = function() {
-  var gone = (window as any).__routerGoBack ? (window as any).__routerGoBack() : false;
-  if (!gone && (window as any).NativeApp) {
+if ((window as any).NativeApp) {
+  setExitHandler(function() {
     (window as any).NativeApp.exit();
-  }
-};
+  });
+}
