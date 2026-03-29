@@ -602,8 +602,7 @@ html, body {
 }
 
 .ppanel__btn.disabled {
-  opacity: 0.35;
-  cursor: default;
+  display: none;
 }
 
 .ppanel__list {
