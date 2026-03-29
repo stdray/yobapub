@@ -62,14 +62,13 @@ public class WebViewActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setUserAgentString(settings.getUserAgentString() + " SmartTV YobaPub");
 
-        // Scale 1920px layout to fit actual screen width
-        webView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            int screenWidth = right - left;
-            if (screenWidth > 0) {
-                int scale = (int) Math.round(screenWidth * 100.0 / 1920);
-                webView.setInitialScale(scale);
-            }
-        });
+        // Scale 1920px layout to fit actual screen width (computed once at startup)
+        android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(dm);
+        if (dm.widthPixels > 0) {
+            int scale = (int) Math.round(dm.widthPixels * 100.0 / 1920);
+            webView.setInitialScale(scale);
+        }
 
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface

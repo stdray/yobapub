@@ -332,7 +332,19 @@ function doSavePrefs(): void {
 
 function applyAudioSwitch(idx: number): void {
   selectedAudio = idx;
-  if (currentAudios.length > 1 && currentFiles.length > 0) {
+  if (idx === 0 || currentAudios.length <= 1) {
+    var pos = videoEl ? videoEl.currentTime : 0;
+    var paused = videoEl ? videoEl.paused : false;
+    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+    currentHlsUrl = '';
+    resumeTime = pos;
+    resumePaused = paused;
+    qualitySwitching = true;
+    var url = getUrlFromFile(currentFiles[selectedQuality]);
+    if (url) playSource(url);
+    return;
+  }
+  if (currentFiles.length > 0) {
     var f = currentFiles[selectedQuality];
     var hlsUrl = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
     if (hlsUrl) {
