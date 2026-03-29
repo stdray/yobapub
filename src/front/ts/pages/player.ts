@@ -347,7 +347,7 @@ function applyAudioSwitch(idx: number): void {
     resumePaused = paused;
     qualitySwitching = true;
     var url = getUrlFromFile(currentFiles[selectedQuality]);
-    if (url) playSource(url);
+    if (url) { showSpinner(); playSource(url); }
     return;
   }
   if (currentFiles.length > 0) {
@@ -373,6 +373,7 @@ function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
     resumeTime = pos;
     resumePaused = paused;
     qualitySwitching = true;
+    showSpinner();
     playSource(rewriteUrl);
     return;
   }
@@ -423,12 +424,19 @@ function playSource(url: string): void {
       // Native HLS on Android WebView or Tizen proxy mode — no hls.js overhead
       currentHlsUrl = url;
       useHls = true;
-      videoEl.src = url;
-      var onMetaNative = function () {
-        if (videoEl) videoEl.removeEventListener('loadedmetadata', onMetaNative);
+      var nativeVel = videoEl;
+      var nativeFired = false;
+      var onNativeReady = function () {
+        if (nativeFired) return;
+        nativeFired = true;
+        nativeVel.removeEventListener('loadedmetadata', onNativeReady);
+        nativeVel.removeEventListener('canplay', onNativeReady);
         onSourceReady();
       };
-      videoEl.addEventListener('loadedmetadata', onMetaNative);
+      nativeVel.addEventListener('loadedmetadata', onNativeReady);
+      nativeVel.addEventListener('canplay', onNativeReady);
+      nativeVel.src = url;
+      nativeVel.load();
       return;
     }
     try {
@@ -471,12 +479,19 @@ function playSource(url: string): void {
     } catch (e) { /* fallback */ }
   }
 
-  videoEl.src = url;
-  var onMeta = function () {
-    if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
+  var plainVel = videoEl;
+  var plainFired = false;
+  var onPlainReady = function () {
+    if (plainFired) return;
+    plainFired = true;
+    plainVel.removeEventListener('loadedmetadata', onPlainReady);
+    plainVel.removeEventListener('canplay', onPlainReady);
     onSourceReady();
   };
-  videoEl.addEventListener('loadedmetadata', onMeta);
+  plainVel.addEventListener('loadedmetadata', onPlainReady);
+  plainVel.addEventListener('canplay', onPlainReady);
+  plainVel.src = url;
+  plainVel.load();
 }
 
 function onSourceReady(): void {
