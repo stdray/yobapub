@@ -407,7 +407,7 @@ function playSource(url: string): void {
       onSourceReady();
     });
     hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
-      if (data.fatal && videoEl) showPlaybackError(videoEl.error, url);
+      if (data.fatal) showPlaybackError(null, url, 'hls fatal: type=' + data.type + ' details=' + data.details + (data.response ? ' status=' + data.response.code : ''));
     });
     hls.loadSource(url);
     hls.attachMedia(videoEl);
@@ -492,7 +492,7 @@ function getVideoErrorMessage(error: MediaError | null): string {
   }
 }
 
-function showPlaybackError(error: MediaError | null, url: string): void {
+function showPlaybackError(error: MediaError | null, url: string, debugMsg?: string): void {
   var msg = getVideoErrorMessage(error);
   var code = error ? error.code : 0;
   var detail = error && (error as any).message ? (error as any).message : '';
@@ -504,7 +504,7 @@ function showPlaybackError(error: MediaError | null, url: string): void {
       '<div class="player__title" style="padding:60px;">' +
         '<div>' + msg + '</div>' +
         '<div style="font-size:0.7em;margin-top:20px;opacity:0.6;">Код ошибки: ' + code + '</div>' +
-        '<div style="font-size:0.55em;margin-top:12px;opacity:0.5;word-break:break-all;">' + playSourceDebug + '</div>' +
+        '<div style="font-size:0.55em;margin-top:12px;opacity:0.5;word-break:break-all;">' + (debugMsg || playSourceDebug) + '</div>' +
         '<div style="font-size:0.45em;margin-top:8px;opacity:0.4;word-break:break-all;">' + navigator.userAgent + '</div>' +
       '</div>' +
     '</div>'
