@@ -21,11 +21,8 @@ flowchart TD
     L --> M[addEventListener:\nended / waiting / seeking\ncanplay / playing / seeked / error]
     M --> N[playSource url]
 
-    N --> O{url содержит\n.m3u8 или /hls?}
-    O -- да --> P[videoEl.src = url\nnative HLS]
-    O -- нет --> Q[videoEl.src = url\nMP4/HTTP]
-    P --> R([loadedmetadata])
-    Q --> R
+    N --> O[videoEl.src = url]
+    O --> R([loadedmetadata])
 
     R --> S[onSourceReady]
 

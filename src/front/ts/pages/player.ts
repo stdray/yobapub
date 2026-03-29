@@ -371,19 +371,7 @@ function switchQuality(): void {
 
 function playSource(url: string): void {
   if (!videoEl) return;
-  if (url.indexOf('blob:') !== 0) currentHlsUrl = '';
-
-  if (url.indexOf('.m3u8') !== -1 || url.indexOf('/hls') !== -1) {
-    currentHlsUrl = url;
-    var onMetaNative = function () {
-      if (videoEl) videoEl.removeEventListener('loadedmetadata', onMetaNative);
-      onSourceReady();
-    };
-    videoEl.addEventListener('loadedmetadata', onMetaNative);
-    videoEl.src = url;
-    return;
-  }
-
+  currentHlsUrl = url;
   var onMeta = function () {
     if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
     onSourceReady();
