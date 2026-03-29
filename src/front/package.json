@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@swc/core": "^1.15.18",
+    "@types/hls.js": "^0.13.3",
     "@types/jquery": "^4.0.0",
     "autoprefixer": "^10.4.27",
     "copy-webpack-plugin": "^14.0.0",

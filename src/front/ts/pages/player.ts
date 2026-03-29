@@ -8,6 +8,7 @@ import { TvKey } from '../utils/platform';
 import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
+import Hls from 'hls.js';
 import { tplPlayer } from './player/template';
 import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime } from './player/media';
 import { getRewrittenHlsUrl } from './player/hls';
@@ -38,6 +39,7 @@ var selectedSub = -1;
 var currentTitle = '';
 var currentDuration = 0;
 var currentHlsUrl = '';
+var hlsInstance: Hls | null = null;
 var playbackStarted = false;
 var resumePaused = false;
 var qualitySwitching = false;
@@ -381,12 +383,21 @@ function switchQuality(): void {
 function playSource(url: string): void {
   if (!videoEl) return;
   currentHlsUrl = url;
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   var onMeta = function () {
     if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
     onSourceReady();
   };
   videoEl.addEventListener('loadedmetadata', onMeta);
-  videoEl.src = url;
+  var isHls = url.indexOf('.m3u8') >= 0 || url.indexOf('/hls/') >= 0;
+  if (isHls && !videoEl.canPlayType('application/vnd.apple.mpegurl') && Hls.isSupported()) {
+    var hls = new Hls();
+    hlsInstance = hls;
+    hls.loadSource(url);
+    hls.attachMedia(videoEl);
+  } else {
+    videoEl.src = url;
+  }
 }
 
 function onSourceReady(): void {
@@ -580,6 +591,7 @@ function destroyPlayer(): void {
   clearPanelIdle();
   resetSeek();
   if (osdTimer) { clearTimeout(osdTimer); osdTimer = null; }
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   if (videoEl) {
     try { videoEl.pause(); } catch (e) { /* ignore */ }
     videoEl.removeAttribute('src');
