@@ -66,7 +66,7 @@ app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory fact
     var manifest = await response.Content.ReadAsStringAsync();
     manifest = HlsRewriter.Rewrite(manifest, url, audio);
 
-    return Results.Content(manifest, "application/vnd.apple.mpegurl");
+    return Results.Content(manifest, "application/x-mpegurl");
 });
 
 app.MapGet("/.well-known/assetlinks.json", () => Results.Json(
