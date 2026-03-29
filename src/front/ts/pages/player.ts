@@ -4,13 +4,13 @@ import { getItem } from '../api/items';
 import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
-import { TvKey, isAndroidWebView } from '../utils/platform';
+import { TvKey } from '../utils/platform';
 import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 import { tplPlayer } from './player/template';
 import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, loadMediaLinksDeferred, getResumeTime } from './player/media';
-import { fetchRewrittenHls, getRewrittenHlsUrl, isBackendRewriteAvailable } from './player/hls';
+import { getRewrittenHlsUrl, isBackendRewriteAvailable } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
 import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey, clearPanelIdle } from './player/panel';
@@ -37,8 +37,6 @@ var selectedAudio = 0;
 var selectedSub = -1;
 var currentTitle = '';
 var currentDuration = 0;
-var hlsAudioTracks: any[] = [];
-var hlsSubTracks: any[] = [];
 var useHls = false;
 var currentHlsUrl = '';
 var playbackStarted = false;
@@ -84,14 +82,13 @@ function getInfoState(): InfoState {
     selectedAudio: selectedAudio,
     selectedSub: selectedSub,
     useHls: useHls,
-    hlsInstance: hlsInstance,
-    hlsAudioTracks: hlsAudioTracks
+    hlsInstance: hlsInstance
   };
 }
 
 function getPanelData(): PanelData {
   return {
-    audioItems: getAudioItems(currentAudios, selectedAudio, useHls, hlsAudioTracks, videoEl),
+    audioItems: getAudioItems(currentAudios, selectedAudio, videoEl),
     subItems: getSubItems(currentSubs, selectedSub),
     qualityItems: getQualityItems(currentFiles, selectedQuality)
   };
@@ -409,11 +406,9 @@ function playSource(url: string): void {
   if (!videoEl) return;
   useHls = false;
   if (url.indexOf('blob:') !== 0) currentHlsUrl = '';
-  hlsAudioTracks = [];
-  hlsSubTracks = [];
 
   if (url.indexOf('.m3u8') !== -1 || url.indexOf('/hls') !== -1 || url.indexOf('blob:') === 0) {
-    if ((isAndroidWebView() || isBackendRewriteAvailable()) && url.indexOf('blob:') !== 0) {
+    if (isBackendRewriteAvailable() && url.indexOf('blob:') !== 0) {
       // Native HLS on Android WebView or Tizen proxy mode — no hls.js overhead
       currentHlsUrl = url;
       useHls = true;
@@ -442,8 +437,6 @@ function playSource(url: string): void {
         hlsInstance.loadSource(url);
         hlsInstance.attachMedia(videoEl);
         hlsInstance.on(Hls.Events.MANIFEST_PARSED, function (_ev: any, _data: any) {
-          hlsAudioTracks = hlsInstance.audioTracks || [];
-          hlsSubTracks = hlsInstance.subtitleTracks || [];
           onSourceReady();
         });
         hlsInstance.on(Hls.Events.ERROR, function (_ev: any, data: any) {
@@ -455,11 +448,6 @@ function playSource(url: string): void {
             );
           }
         });
-        if (Hls.Events.SUBTITLE_TRACKS_UPDATED) {
-          hlsInstance.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, function () {
-            hlsSubTracks = hlsInstance.subtitleTracks || [];
-          });
-        }
         return;
       }
     } catch (e) { /* fallback */ }
@@ -479,18 +467,23 @@ function onSourceReady(): void {
     var pos = resumeTime;
     resumeTime = 0;
     var v = videoEl;
-    var done = false;
+    var seekDone = false;
+    var seekTimer: number | null = null;
     var doSeek = function () {
-      if (done) return;
-      done = true;
+      if (seekDone) return;
+      seekDone = true;
+      if (seekTimer !== null) { clearTimeout(seekTimer); seekTimer = null; }
       v.removeEventListener('playing', doSeek);
+      v.removeEventListener('canplay', doSeek);
       v.currentTime = pos;
     };
+    // Tizen 2.3: 'playing' may not fire; 'canplay' is more reliable; fallback after 3s
+    v.addEventListener('playing', doSeek);
+    v.addEventListener('canplay', doSeek);
+    seekTimer = window.setTimeout(doSeek, 3000);
     if (resumePaused) {
       resumePaused = false;
-      v.currentTime = pos;
     } else {
-      v.addEventListener('playing', doSeek);
       v.play();
     }
   } else {
@@ -753,8 +746,6 @@ export var playerPage: Page = {
     currentFiles = [];
     currentAudios = [];
     currentSubs = [];
-    hlsAudioTracks = [];
-    hlsSubTracks = [];
     selectedQuality = 0;
     selectedAudio = 0;
     selectedSub = -1;

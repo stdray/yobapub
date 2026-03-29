@@ -11,7 +11,6 @@ export interface InfoState {
   selectedSub: number;
   useHls: boolean;
   hlsInstance: any;
-  hlsAudioTracks: any[];
 }
 
 export function getStreamInfo(state: InfoState): string {
@@ -32,9 +31,6 @@ export function getStreamInfo(state: InfoState): string {
     if (a.author && a.author.title) albl += ' (' + a.author.title + ')';
     albl += ' ' + a.codec + ' ' + a.channels + 'ch';
     parts.push(albl);
-  } else if (state.useHls && state.hlsAudioTracks.length > 0) {
-    var ht = state.hlsAudioTracks[state.selectedAudio] || state.hlsAudioTracks[0];
-    parts.push(ht.name || ht.lang || 'Audio');
   }
 
   if (state.selectedSub >= 0 && state.selectedSub < state.subs.length) {

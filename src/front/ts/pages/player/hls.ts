@@ -1,5 +1,4 @@
 import $ from 'jquery';
-import { getApiBase } from '../../api/client';
 import { getAccessToken } from '../../utils/storage';
 
 export function getBaseUrl(url: string): string {
@@ -50,22 +49,9 @@ export function getRewrittenHlsUrl(url: string, audioIndex: number): string {
 }
 
 export function isBackendRewriteAvailable(): boolean {
-  return getApiBase() === '';
+  // Available when served from our own server (not localhost/file://)
+  var h = window.location.hostname;
+  return h !== 'localhost' && h !== '127.0.0.1' && h !== '' && window.location.protocol !== 'file:';
 }
 
-export function fetchRewrittenHls(url: string, audioIndex: number, cb: (blobUrl: string | null) => void): void {
-  $.ajax({
-    url: url,
-    dataType: 'text',
-    success: function (data: string) {
-      var baseUrl = getBaseUrl(url);
-      var rewritten = rewriteHlsManifest(data, audioIndex);
-      rewritten = makeUrlsAbsolute(rewritten, baseUrl);
-      var blob = new Blob([rewritten], { type: 'application/vnd.apple.mpegurl' });
-      cb(URL.createObjectURL(blob));
-    },
-    error: function () {
-      cb(null);
-    }
-  });
-}
+

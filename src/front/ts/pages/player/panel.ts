@@ -29,25 +29,12 @@ export function buildAudioLabel(a: AudioTrack): string {
 export function getAudioItems(
   audios: AudioTrack[],
   selectedAudio: number,
-  useHls: boolean,
-  hlsAudioTracks: any[],
   videoEl: HTMLVideoElement | null
 ): Array<{ label: string; selected: boolean }> {
   var items: Array<{ label: string; selected: boolean }> = [];
   if (audios.length > 0) {
     for (var j = 0; j < audios.length; j++) {
       items.push({ label: buildAudioLabel(audios[j]), selected: j === selectedAudio });
-    }
-    return items;
-  }
-  if (useHls && hlsAudioTracks.length > 1) {
-    var seen: Record<string, boolean> = {};
-    for (var i = 0; i < hlsAudioTracks.length; i++) {
-      var at = hlsAudioTracks[i];
-      var lbl = at.name || at.lang || ('Дорожка ' + (i + 1));
-      if (seen[lbl]) { lbl += ' #' + (i + 1); }
-      seen[lbl] = true;
-      items.push({ label: lbl, selected: i === selectedAudio });
     }
     return items;
   }
