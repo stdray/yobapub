@@ -28,13 +28,10 @@ flowchart TD
 
     S --> T{resumeTime > 0?}
     T -- да --> U[play\nслушаем playing + canplay\ntimeout 3s → currentTime = pos]
-    T -- нет --> V{resumePaused?}
-    V -- нет --> W[play]
-    V -- да --> X[ничего не делаем]
+    T -- нет --> W[play]
 
     U --> Y[hideSpinner\nstartMarkTimer\nshowBar\nupdateInfoBadge]
     W --> Y
-    X --> Y
 ```
 
 ## Переключение аудиодорожки
