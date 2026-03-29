@@ -10,43 +10,8 @@ public class HlsRewriterTests
     // ── hls4 master playlist (real data from HAR) ─────────────────────────
 
     [Fact]
-    public void Hls4_SelectTrack2_SetsDefaultYesOnA2Lines()
+    public void Hls4_SelectTrack2_KeepsOnlyA2Lines()
     {
-        var manifest = Fixture("hls4_master.m3u8");
-        var result = HlsRewriter.Rewrite(manifest,
-            "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 2);
-
-        var lines = result.Split('\n');
-        foreach (var line in lines.Where(l => l.StartsWith("#EXT-X-MEDIA") && l.Contains("TYPE=AUDIO")))
-        {
-            if (line.Contains("/index-a2.m3u8"))
-                Assert.Contains("DEFAULT=YES", line);
-            else
-                Assert.Contains("DEFAULT=NO", line);
-        }
-    }
-
-    [Fact]
-    public void Hls4_SelectTrack1_KeepsDefaultYesOnA1Lines()
-    {
-        var manifest = Fixture("hls4_master.m3u8");
-        var result = HlsRewriter.Rewrite(manifest,
-            "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 1);
-
-        var lines = result.Split('\n');
-        foreach (var line in lines.Where(l => l.StartsWith("#EXT-X-MEDIA") && l.Contains("TYPE=AUDIO")))
-        {
-            if (line.Contains("/index-a1.m3u8"))
-                Assert.Contains("DEFAULT=YES", line);
-            else
-                Assert.Contains("DEFAULT=NO", line);
-        }
-    }
-
-    [Fact]
-    public void Hls4_AllGroupsAreRewritten()
-    {
-        // fixture has 3 groups: audio1080, audio720, audio480 — each with a1 and a2
         var manifest = Fixture("hls4_master.m3u8");
         var result = HlsRewriter.Rewrite(manifest,
             "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 2);
@@ -55,9 +20,42 @@ public class HlsRewriterTests
             .Where(l => l.StartsWith("#EXT-X-MEDIA") && l.Contains("TYPE=AUDIO"))
             .ToList();
 
-        Assert.Equal(6, audioLines.Count);
-        Assert.Equal(3, audioLines.Count(l => l.Contains("DEFAULT=YES")));
-        Assert.Equal(3, audioLines.Count(l => l.Contains("DEFAULT=NO")));
+        Assert.All(audioLines, l => Assert.Contains("/index-a2.m3u8", l));
+        Assert.All(audioLines, l => Assert.Contains("DEFAULT=YES", l));
+        Assert.DoesNotContain(audioLines, l => l.Contains("/index-a1.m3u8"));
+    }
+
+    [Fact]
+    public void Hls4_SelectTrack1_KeepsOnlyA1Lines()
+    {
+        var manifest = Fixture("hls4_master.m3u8");
+        var result = HlsRewriter.Rewrite(manifest,
+            "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 1);
+
+        var audioLines = result.Split('\n')
+            .Where(l => l.StartsWith("#EXT-X-MEDIA") && l.Contains("TYPE=AUDIO"))
+            .ToList();
+
+        Assert.All(audioLines, l => Assert.Contains("/index-a1.m3u8", l));
+        Assert.All(audioLines, l => Assert.Contains("DEFAULT=YES", l));
+        Assert.DoesNotContain(audioLines, l => l.Contains("/index-a2.m3u8"));
+    }
+
+    [Fact]
+    public void Hls4_AllGroupsAreRewritten()
+    {
+        // fixture has 3 groups: audio1080, audio720, audio480 — each with a1 and a2
+        // after rewrite only a2 lines remain (3 groups × 1 track = 3 lines)
+        var manifest = Fixture("hls4_master.m3u8");
+        var result = HlsRewriter.Rewrite(manifest,
+            "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 2);
+
+        var audioLines = result.Split('\n')
+            .Where(l => l.StartsWith("#EXT-X-MEDIA") && l.Contains("TYPE=AUDIO"))
+            .ToList();
+
+        Assert.Equal(3, audioLines.Count);
+        Assert.All(audioLines, l => Assert.Contains("DEFAULT=YES", l));
     }
 
     [Fact]

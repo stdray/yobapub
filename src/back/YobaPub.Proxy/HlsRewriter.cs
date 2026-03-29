@@ -28,13 +28,16 @@ public static class HlsRewriter
         manifest = _hls2IframeSeg.Replace(manifest, "$1" + target + "$2");
         manifest = _hls2TsSeg.Replace(manifest, "$1-" + target + "$2");
 
-        // hls4: master playlist with #EXT-X-MEDIA — set DEFAULT=YES for the target audio track
+        // hls4: master playlist with #EXT-X-MEDIA — keep only target audio track, set DEFAULT=YES
         manifest = _extMedia.Replace(manifest, m =>
         {
             var line = m.Value;
             var isTarget = audioSegPattern.IsMatch(line);
-            return _defaultAttr.Replace(line, isTarget ? "DEFAULT=YES" : "DEFAULT=NO");
+            if (!isTarget) return string.Empty;
+            return _defaultAttr.Replace(line, "DEFAULT=YES");
         });
+        // remove blank lines left after dropping non-target EXT-X-MEDIA entries
+        manifest = System.Text.RegularExpressions.Regex.Replace(manifest, @"\n{2,}", "\n");
 
         // make relative URLs absolute
         var lines = manifest.Split('\n');
