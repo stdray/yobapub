@@ -16,6 +16,9 @@ export interface PanelData {
   audioItems: Array<{ label: string; selected: boolean }>;
   subItems: Array<{ label: string; selected: boolean }>;
   qualityItems: Array<{ label: string; selected: boolean }>;
+  audioEnabled: boolean;
+  subsEnabled: boolean;
+  qualityEnabled: boolean;
 }
 
 export function buildAudioLabel(a: AudioTrack): string {
@@ -87,11 +90,19 @@ function getSelectedLabel(data: PanelData, section: number): string {
   return '...';
 }
 
+function isSectionEnabled(data: PanelData, section: number): boolean {
+  if (section === 0) return data.audioEnabled;
+  if (section === 1) return data.subsEnabled;
+  return data.qualityEnabled;
+}
+
 export function updatePanelButtons($root: JQuery, state: PanelState, data: PanelData): void {
   var labels = ['Аудио: ', 'Сабы: ', 'Качество: '];
   for (var i = 0; i < PANEL_SECTIONS.length; i++) {
     var $btn = $root.find('.ppanel__btn').eq(i);
-    $btn.find('.ppanel__btn-label').html(labels[i] + getSelectedLabel(data, i));
+    var enabled = isSectionEnabled(data, i);
+    $btn.find('.ppanel__btn-label').html(labels[i] + (enabled ? getSelectedLabel(data, i) : '—'));
+    $btn.toggleClass('disabled', !enabled);
     if (i === state.btnIndex && !state.listOpen) {
       $btn.addClass('focused');
     } else {
@@ -167,8 +178,10 @@ function forceClosePanel($root: JQuery, state: PanelState, cbs: PanelCallbacks):
 export function openPanel($root: JQuery, state: PanelState, cbs: PanelCallbacks): void {
   if (state.open) return;
   state.open = true;
-  state.btnIndex = 0;
   state.listOpen = false;
+  var data = cbs.getData();
+  state.btnIndex = 0;
+  while (state.btnIndex < PANEL_SECTIONS.length - 1 && !isSectionEnabled(data, state.btnIndex)) state.btnIndex++;
   cbs.onClearBarTimer();
   cbs.onHideBar();
   $root.find('.player__panel').removeClass('hidden');
@@ -266,14 +279,23 @@ export function handlePanelKey(
   }
 
   switch (kc) {
-    case TvKey.Left:
-      if (state.btnIndex > 0) { state.btnIndex--; updatePanelButtons($root, state, cbs.getData()); }
+    case TvKey.Left: {
+      var data = cbs.getData();
+      var idx = state.btnIndex - 1;
+      while (idx >= 0 && !isSectionEnabled(data, idx)) idx--;
+      if (idx >= 0) { state.btnIndex = idx; updatePanelButtons($root, state, data); }
       e.preventDefault(); break;
-    case TvKey.Right:
-      if (state.btnIndex < PANEL_SECTIONS.length - 1) { state.btnIndex++; updatePanelButtons($root, state, cbs.getData()); }
+    }
+    case TvKey.Right: {
+      var data = cbs.getData();
+      var idx = state.btnIndex + 1;
+      while (idx < PANEL_SECTIONS.length && !isSectionEnabled(data, idx)) idx++;
+      if (idx < PANEL_SECTIONS.length) { state.btnIndex = idx; updatePanelButtons($root, state, data); }
       e.preventDefault(); break;
+    }
     case TvKey.Enter:
-      openPanelList($root, state, cbs); e.preventDefault(); break;
+      if (isSectionEnabled(cbs.getData(), state.btnIndex)) { openPanelList($root, state, cbs); }
+      e.preventDefault(); break;
     case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Down:
       closePanel($root, state, cbs); e.preventDefault(); break;
   }

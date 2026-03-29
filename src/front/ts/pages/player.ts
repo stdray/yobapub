@@ -83,11 +83,20 @@ function getInfoState(): InfoState {
   };
 }
 
+function hasHlsUrl(): boolean {
+  if (currentFiles.length === 0) return false;
+  var f = currentFiles[selectedQuality];
+  return !!((f.urls && (f.urls.hls4 || f.urls.hls2)) || (f.url && (f.url.hls4 || f.url.hls2)));
+}
+
 function getPanelData(): PanelData {
   return {
     audioItems: getAudioItems(currentAudios, selectedAudio, videoEl),
     subItems: getSubItems(currentSubs, selectedSub),
-    qualityItems: getQualityItems(currentFiles, selectedQuality)
+    qualityItems: getQualityItems(currentFiles, selectedQuality),
+    audioEnabled: currentAudios.length > 1 && hasHlsUrl(),
+    subsEnabled: currentSubs.length > 0,
+    qualityEnabled: currentFiles.length > 1
   };
 }
 
