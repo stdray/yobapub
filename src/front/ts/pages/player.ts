@@ -419,8 +419,8 @@ function playSource(url: string): void {
   hlsSubTracks = [];
 
   if (url.indexOf('.m3u8') !== -1 || url.indexOf('/hls') !== -1 || url.indexOf('blob:') === 0) {
-    if (isAndroidWebView() && url.indexOf('blob:') !== 0) {
-      // Native HLS on Android WebView — no hls.js overhead
+    if ((isAndroidWebView() || isBackendRewriteAvailable()) && url.indexOf('blob:') !== 0) {
+      // Native HLS on Android WebView or Tizen proxy mode — no hls.js overhead
       currentHlsUrl = url;
       useHls = true;
       videoEl.src = url;
