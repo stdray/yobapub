@@ -283,13 +283,9 @@ function startWithAudio(title: string): void {
   if (hlsUrl) {
     if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
     currentHlsUrl = hlsUrl;
-    if (!isLegacyTizen() || selectedAudio > 0) {
-      var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
-      var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-      playUrl(rewriteUrl, title);
-      return;
-    }
-    playUrl(hlsUrl, title);
+    var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
+    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+    playUrl(rewriteUrl, title);
     return;
   }
   var url = getUrlFromFile(f);
@@ -412,7 +408,7 @@ function playSource(url: string): void {
   var canPlayVnd = videoEl.canPlayType('application/vnd.apple.mpegurl');
   var canPlayX = videoEl.canPlayType('application/x-mpegurl');
   var hlsSupported = Hls.isSupported();
-  var useHlsJs = isHls && !legacyTizen && (isTizen || !canPlayVnd) && hlsSupported;
+  var useHlsJs = isHls && (isTizen || !canPlayVnd) && hlsSupported;
   playSourceDebug = 'isHls=' + isHls + ' isTizen=' + isTizen + ' legacy=' + legacyTizen +
     ' vnd="' + canPlayVnd + '" x="' + canPlayX +
     '" hlsOk=' + hlsSupported + ' useHlsJs=' + useHlsJs +
