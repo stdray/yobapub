@@ -19,7 +19,7 @@ flowchart TD
 
     K --> L[innerHTML = tplPlayer\nvideoEl = video element]
     L --> M[addEventListener:\nended / waiting / seeking\ncanplay / playing / seeked / error]
-    M --> N[setTimeout 0: playSource url]
+    M --> N[playSource url]
 
     N --> O{url содержит\n.m3u8 или /hls?}
     O -- да --> P[videoEl.src = url\nnative HLS]
