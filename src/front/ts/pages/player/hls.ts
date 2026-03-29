@@ -29,17 +29,23 @@ export function makeUrlsAbsolute(manifest: string, baseUrl: string): string {
 
 export function rewriteHlsManifest(manifest: string, audioIndex: number): string {
   var target = 'a' + audioIndex;
-  return manifest.replace(/(index-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
+  // hls2: muxed audio in segment names
+  var result = manifest
+    .replace(/(index-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
     .replace(/(iframes-v\d+)a\d+(\.m3u8)/g, '$1' + target + '$2')
     .replace(/(seg-\d+-v\d+)-a\d+(\.ts)/g, '$1-' + target + '$2');
+  // hls4: master playlist with #EXT-X-MEDIA audio tracks — set DEFAULT=YES for target track
+  var audioRe = new RegExp('/index-a' + audioIndex + '\\.m3u8');
+  result = result.replace(/(#EXT-X-MEDIA:[^\n]*TYPE=AUDIO[^\n]*)/g, function (line) {
+    var isTarget = audioRe.test(line);
+    return line.replace(/DEFAULT=(YES|NO)/g, isTarget ? 'DEFAULT=YES' : 'DEFAULT=NO');
+  });
+  return result;
 }
 
 export function getRewrittenHlsUrl(url: string, audioIndex: number): string {
-  // Use window.location.origin when page is served from our backend (Android APK or proxy mode).
-  // getApiBase() returns '' in proxy mode (relative URL) and absolute API_BASE otherwise.
-  var base = getApiBase() === '' ? window.location.origin : '';
   var token = getAccessToken() || '';
-  return base + '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
+  return window.location.origin + '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
     (token ? '&access_token=' + encodeURIComponent(token) : '');
 }
 

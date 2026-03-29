@@ -37,9 +37,24 @@ app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory fact
 
     var baseUrl = url[..(url.LastIndexOf('/') + 1)];
     var target = "a" + audio;
-    manifest = System.Text.RegularExpressions.Regex.Replace(manifest, @"(index-v\d+)a\d+(\.m3u8)", "$1" + target + "$2");
-    manifest = System.Text.RegularExpressions.Regex.Replace(manifest, @"(iframes-v\d+)a\d+(\.m3u8)", "$1" + target + "$2");
-    manifest = System.Text.RegularExpressions.Regex.Replace(manifest, @"(seg-\d+-v\d+)-a\d+(\.ts)", "$1-" + target + "$2");
+    var re = System.Text.RegularExpressions.Regex;
+
+    // hls2 format: muxed audio in video segment names (index-v1a1.m3u8, seg-1-v1-a1.ts)
+    manifest = re.Replace(manifest, @"(index-v\d+)a\d+(\.m3u8)", "$1" + target + "$2");
+    manifest = re.Replace(manifest, @"(iframes-v\d+)a\d+(\.m3u8)", "$1" + target + "$2");
+    manifest = re.Replace(manifest, @"(seg-\d+-v\d+)-a\d+(\.ts)", "$1-" + target + "$2");
+
+    // hls4 format: master playlist with #EXT-X-MEDIA audio tracks
+    // Set DEFAULT=YES only for the track whose URI contains /index-a{audio}.m3u8
+    manifest = re.Replace(manifest,
+        @"(#EXT-X-MEDIA:[^\n]*TYPE=AUDIO[^\n]*)",
+        m =>
+        {
+            var line = m.Value;
+            var isTarget = re.IsMatch(line, @"/index-a" + audio + @"\.m3u8");
+            line = re.Replace(line, @"DEFAULT=(YES|NO)", isTarget ? "DEFAULT=YES" : "DEFAULT=NO");
+            return line;
+        });
 
     var lines = manifest.Split('\n');
     for (var i = 0; i < lines.Length; i++)
@@ -48,7 +63,7 @@ app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory fact
         if (line.Length > 0 && line[0] != '#' && !line.Contains("://"))
             lines[i] = baseUrl + line;
         if (line.Contains("URI=\""))
-            lines[i] = System.Text.RegularExpressions.Regex.Replace(lines[i], @"URI=""([^""]+)""", m =>
+            lines[i] = re.Replace(lines[i], @"URI=""([^""]+)""", m =>
                 m.Groups[1].Value.Contains("://") ? m.Value : $"URI=\"{baseUrl}{m.Groups[1].Value}\"");
     }
     manifest = string.Join('\n', lines);

@@ -265,24 +265,27 @@ function remountTrack(): void {
 function startWithAudio(title: string): void {
   var f = currentFiles[selectedQuality];
   if (selectedAudio > 0 && currentAudios.length > 1) {
-    var hlsUrl = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+    var hlsUrl = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
     if (hlsUrl) {
       if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       var audioIndex = currentAudios[selectedAudio].index;
-      if (isBackendRewriteAvailable()) {
-        var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-        currentHlsUrl = hlsUrl;
-        playUrl(rewriteUrl, title);
-      } else {
-        fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
-          if (blobUrl) {
-            currentHlsUrl = hlsUrl;
-            playUrl(blobUrl, title);
-          } else {
-            playUrl(getUrlFromFile(f), title);
-          }
-        });
-      }
+      var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+      currentHlsUrl = hlsUrl;
+      playUrl(rewriteUrl, title);
+      // if (isBackendRewriteAvailable()) {
+      //   var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+      //   currentHlsUrl = hlsUrl;
+      //   playUrl(rewriteUrl, title);
+      // } else {
+      //   fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
+      //     if (blobUrl) {
+      //       currentHlsUrl = hlsUrl;
+      //       playUrl(blobUrl, title);
+      //     } else {
+      //       playUrl(getUrlFromFile(f), title);
+      //     }
+      //   });
+      // }
       return;
     }
   }
@@ -352,7 +355,7 @@ function applyAudioSwitch(idx: number): void {
   }
   if (currentFiles.length > 0) {
     var f = currentFiles[selectedQuality];
-    var hlsUrl = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+    var hlsUrl = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
     if (hlsUrl) {
       if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       switchToRewrittenHls(hlsUrl, idx);
@@ -366,29 +369,19 @@ function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
   var audioIndex = currentAudios[audioIdx].index;
   var pos = videoEl ? videoEl.currentTime : 0;
   var paused = videoEl ? videoEl.paused : false;
-  if (isBackendRewriteAvailable()) {
-    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-    currentHlsUrl = hlsUrl;
-    resumeTime = pos;
-    resumePaused = paused;
-    qualitySwitching = true;
-    showSpinner();
-    playSource(rewriteUrl);
-    return;
-  }
-  fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) {
-    if (!blobUrl || !videoEl) {
-      showToast('Не удалось переключить аудио');
-      return;
-    }
-    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-    currentHlsUrl = hlsUrl;
-    resumeTime = pos;
-    resumePaused = paused;
-    qualitySwitching = true;
-    playSource(blobUrl);
-  });
+  var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  currentHlsUrl = hlsUrl;
+  resumeTime = pos;
+  resumePaused = paused;
+  qualitySwitching = true;
+  showSpinner();
+  playSource(rewriteUrl);
+  // if (isBackendRewriteAvailable()) {
+  //   ...
+  // } else {
+  //   fetchRewrittenHls(hlsUrl, audioIndex, function (blobUrl) { ... });
+  // }
 }
 
 function applySubSwitch(menuIdx: number): void {
