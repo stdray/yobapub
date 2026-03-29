@@ -100,6 +100,7 @@ function parseSettings(raw: Record<string, any>): SettingItem[] {
       if (Array.isArray(setting.value)) {
         for (var i = 0; i < setting.value.length; i++) {
           var optLabel = String(setting.value[i].label || setting.value[i].id || '').toLowerCase();
+          if (key === 'streamingType' && optLabel === 'http') continue;
           if (key === 'streamingType' && isLegacyTizen() && optLabel === 'hls4') continue;
           opts.push({
             id: setting.value[i].id,

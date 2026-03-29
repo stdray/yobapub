@@ -1,25 +1,11 @@
 import { apiGet } from '../../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../../types/api';
-import { getStreamingType, isProxyAll, proxyUrl } from '../../utils/storage';
 
 export interface MediaInfo {
   mid: number;
   title: string;
   audios: AudioTrack[];
   duration: number;
-}
-
-export function getUrlFromFile(f: VideoFile): string {
-  var urls = f.urls || f.url;
-  if (!urls) return '';
-  var pref = getStreamingType();
-  var url = '';
-  if (pref === 'http' && urls.http) url = urls.http;
-  else if (pref === 'hls' && urls.hls) url = urls.hls;
-  else if (pref === 'hls2' && urls.hls2) url = urls.hls2;
-  else if (pref === 'hls4' && urls.hls4) url = urls.hls4;
-  else url = urls.hls4 || urls.hls || urls.http || '';
-  return isProxyAll() ? proxyUrl(url) : url;
 }
 
 export function findEpisodeMedia(item: Item, seasonNum: number, epNum: number): MediaInfo | null {

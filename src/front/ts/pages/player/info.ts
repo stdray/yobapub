@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
-import { getStreamingType } from '../../utils/storage';
+
 
 export interface InfoState {
   files: VideoFile[];
@@ -14,7 +14,7 @@ export interface InfoState {
 export function getStreamInfo(state: InfoState): string {
   var parts: string[] = [];
 
-  parts.push(getStreamingType().toUpperCase());
+  parts.push('HLS');
 
   if (state.files.length > 0 && state.selectedQuality < state.files.length) {
     var f = state.files[state.selectedQuality];

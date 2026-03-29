@@ -10,7 +10,7 @@ import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 import Hls from 'hls.js';
 import { tplPlayer } from './player/template';
-import { MediaInfo, getUrlFromFile, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime } from './player/media';
+import { MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime } from './player/media';
 import { getRewrittenHlsUrl } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
@@ -87,9 +87,7 @@ function getInfoState(): InfoState {
 }
 
 function hasHlsUrl(): boolean {
-  if (currentFiles.length === 0) return false;
-  var f = currentFiles[selectedQuality];
-  return !!((f.urls && (f.urls.hls4 || f.urls.hls2)) || (f.url && (f.url.hls4 || f.url.hls2)));
+  return currentFiles.length > 0;
 }
 
 function getPanelData(): PanelData {
@@ -280,16 +278,12 @@ function startWithAudio(title: string): void {
   else if (streamPref === 'hls2') hlsUrl = hls2Url;
   else if (streamPref === 'hls') hlsUrl = hls4Url || hls2Url;
   else hlsUrl = hls4Url || hls2Url;
-  if (hlsUrl) {
-    if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-    currentHlsUrl = hlsUrl;
-    var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
-    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-    playUrl(rewriteUrl, title);
-    return;
-  }
-  var url = getUrlFromFile(f);
-  if (url) playUrl(url, title);
+  if (!hlsUrl) return;
+  if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
+  currentHlsUrl = hlsUrl;
+  var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
+  var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+  playUrl(rewriteUrl, title);
 }
 
 // --- Bar show/hide ---
@@ -340,19 +334,15 @@ function doSavePrefs(): void {
 
 function applyAudioSwitch(idx: number): void {
   selectedAudio = idx;
-  if (currentFiles.length > 0) {
-    var f = currentFiles[selectedQuality];
-    var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
-    var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
-    var sp = getStreamingType();
-    var hlsUrl = isLegacyTizen() ? hls2 : sp === 'hls4' ? hls4 : sp === 'hls2' ? hls2 : (hls4 || hls2);
-    if (hlsUrl) {
-      if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-      switchToRewrittenHls(hlsUrl, idx);
-      return;
-    }
-  }
-  showToast('Смена аудио недоступна');
+  if (currentFiles.length === 0) return;
+  var f = currentFiles[selectedQuality];
+  var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
+  var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  var sp = getStreamingType();
+  var hlsUrl = isLegacyTizen() ? hls2 : sp === 'hls4' ? hls4 : sp === 'hls2' ? hls2 : (hls4 || hls2);
+  if (!hlsUrl) return;
+  if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
+  switchToRewrittenHls(hlsUrl, idx);
 }
 
 function switchToRewrittenHls(hlsUrl: string, audioIdx: number): void {
@@ -396,16 +386,12 @@ function switchQuality(): void {
   var legacyTizen = isLegacyTizen();
   var sp = getStreamingType();
   var hlsUrl = legacyTizen ? hls2 : sp === 'hls4' ? hls4 : sp === 'hls2' ? hls2 : (hls4 || hls2);
-  if (hlsUrl) {
-    if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-    currentHlsUrl = hlsUrl;
-    var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
-    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
-    playSource(rewriteUrl);
-    return;
-  }
-  var url = getUrlFromFile(f);
-  if (url) playSource(url);
+  if (!hlsUrl) return;
+  if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
+  currentHlsUrl = hlsUrl;
+  var audioIndex = currentAudios.length > 0 ? currentAudios[selectedAudio].index : 1;
+  var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+  playSource(rewriteUrl);
 }
 
 // --- Playback ---
@@ -414,39 +400,19 @@ function playSource(url: string): void {
   if (!videoEl) return;
   currentHlsUrl = url;
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-  var onMeta = function () {
-    if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
+  playSourceDebug = 'url=' + url.substring(0, 120);
+  var hlsConfig: Record<string, any> = {};
+  if (resumeTime > 0) hlsConfig.startPosition = resumeTime;
+  var hls = new Hls(hlsConfig);
+  hlsInstance = hls;
+  hls.on(Hls.Events.MANIFEST_PARSED, function () {
     onSourceReady();
-  };
-  videoEl.addEventListener('loadedmetadata', onMeta);
-  var isHls = url.indexOf('.m3u8') >= 0 || url.indexOf('/hls/') >= 0;
-  var isTizen = typeof (window as any).tizen !== 'undefined' || /Tizen/i.test(navigator.userAgent);
-  var legacyTizen = isLegacyTizen();
-  var canPlayVnd = videoEl.canPlayType('application/vnd.apple.mpegurl');
-  var canPlayX = videoEl.canPlayType('application/x-mpegurl');
-  var hlsSupported = Hls.isSupported();
-  var useHlsJs = isHls && (isTizen || !canPlayVnd) && hlsSupported;
-  playSourceDebug = 'isHls=' + isHls + ' isTizen=' + isTizen + ' legacy=' + legacyTizen +
-    ' vnd="' + canPlayVnd + '" x="' + canPlayX +
-    '" hlsOk=' + hlsSupported + ' useHlsJs=' + useHlsJs +
-    ' url=' + url.substring(0, 80);
-  if (useHlsJs) {
-    var hlsConfig: Partial<Hls['config']> = {};
-    if (resumeTime > 0) (hlsConfig as any).startPosition = resumeTime;
-    var hls = new Hls(hlsConfig as any);
-    hlsInstance = hls;
-    hls.on(Hls.Events.MANIFEST_PARSED, function () {
-      if (videoEl) videoEl.removeEventListener('loadedmetadata', onMeta);
-      onSourceReady();
-    });
-    hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
-      if (data.fatal) showPlaybackError(null, url, 'hls fatal: type=' + data.type + ' details=' + data.details + (data.response ? ' status=' + data.response.code : ''));
-    });
-    hls.loadSource(url);
-    hls.attachMedia(videoEl);
-  } else {
-    videoEl.src = url;
-  }
+  });
+  hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
+    if (data.fatal) showPlaybackError(null, url, 'hls fatal: type=' + data.type + ' details=' + data.details + (data.response ? ' status=' + data.response.code : ''));
+  });
+  hls.loadSource(url);
+  hls.attachMedia(videoEl);
 }
 
 function onSourceReady(): void {
