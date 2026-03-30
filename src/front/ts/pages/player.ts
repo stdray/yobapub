@@ -388,7 +388,12 @@ function playSource(url: string): void {
     onSourceReady();
   });
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
-    if (data.fatal) showPlaybackError(null, url, 'hls fatal: type=' + data.type + ' details=' + data.details + (data.response ? ' status=' + data.response.code : ''));
+    if (!data.fatal) return;
+    if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+      hls.recoverMediaError();
+      return;
+    }
+    showPlaybackError(null, url, 'hls fatal: type=' + data.type + ' details=' + data.details + (data.response ? ' status=' + data.response.code : ''));
   });
   hls.loadSource(url);
   hls.attachMedia(videoEl);
