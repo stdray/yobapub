@@ -26,7 +26,6 @@ const keys = pageKeys();
 let markTimer: number | null = null;
 let videoEl: HTMLVideoElement | null = null;
 let videoStalled = false;
-let stallRecoveryTimer: number | null = null;
 
 
 let currentItem: Item | null = null;
@@ -427,6 +426,26 @@ function playSource(url: string): void {
     plog.info('hls MANIFEST_PARSED');
     onSourceReady();
   });
+  hls.on(Hls.Events.FRAG_LOADING, function (_e: any, data: any) {
+    plog.debug('hls FRAG_LOADING sn={sn} start={start} url={url}', {
+      sn: data.frag ? data.frag.sn : null,
+      start: data.frag ? data.frag.start : null,
+      url: data.frag ? (data.frag.url || '').substring(0, 80) : null,
+    });
+  });
+  hls.on(Hls.Events.FRAG_LOADED, function (_e: any, data: any) {
+    plog.debug('hls FRAG_LOADED sn={sn} start={start} size={size}', {
+      sn: data.frag ? data.frag.sn : null,
+      start: data.frag ? data.frag.start : null,
+      size: data.stats ? data.stats.total : null,
+    });
+  });
+  hls.on(Hls.Events.FRAG_BUFFERED, function (_e: any, data: any) {
+    plog.debug('hls FRAG_BUFFERED sn={sn} start={start}', {
+      sn: data.frag ? data.frag.sn : null,
+      start: data.frag ? data.frag.start : null,
+    });
+  });
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
     if (!data.fatal) {
       plog.debug('hls error (non-fatal) {type} {details} {reason} {fragUrl}', {
@@ -705,7 +724,9 @@ function scheduleStallRecovery(): void {
     stallRecoveryTimer = null;
     if (!videoEl || state.paused || !videoStalled) return;
     const ct = videoEl.currentTime;
-    plog.warn('stall recovery: restarting hls load at {pos}', { pos: ct });
+    plog.warn('stall recovery: restarting hls load at {pos} paused={paused} readyState={readyState}', {
+      pos: ct, paused: videoEl.paused, readyState: videoEl.readyState,
+    });
     if (hlsInstance) {
       hlsInstance.stopLoad();
       hlsInstance.startLoad(ct);
