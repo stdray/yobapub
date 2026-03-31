@@ -26,6 +26,7 @@ const keys = pageKeys();
 let markTimer: number | null = null;
 let videoEl: HTMLVideoElement | null = null;
 let videoStalled = false;
+let stallTimer: number | null = null;
 
 
 let currentItem: Item | null = null;
@@ -600,6 +601,7 @@ function playUrl(url: string, title: string): void {
   });
   videoEl.addEventListener('playing', function () {
     videoStalled = false;
+    if (stallTimer !== null) { clearTimeout(stallTimer); stallTimer = null; }
     plog.info('video playing currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     hideSpinner();
   });
@@ -611,6 +613,16 @@ function playUrl(url: string, title: string): void {
     videoStalled = true;
     plog.warn('video stalled currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     showSpinner();
+    if (!state.paused && videoEl) {
+      if (stallTimer !== null) clearTimeout(stallTimer);
+      stallTimer = window.setTimeout(function () {
+        stallTimer = null;
+        if (!videoEl || !videoStalled || state.paused) return;
+        plog.info('stall recovery: pause+play');
+        videoEl.pause();
+        safePlay(videoEl);
+      }, 8000);
+    }
   });
   videoEl.addEventListener('error', function () {
     const err2 = videoEl ? videoEl.error : null;
@@ -694,6 +706,7 @@ function markWatched(): void {
 
 function destroyPlayer(): void {
   videoStalled = false;
+  if (stallTimer !== null) { clearTimeout(stallTimer); stallTimer = null; }
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
