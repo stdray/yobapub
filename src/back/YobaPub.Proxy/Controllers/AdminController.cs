@@ -24,4 +24,11 @@ public class AdminController(LogStore store) : Controller
             TotalPages = (int)Math.Ceiling((double)total / pageSize)
         });
     }
+
+    [HttpPost("logs/clear")]
+    public IActionResult ClearLogs(LogsQuery query)
+    {
+        store.DeleteAll();
+        return RedirectToAction(nameof(Logs), query);
+    }
 }

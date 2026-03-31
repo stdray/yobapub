@@ -34,12 +34,13 @@ function sendToBackend(level: Level, message: string, props: Record<string, unkn
 }
 
 function emit(level: Level, template: string, props: Record<string, unknown>): void {
-  const rendered = '[' + relTs() + '][' + level[0] + '] ' + renderTemplate(template, props);
-  sendToBackend(level, rendered, props);
+  const message = renderTemplate(template, props);
+  sendToBackend(level, message, props);
+  const console_msg = '[' + relTs() + '][' + level[0] + '] ' + message;
   switch (level) {
-    case 'Warning': console.warn(rendered, props); break;
-    case 'Error':   console.error(rendered, props); break;
-    default:        console.log(rendered, props); break;
+    case 'Warning': console.warn(console_msg, props); break;
+    case 'Error':   console.error(console_msg, props); break;
+    default:        console.log(console_msg, props); break;
   }
 }
 

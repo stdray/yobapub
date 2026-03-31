@@ -498,6 +498,13 @@ function onSourceReady(): void {
             plog.info('attemptSeek done retries={retries} currentTime={currentTime} success={success}', {
               retries, currentTime: v.currentTime, success: diff <= 2,
             });
+            if (diff > 2) {
+              // Seek failed on Tizen 2.3 — video may be stuck in seeking state.
+              // Mimic manual play/pause: pause then play to unstick the element.
+              plog.warn('seek failed, resetting playback from currentTime={currentTime}', { currentTime: v.currentTime });
+              v.pause();
+              safePlay(v);
+            }
             return;
           }
           retries++;

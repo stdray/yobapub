@@ -26,6 +26,14 @@
   </form>
   <label><input type="checkbox" id="autoRefresh" checked> Auto 10s</label>
   <span id="status">@Model.Total записей</span>
+  <form asp-action="ClearLogs" method="post" style="margin:0"
+        onsubmit="return confirm('Удалить все логи?')">
+    <input type="hidden" name="level" value="@q.Level">
+    <input type="hidden" name="device" value="@q.Device">
+    <input type="hidden" name="page" value="@q.Page">
+    <input type="hidden" name="pageSize" value="@pageSize">
+    <button type="submit" class="danger">Очистить</button>
+  </form>
   <form asp-controller="Auth" asp-action="Logout" method="post" style="margin:0">
     <button type="submit" class="danger">Выйти</button>
   </form>

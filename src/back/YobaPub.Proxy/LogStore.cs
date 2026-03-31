@@ -73,5 +73,7 @@ public class LogStore : IDisposable
     public int DeleteOlderThan(DateTimeOffset cutoff) =>
         _col.DeleteMany(x => x.ServerTs < cutoff);
 
+    public int DeleteAll() => _col.DeleteAll();
+
     public void Dispose() => _db.Dispose();
 }
