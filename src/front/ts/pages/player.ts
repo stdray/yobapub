@@ -433,7 +433,10 @@ function onSourceReady(): void {
         // buffered, so the first seek may be silently ignored. Retry until it lands.
         var retries = 0;
         var attemptSeek = function () {
-          if (Math.abs(v.currentTime - pos) <= 2 || retries >= 3) return;
+          if (Math.abs(v.currentTime - pos) <= 2 || retries >= 3) {
+            hideSpinner();
+            return;
+          }
           retries++;
           v.currentTime = pos;
           window.setTimeout(attemptSeek, 500);
