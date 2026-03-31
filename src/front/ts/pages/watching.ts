@@ -29,7 +29,7 @@ let sections: SectionData[] = [];
 let serialsData: WatchingSerialItem[] = [];
 let moviesData: WatchingMovieItem[] = [];
 
-const tplMenu = doT.template(`
+const tplMenuCompiled = doT.template(`
   <div class="sidebar">
     {{~it.items :item:idx}}
       <div class="sidebar__item{{?item.active}} active{{?}}{{?item.focused}} focused{{?}}" data-menu="{{=idx}}">{{=item.label}}</div>
@@ -37,17 +37,26 @@ const tplMenu = doT.template(`
   </div>
 `);
 
-const tplSection = doT.template(`
+export const tplMenu = (data: { readonly items: Array<{ readonly label: string; readonly active: boolean; readonly focused: boolean }> }): string =>
+  tplMenuCompiled(data);
+
+const tplSectionCompiled = doT.template(`
   <div class="watching__section-title">{{=it.title}}</div>
   <div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>
 `);
 
-const tplLayout = doT.template(`
+export const tplSection = (data: { readonly title: string; readonly idx: number; readonly cards: string }): string =>
+  tplSectionCompiled(data);
+
+const tplLayoutCompiled = doT.template(`
   <div class="layout">
     {{=it.menu}}
     <div class="content"><div class="watching">{{=it.rows}}</div></div>
   </div>
 `);
+
+export const tplLayout = (data: { readonly menu: string; readonly rows: string }): string =>
+  tplLayoutCompiled(data);
 
 function buildMenu(): string {
   const items = [];

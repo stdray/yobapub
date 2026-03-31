@@ -21,7 +21,7 @@ let selectedSeason = 0;
 let focusedEpisode = 0;
 let focusedSeasonTab = 0;
 
-const tplDetail = doT.template(`
+const tplDetailCompiled = doT.template(`
   <div class="detail">
     <div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>
     <div class="detail__info">
@@ -40,17 +40,38 @@ const tplDetail = doT.template(`
   </div>
 `);
 
-const tplSeasonTab = doT.template(`
+export const tplDetail = (data: {
+  readonly poster: string;
+  readonly titleRu: string;
+  readonly titleEn: string;
+  readonly year: number;
+  readonly countries: string;
+  readonly genres: string;
+  readonly ratings: string;
+  readonly plot: string;
+  readonly playLabel: string;
+  readonly seasonTabs: string;
+  readonly episodes: string;
+}): string =>
+  tplDetailCompiled(data);
+
+const tplSeasonTabCompiled = doT.template(`
   <div class="episodes__season-tab{{?it.active}} active{{?}}" data-season="{{=it.idx}}">Сезон {{=it.num}}</div>
 `);
 
-const tplEpisode = doT.template(`
+export const tplSeasonTab = (data: { readonly idx: number; readonly num: number; readonly active: boolean }): string =>
+  tplSeasonTabCompiled(data);
+
+const tplEpisodeCompiled = doT.template(`
   <div class="episode" data-ep="{{=it.idx}}">
     <span class="episode__number">{{=it.number}}</span>
     <span class="episode__title">{{=it.title}}</span>
     <span class="episode__status">{{=it.status}}</span>
   </div>
 `);
+
+export const tplEpisode = (data: { readonly idx: number; readonly number: number; readonly title: string; readonly status: string }): string =>
+  tplEpisodeCompiled(data);
 
 function getEpisodeStatus(seasonNum: number, epNum: number): { time: number; status: number } {
   if (!watchingInfo || !watchingInfo.seasons) return { time: 0, status: -1 };

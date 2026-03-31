@@ -28,13 +28,16 @@ function formatDate(unix: number): string {
   return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
 }
 
-const tplLayout = doT.template(`
+const tplLayoutCompiled = doT.template(`
   <div class="content"><div class="watching">
     <div class="watching__section-title">История просмотров</div>
     <div class="watching__grid" data-section="0">{{=it.cards}}</div>
     {{?it.pager}}<div class="history__pager">{{=it.pager}}</div>{{?}}
   </div></div>
 `);
+
+export const tplLayout = (data: { readonly cards: string; readonly pager: string }): string =>
+  tplLayoutCompiled(data);
 
 function buildCards(): string {
   if (entries.length === 0) {

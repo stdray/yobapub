@@ -50,7 +50,7 @@ const LABELS: Record<string, string> = {
   mixedPlaylist: 'Смешанный плейлист'
 };
 
-const tplPage = doT.template(`
+const tplPageCompiled = doT.template(`
   <div class="settings-page">
     <div class="settings-page__title">Настройки</div>
     <div class="settings-page__list">{{=it.items}}</div>
@@ -62,7 +62,10 @@ const tplPage = doT.template(`
   </div>
 `);
 
-const tplSettingItem = doT.template(`
+export const tplPage = (data: { readonly items: string; readonly version: string }): string =>
+  tplPageCompiled(data);
+
+const tplSettingItemCompiled = doT.template(`
   <div class="sitem{{?it.focused}} focused{{?}}{{?it.stepper}} sitem--stepper{{?}}" data-idx="{{=it.idx}}">
     <span class="sitem__label">{{=it.label}}</span>
     {{?it.stepper}}
@@ -77,7 +80,10 @@ const tplSettingItem = doT.template(`
   </div>
 `);
 
-const tplOptions = doT.template(`
+export const tplSettingItem = (data: { readonly idx: number; readonly label: string; readonly value: string; readonly focused: boolean; readonly stepper: boolean }): string =>
+  tplSettingItemCompiled(data);
+
+const tplOptionsCompiled = doT.template(`
   <div class="soptions">
     <div class="soptions__title">{{=it.title}}</div>
     {{~it.options :opt:i}}
@@ -85,6 +91,9 @@ const tplOptions = doT.template(`
     {{~}}
   </div>
 `);
+
+export const tplOptions = (data: { readonly title: string; readonly options: Array<{ readonly label: string; readonly selected: boolean }>; readonly focused: number }): string =>
+  tplOptionsCompiled(data);
 
 function parseSettings(raw: Record<string, any>): SettingItem[] {
   const items: SettingItem[] = [];

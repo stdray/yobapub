@@ -33,14 +33,20 @@ let sections: SectionData[] = [];
 let focusedSection = 0;
 let focusedIndex = 0;
 
-const tplSection = doT.template(`
+const tplSectionCompiled = doT.template(`
   <div class="watching__section-title">{{=it.title}}</div>
   <div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>
 `);
 
-const tplLayout = doT.template(`
+export const tplSection = (data: { readonly title: string; readonly idx: number; readonly cards: string }): string =>
+  tplSectionCompiled(data);
+
+const tplLayoutCompiled = doT.template(`
   <div class="content"><div class="watching">{{=it.rows}}</div></div>
 `);
+
+export const tplLayout = (data: { readonly rows: string }): string =>
+  tplLayoutCompiled(data);
 
 function buildRows(): string {
   if (sections.length === 0) {

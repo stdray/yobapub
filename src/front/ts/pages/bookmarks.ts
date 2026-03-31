@@ -24,7 +24,7 @@ let currentFolderTitle = '';
 let itemsData: Item[] = [];
 let focusedIndex = 0;
 
-const tplFolderItem = doT.template(`
+const tplFolderItemCompiled = doT.template(`
   <div class="folder-item" data-id="{{=it.id}}">
     <div class="folder-item__icon">&#128194;</div>
     <div class="folder-item__info">
@@ -34,19 +34,28 @@ const tplFolderItem = doT.template(`
   </div>
 `);
 
-const tplFoldersPage = doT.template(`
+export const tplFolderItem = (data: { readonly id: number; readonly title: string; readonly count: string }): string =>
+  tplFolderItemCompiled(data);
+
+const tplFoldersPageCompiled = doT.template(`
   <div class="watching">
     <div class="watching__section-title">{{=it.title}}</div>
     <div class="folder-list">{{=it.items}}</div>
   </div>
 `);
 
-const tplItemsPage = doT.template(`
+export const tplFoldersPage = (data: { readonly title: string; readonly items: string }): string =>
+  tplFoldersPageCompiled(data);
+
+const tplItemsPageCompiled = doT.template(`
   <div class="watching">
     <div class="watching__section-title">{{=it.title}}</div>
     <div class="watching__grid">{{=it.cards}}</div>
   </div>
 `);
+
+export const tplItemsPage = (data: { readonly title: string; readonly cards: string }): string =>
+  tplItemsPageCompiled(data);
 
 function renderFolders(): void {
   if (folders.length === 0) {

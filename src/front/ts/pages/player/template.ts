@@ -1,6 +1,6 @@
 import * as doT from 'dot';
 
-export var tplPlayer = doT.template(`
+const tplPlayerCompiled = doT.template(`
   <div class="player">
     <video preload="auto"></video>
     <div class="player__spinner"><div class="spinner__circle"></div></div>
@@ -40,3 +40,6 @@ export var tplPlayer = doT.template(`
     <div class="player__toast hidden"></div>
   </div>
 `);
+
+export const tplPlayer = (data: { readonly title: string; readonly episode: string }): string =>
+  tplPlayerCompiled(data);

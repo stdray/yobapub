@@ -50,7 +50,7 @@ interface KbKeyData {
   wide: boolean;
 }
 
-const tplKeyboard = doT.template(`
+const tplKeyboardCompiled = doT.template(`
   <div class="kb">
     {{~it.rows :row:ri}}
       <div class="kb__row">
@@ -62,7 +62,10 @@ const tplKeyboard = doT.template(`
   </div>
 `);
 
-const tplLayout = doT.template(`
+export const tplKeyboard = (data: { readonly rows: Array<{ readonly label: string; readonly wide: boolean }[]> }): string =>
+  tplKeyboardCompiled(data);
+
+const tplLayoutCompiled = doT.template(`
   <div class="search">
     <div class="search-input"><span class="search-input__text"></span><span class="search-input__cursor">|</span></div>
     <div class="search__body">
@@ -71,6 +74,9 @@ const tplLayout = doT.template(`
     </div>
   </div>
 `);
+
+export const tplLayout = (data: Record<string, never>): string =>
+  tplLayoutCompiled(data);
 
 function buildKeyboardRows(): KbKeyData[][] {
   const layout = KB_LAYOUTS[currentLayout];

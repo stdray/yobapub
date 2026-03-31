@@ -12,14 +12,17 @@ const keys = pageKeys();
 let poller: { stop: () => void } | null = null;
 let countdownTimer: number | null = null;
 
-const tplLoading = doT.template(`
+const tplLoadingCompiled = doT.template(`
   <div class="login">
     <div class="login__title">YobaPub</div>
     <div class="login__status">Загрузка...</div>
   </div>
 `);
 
-const tplCode = doT.template(`
+export const tplLoading = (data: Record<string, never>): string =>
+  tplLoadingCompiled(data);
+
+const tplCodeCompiled = doT.template(`
   <div class="login">
     <div class="login__title">Вход в аккаунт</div>
     <div class="login__url">Перейдите на <b>{{=it.uri}}</b></div>
@@ -29,7 +32,10 @@ const tplCode = doT.template(`
   </div>
 `);
 
-const tplExpired = doT.template(`
+export const tplCode = (data: { readonly uri: string; readonly code: string; readonly expires: number }): string =>
+  tplCodeCompiled(data);
+
+const tplExpiredCompiled = doT.template(`
   <div class="login">
     <div class="login__title">YobaPub</div>
     <div class="login__expired">Срок активации истёк!</div>
@@ -37,13 +43,19 @@ const tplExpired = doT.template(`
   </div>
 `);
 
-const tplError = doT.template(`
+export const tplExpired = (data: Record<string, never>): string =>
+  tplExpiredCompiled(data);
+
+const tplErrorCompiled = doT.template(`
   <div class="login">
     <div class="login__title">YobaPub</div>
     <div class="login__error">{{=it.message}}</div>
     <div class="login__status">Нажмите Enter для повтора</div>
   </div>
 `);
+
+export const tplError = (data: { readonly message: string }): string =>
+  tplErrorCompiled(data);
 
 function cleanup(): void {
   if (poller) {

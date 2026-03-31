@@ -17,7 +17,7 @@ let btnCount = 0;
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
 
-const tplDetail = doT.template(`
+const tplDetailCompiled = doT.template(`
   <div class="detail">
     <div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>
     <div class="detail__info">
@@ -32,6 +32,21 @@ const tplDetail = doT.template(`
     </div>
   </div>
 `);
+
+export const tplDetail = (data: {
+  readonly poster: string;
+  readonly titleRu: string;
+  readonly titleEn: string;
+  readonly year: number;
+  readonly countries: string;
+  readonly genres: string;
+  readonly duration: string;
+  readonly quality: number;
+  readonly ratings: string;
+  readonly buttons: string;
+  readonly plot: string;
+}): string =>
+  tplDetailCompiled(data);
 
 function render(item: Item): void {
   let title = item.title.split(' / ');
