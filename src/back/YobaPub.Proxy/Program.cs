@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using YobaPub.Proxy;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,6 +7,17 @@ var builder = WebApplication.CreateBuilder(args);
 var proxyConfig = builder.Configuration.GetSection("Proxy").Get<ProxyConfig>() ?? new ProxyConfig();
 
 builder.Services.AddSingleton(proxyConfig);
+builder.Services.AddOptions<AdminOptions>().BindConfiguration("Admin");
+builder.Services.AddSingleton<LogStore>();
+builder.Services.AddHostedService<LogRetentionService>();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(opt =>
+    {
+        opt.LoginPath = "/admin/login";
+        opt.ExpireTimeSpan = TimeSpan.FromDays(1);
+    });
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(o => o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
 builder.Services.AddHttpClient("proxy")
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
     {
@@ -17,8 +30,34 @@ var app = builder.Build();
 app.UseMiddleware<UniversalProxyMiddleware>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
 app.MapFallbackToFile("index.html");
+
 app.MapGet("/api/proxy-config", (ProxyConfig cfg) => Results.Json(new { cfg.ProxyAll, cfg.Upstream }));
+
+app.MapPost("/api/log", async (HttpContext ctx, LogStore store) =>
+{
+    try
+    {
+        using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
+        var root = doc.RootElement;
+        var entry = new LogEntry
+        {
+            ServerTs = DateTimeOffset.UtcNow,
+            ClientTs = root.TryGetProperty("clientTs", out var ts) && ts.TryGetInt64(out var tsVal) ? tsVal : 0,
+            Level = root.TryGetProperty("level", out var level) ? level.GetString() ?? "" : "",
+            Category = root.TryGetProperty("category", out var cat) ? cat.GetString() ?? "" : "",
+            Message = root.TryGetProperty("message", out var msg) ? msg.GetString() ?? "" : "",
+            DeviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
+            Props = root.TryGetProperty("props", out var props) ? props.GetRawText() : "{}"
+        };
+        store.Add(entry);
+    }
+    catch { /* ignore malformed requests */ }
+    return Results.Ok();
+});
 
 app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory factory, HttpContext ctx) =>
 {
@@ -72,7 +111,6 @@ app.MapGet("/.well-known/assetlinks.json", () => Results.Json(
             target = new {
                 @namespace = "android_app",
                 package_name = "su.p3o.yobapub",
-                // TWA requires HTTPS; on HTTP only WebView fallback is used
                 sha256_cert_fingerprints = new[] {
                     app.Configuration["Proxy:AndroidCertFingerprint"] ?? ""
                 }

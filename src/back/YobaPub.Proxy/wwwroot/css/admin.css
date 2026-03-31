@@ -1,0 +1,83 @@
+/* ── Base ─────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: monospace; font-size: 13px;
+  background: #1a1a1a; color: #ccc;
+}
+
+h1 { color: #fff; }
+
+label { display: block; color: #888; font-size: 12px; margin-bottom: 4px; }
+
+select,
+input[type=text],
+input[type=password] {
+  background: #222; color: #ccc; border: 1px solid #444;
+  padding: 3px 6px; font: inherit;
+}
+input:focus { outline: none; border-color: #6af; }
+
+button {
+  background: #2a5; color: #fff; border: none;
+  padding: 4px 10px; cursor: pointer; font: inherit;
+}
+button:hover { background: #3b6; }
+button.danger { background: #622; }
+button.danger:hover { background: #833; }
+
+/* ── Login page ───────────────────────────────────── */
+body.login {
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center; min-height: 100vh;
+}
+
+.card {
+  background: #222; border: 1px solid #333;
+  padding: 32px 36px; width: 320px;
+}
+.card h1 { font-size: 16px; margin-bottom: 24px; }
+
+.card input[type=text],
+.card input[type=password] {
+  display: block; width: 100%;
+  padding: 7px 10px; margin-bottom: 16px;
+}
+.card button { width: 100%; padding: 9px; }
+
+.error { margin-top: 14px; color: #f66; font-size: 12px; text-align: center; }
+
+/* ── Logs page ────────────────────────────────────── */
+header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; background: #111; border-bottom: 1px solid #333;
+  position: sticky; top: 0; z-index: 10;
+}
+header h1 { font-size: 15px; }
+#status { color: #666; font-size: 11px; margin-left: auto; }
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  background: #222; color: #aaa; padding: 6px 8px; text-align: left;
+  position: sticky; top: 41px; font-weight: normal; border-bottom: 1px solid #333;
+}
+td { padding: 3px 8px; border-bottom: 1px solid #222; vertical-align: top; }
+
+tr.E td { background: #2a1010; }
+tr.W td { background: #2a2010; }
+tr.V td { color: #555; }
+
+.ts { white-space: nowrap; color: #777; width: 80px; }
+.dev { color: #6af; width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lvl { width: 24px; text-align: center; }
+.cat { width: 100px; color: #aaf; white-space: nowrap; }
+.msg { word-break: break-word; }
+
+.empty { padding: 20px; color: #666; text-align: center; }
+
+.pager {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 14px; color: #888; font-size: 12px;
+}
+.pager a { color: #6af; text-decoration: none; }
+.pager a:hover { text-decoration: underline; }

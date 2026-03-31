@@ -9,8 +9,20 @@ var KEYS = {
   STREAMING_TYPE: 'kp_streaming_type',
   PROXY_ALL: 'kp_proxy_all',
   PROXY_POSTERS: 'kp_proxy_posters',
-  START_PAGE: 'kp_start_page'
+  START_PAGE: 'kp_start_page',
+  DEVICE_ID: 'kp_device_id'
 };
+
+export function getDeviceId(): string {
+  var id = localStorage.getItem(KEYS.DEVICE_ID);
+  if (id) return id;
+  id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+  localStorage.setItem(KEYS.DEVICE_ID, id);
+  return id;
+}
 
 export function getAccessToken(): string | null {
   return localStorage.getItem(KEYS.ACCESS_TOKEN);

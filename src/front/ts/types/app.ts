@@ -16,6 +16,7 @@ export interface RouteParams {
   tvFocusedIndex?: number;
   historyPage?: number;
   historyFocusedIndex?: number;
+  episodeId?: number;
 }
 
 export interface Page {

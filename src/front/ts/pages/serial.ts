@@ -67,6 +67,19 @@ function getEpisodeStatus(seasonNum: number, epNum: number): { time: number; sta
   return { time: 0, status: -1 };
 }
 
+function findEpisodeById(episodeId: number): { seasonIdx: number; episodeIdx: number } | null {
+  if (!currentItem || !currentItem.seasons) return null;
+  for (var i = 0; i < currentItem.seasons.length; i++) {
+    var s = currentItem.seasons[i];
+    for (var j = 0; j < s.episodes.length; j++) {
+      if (s.episodes[j].id === episodeId) {
+        return { seasonIdx: i, episodeIdx: j };
+      }
+    }
+  }
+  return null;
+}
+
 function findResumeEpisode(): { season: number; episode: number; seasonIdx: number; episodeIdx: number } | null {
   if (!currentItem || !currentItem.seasons) return null;
   for (var i = 0; i < currentItem.seasons.length; i++) {
@@ -239,11 +252,24 @@ export var serialPage: Page = {
     showSpinnerIn($root);
     var id = params.id!;
 
+    var targetEpisodeId = params.episodeId;
+
     loadItemWithWatching(id,
       function (item, watching) {
         currentItem = item;
         watchingInfo = watching;
         render(currentItem);
+        if (targetEpisodeId) {
+          var found = findEpisodeById(targetEpisodeId);
+          if (found) {
+            if (found.seasonIdx !== selectedSeason) {
+              switchSeason(found.seasonIdx);
+            }
+            focusArea = 'episodes';
+            focusedEpisode = found.episodeIdx;
+            updateFocus();
+          }
+        }
       },
       function () {
         $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');

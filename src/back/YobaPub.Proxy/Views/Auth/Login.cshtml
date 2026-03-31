@@ -1,0 +1,19 @@
+@{
+    ViewData["Title"] = "YobaPub — Вход";
+    ViewData["BodyClass"] = "login";
+}
+<div class="card">
+  <h1>YobaPub Logs</h1>
+  <form asp-action="Login" method="post">
+    <input type="hidden" name="returnUrl" value="@Context.Request.Query["returnUrl"]">
+    <label>Логин</label>
+    <input type="text" name="username" autofocus autocomplete="username">
+    <label>Пароль</label>
+    <input type="password" name="password" autocomplete="current-password">
+    <button type="submit">Войти</button>
+    @if (ViewData["Error"] != null)
+    {
+      <div class="error">@ViewData["Error"]</div>
+    }
+  </form>
+</div>

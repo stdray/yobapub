@@ -1,4 +1,6 @@
-// Structured logger. Console-only for now; Seq transport to be added later.
+// Structured logger. Logs to console and to the backend /api/log endpoint.
+
+import { getDeviceId } from './storage';
 
 type Level = 'Verbose' | 'Debug' | 'Information' | 'Warning' | 'Error';
 
@@ -15,8 +17,25 @@ function renderTemplate(template: string, props: Record<string, unknown>): strin
   });
 }
 
+function sendToBackend(level: Level, message: string, props: Record<string, unknown>): void {
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/log', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify({
+      level,
+      category: typeof props['category'] === 'string' ? props['category'] : '',
+      message,
+      props,
+      deviceId: getDeviceId(),
+      clientTs: Date.now()
+    }));
+  } catch (_) { /* fire-and-forget */ }
+}
+
 function emit(level: Level, template: string, props: Record<string, unknown>): void {
   const rendered = '[' + relTs() + '][' + level[0] + '] ' + renderTemplate(template, props);
+  sendToBackend(level, rendered, props);
   switch (level) {
     case 'Warning': console.warn(rendered, props); break;
     case 'Error':   console.error(rendered, props); break;

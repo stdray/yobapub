@@ -152,7 +152,11 @@ function handleKey(e: JQuery.Event): void {
       if (entry) {
         setParams({ historyPage: currentPage, historyFocusedIndex: focusedIndex });
         var isSerial = entry.item.type === 'serial' || entry.item.type === 'docuserial';
-        navigate(isSerial ? 'serial' : 'movie', { id: entry.item.id });
+        if (isSerial) {
+          navigate('serial', { id: entry.item.id, episodeId: entry.media.id });
+        } else {
+          navigate('movie', { id: entry.item.id });
+        }
       }
       e.preventDefault(); break;
     }
