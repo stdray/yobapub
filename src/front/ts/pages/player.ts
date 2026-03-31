@@ -429,7 +429,16 @@ function onSourceReady(): void {
       v.removeEventListener('playing', doSeek);
       v.removeEventListener('canplay', doSeek);
       if (Math.abs(v.currentTime - pos) > 2) {
-        v.currentTime = pos;
+        // On Tizen 2.3 (Chromium 28) canplay fires before the fragment at pos is
+        // buffered, so the first seek may be silently ignored. Retry until it lands.
+        var retries = 0;
+        var attemptSeek = function () {
+          if (Math.abs(v.currentTime - pos) <= 2 || retries >= 3) return;
+          retries++;
+          v.currentTime = pos;
+          window.setTimeout(attemptSeek, 500);
+        };
+        attemptSeek();
       }
     };
     v.addEventListener('playing', doSeek);
