@@ -13,6 +13,7 @@ import { serialPage } from './pages/serial';
 import { playerPage } from './pages/player';
 import { settingsPage } from './pages/settings';
 import { noveltiesPage } from './pages/novelties';
+import { searchPage } from './pages/search';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
 
 objectFitImages();
@@ -29,6 +30,7 @@ registerPage('serial', serialPage);
 registerPage('player', playerPage);
 registerPage('settings', settingsPage);
 registerPage('novelties', noveltiesPage);
+registerPage('search', searchPage);
 
 function notifyDevice(): void {
   var info = getDeviceInfo();

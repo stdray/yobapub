@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import { apiGetWithRefresh } from './client';
-import { Item, WatchingInfoItem } from '../types/api';
+import { Item, ItemsResponse, WatchingInfoItem } from '../types/api';
 import { getWatchingInfo } from './watching';
 
 export function getItem(id: number): JQueryDeferred<any> {
@@ -11,6 +11,13 @@ export function getItems(type: string, sort?: string): JQueryDeferred<any> {
   var params: Record<string, any> = { type: type };
   if (sort) params.sort = sort;
   return apiGetWithRefresh('/v1/items', params);
+}
+
+export function searchItems(query: string, page?: number, perpage?: number): JQueryDeferred<ItemsResponse> {
+  var params: Record<string, string | number> = { q: query, field: 'title' };
+  if (page !== undefined) params.page = page;
+  if (perpage !== undefined) params.perpage = perpage;
+  return apiGetWithRefresh('/v1/items/search', params);
 }
 
 export function loadItemWithWatching(

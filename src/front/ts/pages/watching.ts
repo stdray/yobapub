@@ -144,6 +144,7 @@ function handleMenuKey(e: JQuery.Event): void {
     case TvKey.Enter:
       if (menuIndex === 0) { navigate('novelties'); }
       else if (menuIndex === 2) { navigate('bookmarks'); }
+      else if (menuIndex === 3) { navigate('search'); }
       else if (menuIndex === 4) { navigate('settings'); }
       else if (menuIndex === 5) { unlinkDevice().always(function () { clearTokens(); navigate('login'); }); }
       e.preventDefault(); break;

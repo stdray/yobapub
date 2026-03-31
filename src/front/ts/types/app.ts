@@ -1,4 +1,4 @@
-export type RouteName = 'login' | 'watching' | 'bookmarks' | 'movie' | 'serial' | 'player' | 'settings' | 'novelties';
+export type RouteName = 'login' | 'watching' | 'bookmarks' | 'movie' | 'serial' | 'player' | 'settings' | 'novelties' | 'search';
 
 export interface RouteParams {
   id?: number;
@@ -9,6 +9,7 @@ export interface RouteParams {
   focusedIndex?: number;
   folderId?: number;
   folderTitle?: string;
+  searchQuery?: string;
 }
 
 export interface Page {
