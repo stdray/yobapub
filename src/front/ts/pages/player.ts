@@ -391,7 +391,9 @@ function doSavePrefs(): void {
 
 function buildHlsConfig(): Record<string, any> {
   var cfg: Record<string, any> = {};
-  if (state.position > 0) cfg.startPosition = state.position;
+  // startPosition intentionally omitted: onSourceReady handles seeking via manual
+  // retry loop (needed for Tizen 2.3). Setting startPosition here would conflict
+  // with that seek and cause fragParsingError on some browsers.
   cfg.maxBufferLength = 10;
   cfg.maxMaxBufferLength = 30;
   cfg.maxBufferHole = 1.0;
