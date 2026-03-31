@@ -428,6 +428,10 @@ function playSource(url: string): void {
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
     if (!data.fatal) {
       plog.debug('hls error (non-fatal) {type} {details}', { type: data.type, details: data.details });
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        plog.warn('hls non-fatal mediaError, recovering');
+        hls.recoverMediaError();
+      }
       return;
     }
     plog.error('hls fatal {type} {details} {status}', {
@@ -478,7 +482,12 @@ function onSourceReady(): void {
             hideSpinner();
             if (!state.paused) {
               plog.info('attemptSeek resuming play after seek paused={paused}', { paused: v.paused });
-              v.play();
+              var pr = v.play();
+              if (pr && typeof (pr as any).catch === 'function') {
+                (pr as any).catch(function (err: Error) {
+                  plog.error('play() after seek rejected {name} {message}', { name: err.name, message: err.message });
+                });
+              }
             }
             return;
           }
@@ -492,7 +501,12 @@ function onSourceReady(): void {
         hideSpinner();
         if (!state.paused) {
           plog.info('doSeek resuming play paused={paused}', { paused: v.paused });
-          v.play();
+          var pr2 = v.play();
+          if (pr2 && typeof (pr2 as any).catch === 'function') {
+            (pr2 as any).catch(function (err: Error) {
+              plog.error('play() doSeek rejected {name} {message}', { name: err.name, message: err.message });
+            });
+          }
         }
       }
     };
