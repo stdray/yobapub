@@ -474,8 +474,8 @@ function onSourceReady(): void {
               retries, currentTime: v.currentTime, success: diff <= 2,
             });
             hideSpinner();
-            if (v.paused && !state.paused) {
-              plog.info('attemptSeek resuming play after seek');
+            if (!state.paused) {
+              plog.info('attemptSeek resuming play after seek paused={paused}', { paused: v.paused });
               v.play();
             }
             return;
@@ -488,8 +488,8 @@ function onSourceReady(): void {
       } else {
         plog.info('doSeek: already at position, no seek needed currentTime={currentTime}', { currentTime: v.currentTime });
         hideSpinner();
-        if (v.paused && !state.paused) {
-          plog.info('doSeek resuming play (was paused after source load)');
+        if (!state.paused) {
+          plog.info('doSeek resuming play paused={paused}', { paused: v.paused });
           v.play();
         }
       }
