@@ -472,57 +472,36 @@ function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
   if (state.position > 0) {
-    var pos = state.position;
-    var v = videoEl;
-    var seekDone = false;
-    var seekTimer: number | null = null;
-    var doSeek = function (trigger: string) {
-      plog.debug('doSeek trigger={trigger} seekDone={seekDone} currentTime={currentTime} target={target}', {
-        trigger, seekDone, currentTime: v.currentTime, target: pos,
+    // Seek first (while paused), then play once position is confirmed.
+    // On Tizen 2.3 (Chromium 28) currentTime assignment may be silently ignored
+    // if the fragment at that position isn't buffered yet — retry until it lands.
+    const pos = state.position;
+    const v = videoEl;
+    let retries = 0;
+    const trySeekThenPlay = () => {
+      const diff = Math.abs(v.currentTime - pos);
+      plog.debug('trySeekThenPlay retry={retries} currentTime={currentTime} target={target} diff={diff}', {
+        retries, currentTime: v.currentTime, target: pos, diff,
       });
-      if (seekDone) return;
-      seekDone = true;
-      if (seekTimer !== null) { clearTimeout(seekTimer); seekTimer = null; }
-      v.removeEventListener('playing', doSeekPlaying);
-      v.removeEventListener('canplay', doSeekCanplay);
-      if (Math.abs(v.currentTime - pos) > 2) {
-        // On Tizen 2.3 (Chromium 28) canplay fires before the fragment at pos is
-        // buffered, so the first seek may be silently ignored. Retry until it lands.
-        var retries = 0;
-        var attemptSeek = function () {
-          var diff = Math.abs(v.currentTime - pos);
-          plog.debug('attemptSeek retry={retries} currentTime={currentTime} target={target} diff={diff}', {
-            retries, currentTime: v.currentTime, target: pos, diff,
-          });
-          if (diff <= 2 || retries >= 3) {
-            plog.info('attemptSeek done retries={retries} currentTime={currentTime} success={success}', {
-              retries, currentTime: v.currentTime, success: diff <= 2,
-            });
-            if (diff > 2) {
-              // Seek failed on Tizen 2.3 — video may be stuck in seeking state.
-              // Mimic manual play/pause: pause then play to unstick the element.
-              plog.warn('seek failed, resetting playback from currentTime={currentTime}', { currentTime: v.currentTime });
-              v.pause();
-              safePlay(v);
-            }
-            return;
-          }
-          retries++;
-          v.currentTime = pos;
-          window.setTimeout(attemptSeek, 500);
-        };
-        attemptSeek();
-      } else {
-        plog.debug('doSeek: already at position currentTime={currentTime}', { currentTime: v.currentTime });
+      if (diff <= 2) {
+        plog.info('resume seek done retries={retries} currentTime={currentTime}', { retries, currentTime: v.currentTime });
+        if (!state.paused) safePlay(v);
+        return;
       }
+      if (retries >= 3) {
+        plog.warn('resume seek failed after {retries} retries, playing from currentTime={currentTime}', {
+          retries, currentTime: v.currentTime,
+        });
+        if (!state.paused) safePlay(v);
+        return;
+      }
+      retries++;
+      v.currentTime = pos;
+      window.setTimeout(trySeekThenPlay, 500);
     };
-    var doSeekPlaying = function () { doSeek('playing'); };
-    var doSeekCanplay = function () { doSeek('canplay'); };
-    v.addEventListener('playing', doSeekPlaying);
-    v.addEventListener('canplay', doSeekCanplay);
-    seekTimer = window.setTimeout(function () { doSeek('timeout-3s'); }, 3000);
-    plog.info('onSourceReady calling play paused={paused}', { paused: state.paused });
-    if (!state.paused) safePlay(v);
+    plog.info('onSourceReady seeking to pos={pos} paused={paused}', { pos, paused: state.paused });
+    v.currentTime = pos;
+    window.setTimeout(trySeekThenPlay, 500);
   } else {
     plog.info('onSourceReady no resume pos, calling play paused={paused}', { paused: state.paused });
     if (!state.paused) safePlay(videoEl);
