@@ -507,10 +507,21 @@ function onSourceReady(): void {
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
   if (state.position > 0) {
     // Don't play yet — wait for FRAG_BUFFERED at target position.
-    // Set currentTime as a hint so hls.js loads fragments near this position.
-    pendingSeekPos = state.position;
-    videoEl.currentTime = state.position;
-    plog.info('onSourceReady waiting for data at pos={pos}', { pos: state.position });
+    // Keep setting currentTime to nudge hls.js into loading fragments near pos.
+    // On Chromium 28, currentTime assignment is ignored until data is buffered,
+    // but hls.js watches it to decide which fragments to fetch.
+    const pos = state.position;
+    const v = videoEl;
+    pendingSeekPos = pos;
+    const nudgeSeek = () => {
+      if (pendingSeekPos < 0 || v !== videoEl) return;
+      v.currentTime = pos;
+      plog.debug('nudgeSeek pos={pos} currentTime={currentTime}', { pos, currentTime: v.currentTime });
+      window.setTimeout(nudgeSeek, 500);
+    };
+    v.currentTime = pos;
+    plog.info('onSourceReady waiting for data at pos={pos}', { pos });
+    window.setTimeout(nudgeSeek, 500);
   } else {
     pendingSeekPos = -1;
     plog.info('onSourceReady pos=0, playing paused={paused}', { paused: state.paused });
