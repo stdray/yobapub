@@ -7,6 +7,9 @@ import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+import { Logger } from '../utils/log';
+
+const plog = new Logger('player');
 
 import Hls from 'hls.js';
 import { tplPlayer } from './player/template';
@@ -170,6 +173,10 @@ function startSeek(dir: string): void {
   seekPos = Math.max(0, dur > 0 ? Math.min(seekPos, dur - 2) : seekPos);
   seekCount++;
 
+  plog.debug('startSeek {dir} seekPos={seekPos} step={step} count={count}', {
+    dir, seekPos, step, count: seekCount,
+  });
+
   syncProgressState();
   updateProgress($root, progressState);
   showOsd(dir === 'right' ? 'ff' : 'rw');
@@ -186,6 +193,7 @@ function applySeek(): void {
   if (dur > 0) seekPos = Math.min(seekPos, dur - 2);
   seekPos = Math.max(0, seekPos);
   var pos = seekPos;
+  plog.info('applySeek pos={pos} dur={dur}', { pos, dur });
   resetSeek();
   continuePlaying({ quality: state.quality, audio: state.audio, sub: state.sub, position: pos, paused: state.paused });
   showBar();
@@ -295,6 +303,12 @@ function continuePlaying(next: PlayState, title?: string): void {
   var needSub = next.sub !== state.sub;
   var needSeek = !needSource && Math.abs(next.position - currentPosition()) > 2;
 
+  plog.info('continuePlaying {needSource} {needSeek} {needSub}', {
+    needSource, needSeek, needSub,
+    pos: next.position, quality: next.quality, audio: next.audio, sub: next.sub,
+    paused: next.paused, hasVideo: !!videoEl,
+  });
+
   state = { quality: next.quality, audio: next.audio, sub: next.sub, position: next.position, paused: next.paused };
   if (seeking) resetSeek();
 
@@ -398,14 +412,28 @@ function playSource(url: string): void {
   currentHlsUrl = url;
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   playSourceDebug = 'url=' + url.substring(0, 120);
-  var hls = new Hls(buildHlsConfig());
+  var cfg = buildHlsConfig();
+  plog.info('playSource startPosition={startPosition} url={url}', {
+    startPosition: cfg.startPosition || 0,
+    url: url.substring(0, 120),
+  });
+  var hls = new Hls(cfg);
   hlsInstance = hls;
   hls.on(Hls.Events.MANIFEST_PARSED, function () {
+    plog.info('hls MANIFEST_PARSED');
     onSourceReady();
   });
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
-    if (!data.fatal) return;
+    if (!data.fatal) {
+      plog.debug('hls error (non-fatal) {type} {details}', { type: data.type, details: data.details });
+      return;
+    }
+    plog.error('hls fatal {type} {details} {status}', {
+      type: data.type, details: data.details,
+      status: data.response ? data.response.code : null,
+    });
     if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+      plog.warn('hls recoverMediaError');
       hls.recoverMediaError();
       return;
     }
@@ -417,24 +445,39 @@ function playSource(url: string): void {
 
 function onSourceReady(): void {
   if (!videoEl) return;
+  plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
   if (state.position > 0) {
     var pos = state.position;
     var v = videoEl;
     var seekDone = false;
     var seekTimer: number | null = null;
-    var doSeek = function () {
+    var doSeek = function (trigger: string) {
+      plog.debug('doSeek trigger={trigger} seekDone={seekDone} currentTime={currentTime} target={target}', {
+        trigger, seekDone, currentTime: v.currentTime, target: pos,
+      });
       if (seekDone) return;
       seekDone = true;
       if (seekTimer !== null) { clearTimeout(seekTimer); seekTimer = null; }
-      v.removeEventListener('playing', doSeek);
-      v.removeEventListener('canplay', doSeek);
+      v.removeEventListener('playing', doSeekPlaying);
+      v.removeEventListener('canplay', doSeekCanplay);
       if (Math.abs(v.currentTime - pos) > 2) {
         // On Tizen 2.3 (Chromium 28) canplay fires before the fragment at pos is
         // buffered, so the first seek may be silently ignored. Retry until it lands.
         var retries = 0;
         var attemptSeek = function () {
-          if (Math.abs(v.currentTime - pos) <= 2 || retries >= 3) {
+          var diff = Math.abs(v.currentTime - pos);
+          plog.debug('attemptSeek retry={retries} currentTime={currentTime} target={target} diff={diff}', {
+            retries, currentTime: v.currentTime, target: pos, diff,
+          });
+          if (diff <= 2 || retries >= 3) {
+            plog.info('attemptSeek done retries={retries} currentTime={currentTime} success={success}', {
+              retries, currentTime: v.currentTime, success: diff <= 2,
+            });
             hideSpinner();
+            if (v.paused && !state.paused) {
+              plog.info('attemptSeek resuming play after seek');
+              v.play();
+            }
             return;
           }
           retries++;
@@ -442,14 +485,39 @@ function onSourceReady(): void {
           window.setTimeout(attemptSeek, 500);
         };
         attemptSeek();
+      } else {
+        plog.info('doSeek: already at position, no seek needed currentTime={currentTime}', { currentTime: v.currentTime });
+        hideSpinner();
+        if (v.paused && !state.paused) {
+          plog.info('doSeek resuming play (was paused after source load)');
+          v.play();
+        }
       }
     };
-    v.addEventListener('playing', doSeek);
-    v.addEventListener('canplay', doSeek);
-    seekTimer = window.setTimeout(doSeek, 3000);
-    if (!state.paused) v.play();
+    var doSeekPlaying = function () { doSeek('playing'); };
+    var doSeekCanplay = function () { doSeek('canplay'); };
+    v.addEventListener('playing', doSeekPlaying);
+    v.addEventListener('canplay', doSeekCanplay);
+    seekTimer = window.setTimeout(function () { doSeek('timeout-3s'); }, 3000);
+    plog.info('onSourceReady calling play paused={paused}', { paused: state.paused });
+    if (!state.paused) {
+      var playResult = v.play();
+      if (playResult && typeof (playResult as any).catch === 'function') {
+        (playResult as any).catch(function (err: Error) {
+          plog.error('play() rejected {name} {message}', { name: err.name, message: err.message });
+        });
+      }
+    }
   } else {
-    if (!state.paused) videoEl.play();
+    plog.info('onSourceReady no resume pos, calling play paused={paused}', { paused: state.paused });
+    if (!state.paused) {
+      var playResult2 = videoEl.play();
+      if (playResult2 && typeof (playResult2 as any).catch === 'function') {
+        (playResult2 as any).catch(function (err: Error) {
+          plog.error('play() rejected {name} {message}', { name: err.name, message: err.message });
+        });
+      }
+    }
   }
   playbackStarted = true;
   if (state.sub >= 0 && videoEl) {
@@ -489,6 +557,10 @@ function showPlaybackError(error: MediaError | null, url: string, debugMsg?: str
   var msg = getVideoErrorMessage(error);
   var code = error ? error.code : 0;
   var detail = error && (error as any).message ? (error as any).message : '';
+  plog.error('playbackError {code} {msg} {detail} {debugMsg}', {
+    code, msg, detail: detail || null, debugMsg: debugMsg || null,
+    url: url.substring(0, 120), ua: navigator.userAgent,
+  });
   console.error('[Player] Playback error: code=' + code + ' msg=' + msg + (detail ? ' detail=' + detail : '') + ' url=' + url);
   console.error('[Player] UA=' + navigator.userAgent);
   destroyPlayer();
@@ -524,15 +596,39 @@ function playUrl(url: string, title: string): void {
 
   var sourceUrl = url;
   videoEl.addEventListener('ended', function () {
+    plog.info('video ended currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     if (!markedWatched) markWatched();
     if (!navigateTrack(1)) goBack();
   });
-  videoEl.addEventListener('waiting', showSpinner);
-  videoEl.addEventListener('seeking', showSpinner);
-  videoEl.addEventListener('canplay', hideSpinner);
-  videoEl.addEventListener('playing', hideSpinner);
-  videoEl.addEventListener('seeked', hideSpinner);
+  videoEl.addEventListener('waiting', function () {
+    plog.debug('video waiting currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+    showSpinner();
+  });
+  videoEl.addEventListener('seeking', function () {
+    plog.debug('video seeking currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+    showSpinner();
+  });
+  videoEl.addEventListener('canplay', function () {
+    plog.debug('video canplay currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+    hideSpinner();
+  });
+  videoEl.addEventListener('playing', function () {
+    plog.info('video playing currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+    hideSpinner();
+  });
+  videoEl.addEventListener('seeked', function () {
+    plog.debug('video seeked currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+    hideSpinner();
+  });
+  videoEl.addEventListener('stalled', function () {
+    plog.warn('video stalled currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+  });
   videoEl.addEventListener('error', function () {
+    const err2 = videoEl ? videoEl.error : null;
+    plog.error('video error code={code} message={message}', {
+      code: err2 ? err2.code : null,
+      message: err2 ? (err2 as any).message || null : null,
+    });
     if (videoEl) showPlaybackError(videoEl.error, sourceUrl);
   });
 
