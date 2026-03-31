@@ -42,7 +42,7 @@ let currentHlsUrl = '';
 let hlsInstance: Hls | null = null;
 let playSourceDebug = '';
 let playbackStarted = false;
-let pendingSeekPos = -1;
+
 
 interface PlayState {
   quality: number;
@@ -478,49 +478,19 @@ function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
   if (state.position > 0) {
-    // Don't play yet — wait for FRAG_BUFFERED at target position.
-    // Keep setting currentTime to nudge hls.js into loading fragments near pos.
-    // On Chromium 28, currentTime assignment is ignored until data is buffered,
-    // but hls.js watches it to decide which fragments to fetch.
+    // Play first (from pos 0 where data is), then seek.
+    // hls.js only reacts to currentTime changes during active playback.
     const pos = state.position;
     const v = videoEl;
-    pendingSeekPos = pos;
-    const isBuffered = (time: number): boolean => {
-      for (let i = 0; i < v.buffered.length; i++) {
-        if (time >= v.buffered.start(i) && time <= v.buffered.end(i)) return true;
-      }
-      return false;
+    plog.info('onSourceReady starting playback then seeking to {pos}', { pos });
+    safePlay(v);
+    const onPlaying = () => {
+      v.removeEventListener('playing', onPlaying);
+      plog.info('playback started, seeking to {pos}', { pos });
+      v.currentTime = pos;
     };
-    const nudgeSeek = () => {
-      if (pendingSeekPos < 0 || v !== videoEl) return;
-      if (isBuffered(pos)) {
-        pendingSeekPos = -1;
-        plog.info('data buffered at {pos}, seeking then playing', { pos });
-        v.currentTime = pos;
-        // Delay play() to let Chromium 28 finish processing the seek
-        window.setTimeout(function () {
-          if (v !== videoEl) return;
-          plog.info('play after seek delay seeking={seeking} readyState={rs} buffered={b}', {
-            seeking: v.seeking, rs: v.readyState,
-            b: v.buffered.length > 0 ? v.buffered.start(0) + '-' + v.buffered.end(0) : 'none',
-          });
-          hideSpinner();
-          if (!state.paused) safePlay(v);
-        }, 300);
-        return;
-      }
-      if (Math.abs(v.currentTime - pos) > 2) v.currentTime = pos;
-      plog.debug('nudgeSeek pos={pos} currentTime={ct} buffered={buffered}', {
-        pos, ct: v.currentTime,
-        buffered: v.buffered.length > 0 ? v.buffered.start(0) + '-' + v.buffered.end(0) : 'none',
-      });
-      window.setTimeout(nudgeSeek, 500);
-    };
-    v.currentTime = pos;
-    plog.info('onSourceReady waiting for data at pos={pos}', { pos });
-    window.setTimeout(nudgeSeek, 500);
+    v.addEventListener('playing', onPlaying);
   } else {
-    pendingSeekPos = -1;
     plog.info('onSourceReady pos=0, playing paused={paused}', { paused: state.paused });
     if (!state.paused) safePlay(videoEl);
   }
