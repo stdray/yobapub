@@ -4,7 +4,7 @@ import { goBack } from '../router';
 import { TvKey } from '../utils/platform';
 import { pageKeys, clearPage } from '../utils/page';
 import { Logger } from '../utils/log';
-import { getAccessToken, isProxyAll } from '../utils/storage';
+import { isProxyAll } from '../utils/storage';
 
 const $root = $('#page-tv-player');
 const keys = pageKeys();
@@ -12,18 +12,6 @@ const plog = new Logger('tv-player');
 let hls: any = null;
 let video: HTMLVideoElement | null = null;
 
-function getProcessedStreamUrl(streamUrl: string): string {
-  // Для TV потоков HLS всегда нужна переписка манифеста (для абсолютных путей и CORS)
-  // используем /hls/rewrite, как и для фильмов
-  const token = getAccessToken() || '';
-  const proxiedUrl = window.location.origin + '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0' +
-    (token ? '&access_token=' + encodeURIComponent(token) : '');
-  plog.debug('Stream URL processed through /hls/rewrite', {
-    original: streamUrl.substring(0, 80),
-    processed: proxiedUrl.substring(0, 80)
-  });
-  return proxiedUrl;
-}
 
 function render(title: string): void {
   plog.debug('render called', { title });
@@ -83,16 +71,45 @@ function startPlayback(streamUrl: string): void {
   plog.debug('HLS check', { hlsExists: !!HlsCtor, hlsSupported: HlsCtor && HlsCtor.isSupported() });
   if (HlsCtor && HlsCtor.isSupported()) {
     plog.info('Using HLS.js');
-    hls = new HlsCtor({
+
+    const hlsConfig: Record<string, any> = {
       maxBufferLength: 30,
       maxMaxBufferLength: 60
-    });
-    plog.debug('HLS instance created');
-    const processedUrl = getProcessedStreamUrl(streamUrl);
-    hls.loadSource(processedUrl);
-    plog.debug('HLS source loaded', { processedUrl: processedUrl.substring(0, 80) });
+    };
+
+    // If proxy is enabled, rewrite segment URLs to go through proxy
+    if (isProxyAll()) {
+      plog.debug('Proxy enabled, will rewrite segment URLs');
+
+      const rewriteUrl = (url: string): string => {
+        // Only rewrite absolute CDN URLs to proxy
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          return '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=0';
+        }
+        return url;
+      };
+
+      hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
+        const rewritten = rewriteUrl(url);
+        if (rewritten !== url) {
+          plog.debug('Rewrote segment URL to proxy', {
+            from: url.substring(0, 60),
+            to: rewritten.substring(0, 60)
+          });
+        }
+        return { url: rewritten, xhr };
+      };
+    }
+
+    hls = new HlsCtor(hlsConfig);
+    plog.debug('HLS instance created', { proxyEnabled: isProxyAll() });
+
+    hls.loadSource(streamUrl);
+    plog.debug('HLS source loaded', { streamUrl: streamUrl.substring(0, 80) });
+
     hls.attachMedia(video);
     plog.debug('HLS attached to video element');
+
     hls.on(HlsCtor.Events.ERROR, (event: unknown, data: any) => {
       // Avoid serializing cyclic objects - just log key properties
       const errorInfo: Record<string, unknown> = {
@@ -121,8 +138,7 @@ function startPlayback(streamUrl: string): void {
     });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     plog.info('Using native HLS playback');
-    const processedUrl = getProcessedStreamUrl(streamUrl);
-    video.src = processedUrl;
+    video.src = streamUrl;
   } else {
     plog.error('HLS not supported and native playback not available');
   }

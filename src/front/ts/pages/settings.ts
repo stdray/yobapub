@@ -298,6 +298,26 @@ function stepSubSize(dir: number): void {
   render();
 }
 
+function toggleCheckbox(dir: number): void {
+  const item = allSettings[focusedIndex];
+  if (!item || item.type !== 'checkbox') return;
+
+  // dir < 0 (left) = off (0), dir > 0 (right) = on (1)
+  const newValue = dir > 0 ? 1 : 0;
+  if (item.value === newValue) return; // no change
+
+  item.value = newValue;
+
+  // Save the change
+  if (item.key === '_proxyPosters') {
+    setProxyPosters(!!newValue);
+  } else if (item.key === '_proxyAll') {
+    setProxyAll(!!newValue);
+  }
+
+  render();
+}
+
 function handleKey(e: JQuery.Event): void {
   if (optionsOpen) {
     handleOptionsKey(e);
@@ -317,9 +337,11 @@ function handleKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     case TvKey.Left:
       if (item && item.type === 'stepper') { stepSubSize(-1); e.preventDefault(); }
+      else if (item && item.type === 'checkbox') { toggleCheckbox(-1); e.preventDefault(); }
       break;
     case TvKey.Right:
       if (item && item.type === 'stepper') { stepSubSize(1); e.preventDefault(); }
+      else if (item && item.type === 'checkbox') { toggleCheckbox(1); e.preventDefault(); }
       break;
     case TvKey.Enter:
       if (item && item.type === 'stepper') { e.preventDefault(); break; }

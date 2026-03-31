@@ -10,7 +10,20 @@ export function applySubSize(): void {
     subStyleEl = document.createElement('style');
     document.head.appendChild(subStyleEl);
   }
-  subStyleEl.textContent = 'video::cue { font-size: ' + size + 'px !important; }';
+
+  // Calculate line-height: larger sizes = smaller line-height for compactness
+  // Min 22px -> 1.6, Max 82px -> 1.1
+  const lineHeightRange = 1.6 - 1.1; // 0.5
+  const sizeRange = SUB_SIZE_MAX - SUB_SIZE_MIN; // 60
+  const sizeProgress = (size - SUB_SIZE_MIN) / sizeRange; // 0 to 1
+  const lineHeight = (1.6 - lineHeightRange * sizeProgress).toFixed(2);
+
+  subStyleEl.textContent =
+    'video::cue { ' +
+      'font-family: "Comic Sans MS", "Comic Sans", cursive !important; ' +
+      'font-size: ' + size + 'px !important; ' +
+      'line-height: ' + lineHeight + ' !important; ' +
+    '}';
 }
 
 export function changeSubSize(dir: number, showToast: (text: string) => void): void {

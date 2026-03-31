@@ -76,9 +76,3 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 
 `src/back/YobaPub.Proxy/` — .NET reverse proxy with HLS manifest rewriting (`HlsRewriter.cs`). Rewrites m3u8 URLs for audio track selection. Config in `appsettings.json`.
 
-## Task Plans
-
-Detailed implementation plans for upcoming features are in `doc/tasks/`:
-- `novelties.md` — New releases page
-- `search.md` — Search with virtual keyboard
-- `tv.md` — Live TV channels + player

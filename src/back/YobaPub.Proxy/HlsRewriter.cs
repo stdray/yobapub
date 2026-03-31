@@ -19,7 +19,6 @@ public static class HlsRewriter
     {
         manifest = manifest.Replace("\r\n", "\n").Replace('\r', '\n');
         var baseUrl = sourceUrl[..(sourceUrl.LastIndexOf('/') + 1)];
-        var sourceHost = new System.Uri(sourceUrl).Host;
         var target = "a" + audioIndex;
         var audioSegPattern = new System.Text.RegularExpressions.Regex(
             @"/index-a" + audioIndex + @"\.m3u8");
@@ -40,47 +39,16 @@ public static class HlsRewriter
         // remove blank lines left after dropping non-target EXT-X-MEDIA entries
         manifest = System.Text.RegularExpressions.Regex.Replace(manifest, @"\n{2,}", "\n");
 
-        // make relative URLs absolute and rewrite CDN URLs to proxy
+        // make relative URLs absolute
         var lines = manifest.Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
             var line = lines[i].Trim();
-            if (line.Length > 0 && line[0] != '#')
-            {
-                // Check if line is a URL
-                if (line.Contains("://"))
-                {
-                    // Absolute URL - rewrite CDN URLs to proxy
-                    if (Uri.TryCreate(line, UriKind.Absolute, out var uri) && uri.Host == sourceHost)
-                    {
-                        lines[i] = "/hls/rewrite?url=" + Uri.EscapeDataString(line) + "&audio=" + audioIndex;
-                    }
-                }
-                else
-                {
-                    // Relative URL - make absolute then rewrite to proxy
-                    var absoluteUrl = baseUrl + line;
-                    lines[i] = "/hls/rewrite?url=" + Uri.EscapeDataString(absoluteUrl) + "&audio=" + audioIndex;
-                }
-            }
+            if (line.Length > 0 && line[0] != '#' && !line.Contains("://"))
+                lines[i] = baseUrl + line;
             if (line.Contains("URI=\""))
                 lines[i] = _relativeUri.Replace(lines[i], m =>
-                {
-                    var uri = m.Groups[1].Value;
-                    if (uri.Contains("://"))
-                    {
-                        // Absolute URI
-                        if (Uri.TryCreate(uri, UriKind.Absolute, out var u) && u.Host == sourceHost)
-                            return "URI=\"/hls/rewrite?url=" + Uri.EscapeDataString(uri) + "&audio=" + audioIndex + "\"";
-                        return m.Value;
-                    }
-                    else
-                    {
-                        // Relative URI
-                        var absoluteUri = baseUrl + uri;
-                        return "URI=\"/hls/rewrite?url=" + Uri.EscapeDataString(absoluteUri) + "&audio=" + audioIndex + "\"";
-                    }
-                });
+                    m.Groups[1].Value.Contains("://") ? m.Value : $"URI=\"{baseUrl}{m.Groups[1].Value}\"");
         }
 
         return string.Join('\n', lines);

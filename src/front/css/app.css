@@ -682,9 +682,7 @@ html, body {
 }
 
 video::cue {
-  font-size: 46px;
   font-weight: bold;
-  font-family: 'Comic Sans MS', 'Comic Sans', cursive;
   color: #fff;
   background: transparent;
   text-shadow:
