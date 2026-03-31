@@ -23,6 +23,40 @@ function render(title: string): void {
   );
   video = $root.find('video')[0] as HTMLVideoElement;
   plog.debug('video element rendered', { videoExists: !!video });
+
+  if (video) {
+    // Логирование видео-событий
+    video.addEventListener('play', () => plog.debug('video: play'));
+    video.addEventListener('playing', () => plog.debug('video: playing'));
+    video.addEventListener('pause', () => plog.debug('video: pause'));
+    video.addEventListener('ended', () => plog.debug('video: ended'));
+    video.addEventListener('error', (e) => {
+      const err = video?.error;
+      plog.error('video: error', {
+        code: err?.code,
+        message: err?.message
+      });
+    });
+    video.addEventListener('stalled', () => plog.debug('video: stalled'));
+    video.addEventListener('waiting', () => plog.debug('video: waiting'));
+    video.addEventListener('loadstart', () => plog.debug('video: loadstart'));
+    video.addEventListener('progress', () => plog.debug('video: progress'));
+    video.addEventListener('suspend', () => plog.debug('video: suspend'));
+    video.addEventListener('abort', () => plog.debug('video: abort'));
+    video.addEventListener('emptied', () => plog.debug('video: emptied'));
+    video.addEventListener('loadedmetadata', () => plog.debug('video: loadedmetadata'));
+    video.addEventListener('loadeddata', () => plog.debug('video: loadeddata'));
+    video.addEventListener('canplay', () => plog.debug('video: canplay'));
+    video.addEventListener('canplaythrough', () => plog.debug('video: canplaythrough'));
+    video.addEventListener('durationchange', () => plog.debug('video: durationchange', { duration: video.duration }));
+    video.addEventListener('timeupdate', () => {
+      // Not logging timeupdate as it fires constantly
+    });
+    video.addEventListener('ratechange', () => plog.debug('video: ratechange'));
+    video.addEventListener('seeking', () => plog.debug('video: seeking'));
+    video.addEventListener('seeked', () => plog.debug('video: seeked'));
+    video.addEventListener('volumechange', () => plog.debug('video: volumechange'));
+  }
 }
 
 function startPlayback(streamUrl: string): void {
@@ -44,12 +78,22 @@ function startPlayback(streamUrl: string): void {
     plog.debug('HLS source loaded', { streamUrl });
     hls.attachMedia(video);
     plog.debug('HLS attached to video element');
-    hls.on(HlsCtor.Events.ERROR, (_: unknown, data: { fatal: boolean; type: string }) => {
-      plog.error('HLS error', { fatal: data.fatal, type: data.type });
-      if (data.fatal) {
+    hls.on(HlsCtor.Events.ERROR, (event: unknown, data: any) => {
+      plog.error('HLS error', {
+        fatal: data?.fatal,
+        type: data?.type,
+        details: data?.details,
+        error: data?.error,
+        fullData: JSON.stringify(data)
+      });
+      if (data && data.fatal) {
         if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
           plog.warn('Media error, attempting recovery');
-          hls.recoverMediaError();
+          try {
+            hls.recoverMediaError();
+          } catch (e) {
+            plog.error('Recovery failed', { error: String(e) });
+          }
         } else {
           plog.error('Fatal HLS error, stopping playback');
           stopPlayback();
