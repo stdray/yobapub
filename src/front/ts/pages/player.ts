@@ -442,20 +442,20 @@ function playSource(url: string): void {
     });
   });
   hls.on(Hls.Events.FRAG_BUFFERED, function (_e: any, data: any) {
-    const fragStart = data.frag ? data.frag.start : 0;
-    const fragDuration = data.frag ? (data.frag.duration || 10) : 0;
-    plog.debug('hls FRAG_BUFFERED sn={sn} start={start} dur={dur}', {
+    plog.debug('hls FRAG_BUFFERED sn={sn} start={start}', {
       sn: data.frag ? data.frag.sn : null,
-      start: fragStart,
-      dur: fragDuration,
+      start: data.frag ? data.frag.start : null,
     });
-    if (pendingSeekPos >= 0 && videoEl && fragStart <= pendingSeekPos && pendingSeekPos < fragStart + fragDuration) {
-      const pos = pendingSeekPos;
-      pendingSeekPos = -1;
-      plog.info('data ready, seeking to {pos} and playing', { pos });
-      videoEl.currentTime = pos;
-      hideSpinner();
-      if (!state.paused) safePlay(videoEl);
+    if (pendingSeekPos >= 0 && videoEl) {
+      const diff = Math.abs(videoEl.currentTime - pendingSeekPos);
+      if (diff <= 2) {
+        const pos = pendingSeekPos;
+        pendingSeekPos = -1;
+        plog.info('data ready at currentTime={ct}, playing from {pos}', { ct: videoEl.currentTime, pos });
+        videoEl.currentTime = pos;
+        hideSpinner();
+        if (!state.paused) safePlay(videoEl);
+      }
     }
   });
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
@@ -515,6 +515,15 @@ function onSourceReady(): void {
     pendingSeekPos = pos;
     const nudgeSeek = () => {
       if (pendingSeekPos < 0 || v !== videoEl) return;
+      const diff = Math.abs(v.currentTime - pos);
+      if (diff <= 2) {
+        pendingSeekPos = -1;
+        plog.info('seek confirmed currentTime={ct}, playing', { ct: v.currentTime });
+        v.currentTime = pos;
+        hideSpinner();
+        if (!state.paused) safePlay(v);
+        return;
+      }
       v.currentTime = pos;
       plog.debug('nudgeSeek pos={pos} currentTime={currentTime}', { pos, currentTime: v.currentTime });
       window.setTimeout(nudgeSeek, 500);
