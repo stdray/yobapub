@@ -17,21 +17,21 @@ let btnCount = 0;
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
 
-const tplDetail = doT.template(
-  '<div class="detail">' +
-    '<div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>' +
-    '<div class="detail__info">' +
-      '<div class="detail__title">{{=it.titleRu}}</div>' +
-      '{{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}' +
-      '<div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>' +
-      '<div class="detail__meta">{{=it.genres}}</div>' +
-      '{{?it.duration}}<div class="detail__meta">{{=it.duration}} &bull; {{=it.quality}}p</div>{{?}}' +
-      '{{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}' +
-      '<div class="detail__actions">{{=it.buttons}}</div>' +
-      '<div class="detail__plot">{{=it.plot}}</div>' +
-    '</div>' +
-  '</div>'
-);
+const tplDetail = doT.template(`
+  <div class="detail">
+    <div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>
+    <div class="detail__info">
+      <div class="detail__title">{{=it.titleRu}}</div>
+      {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
+      <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
+      <div class="detail__meta">{{=it.genres}}</div>
+      {{?it.duration}}<div class="detail__meta">{{=it.duration}} &bull; {{=it.quality}}p</div>{{?}}
+      {{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}
+      <div class="detail__actions">{{=it.buttons}}</div>
+      <div class="detail__plot">{{=it.plot}}</div>
+    </div>
+  </div>
+`);
 
 function render(item: Item): void {
   let title = item.title.split(' / ');

@@ -12,38 +12,38 @@ const keys = pageKeys();
 let poller: { stop: () => void } | null = null;
 let countdownTimer: number | null = null;
 
-const tplLoading = doT.template(
-  '<div class="login">' +
-    '<div class="login__title">YobaPub</div>' +
-    '<div class="login__status">Загрузка...</div>' +
-  '</div>'
-);
+const tplLoading = doT.template(`
+  <div class="login">
+    <div class="login__title">YobaPub</div>
+    <div class="login__status">Загрузка...</div>
+  </div>
+`);
 
-const tplCode = doT.template(
-  '<div class="login">' +
-    '<div class="login__title">Вход в аккаунт</div>' +
-    '<div class="login__url">Перейдите на <b>{{=it.uri}}</b></div>' +
-    '<div class="login__code">{{=it.code}}</div>' +
-    '<div class="login__timer">Код действителен: <span id="login-countdown">{{=it.expires}}</span> сек</div>' +
-    '<div class="login__status">Ожидание активации...</div>' +
-  '</div>'
-);
+const tplCode = doT.template(`
+  <div class="login">
+    <div class="login__title">Вход в аккаунт</div>
+    <div class="login__url">Перейдите на <b>{{=it.uri}}</b></div>
+    <div class="login__code">{{=it.code}}</div>
+    <div class="login__timer">Код действителен: <span id="login-countdown">{{=it.expires}}</span> сек</div>
+    <div class="login__status">Ожидание активации...</div>
+  </div>
+`);
 
-const tplExpired = doT.template(
-  '<div class="login">' +
-    '<div class="login__title">YobaPub</div>' +
-    '<div class="login__expired">Срок активации истёк!</div>' +
-    '<div class="login__status">Нажмите Enter для повтора</div>' +
-  '</div>'
-);
+const tplExpired = doT.template(`
+  <div class="login">
+    <div class="login__title">YobaPub</div>
+    <div class="login__expired">Срок активации истёк!</div>
+    <div class="login__status">Нажмите Enter для повтора</div>
+  </div>
+`);
 
-const tplError = doT.template(
-  '<div class="login">' +
-    '<div class="login__title">YobaPub</div>' +
-    '<div class="login__error">{{=it.message}}</div>' +
-    '<div class="login__status">Нажмите Enter для повтора</div>' +
-  '</div>'
-);
+const tplError = doT.template(`
+  <div class="login">
+    <div class="login__title">YobaPub</div>
+    <div class="login__error">{{=it.message}}</div>
+    <div class="login__status">Нажмите Enter для повтора</div>
+  </div>
+`);
 
 function cleanup(): void {
   if (poller) {

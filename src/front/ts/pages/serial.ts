@@ -21,36 +21,36 @@ let selectedSeason = 0;
 let focusedEpisode = 0;
 let focusedSeasonTab = 0;
 
-const tplDetail = doT.template(
-  '<div class="detail">' +
-    '<div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>' +
-    '<div class="detail__info">' +
-      '<div class="detail__title">{{=it.titleRu}}</div>' +
-      '{{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}' +
-      '<div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>' +
-      '<div class="detail__meta">{{=it.genres}}</div>' +
-      '{{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}' +
-      '<div class="detail__plot">{{=it.plot}}</div>' +
-      '<div class="detail__actions"><div class="btn" data-action="play">{{=it.playLabel}}</div></div>' +
-      '<div class="episodes">' +
-        '<div class="episodes__seasons">{{=it.seasonTabs}}</div>' +
-        '<div class="episodes__list">{{=it.episodes}}</div>' +
-      '</div>' +
-    '</div>' +
-  '</div>'
-);
+const tplDetail = doT.template(`
+  <div class="detail">
+    <div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>
+    <div class="detail__info">
+      <div class="detail__title">{{=it.titleRu}}</div>
+      {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
+      <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
+      <div class="detail__meta">{{=it.genres}}</div>
+      {{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}
+      <div class="detail__plot">{{=it.plot}}</div>
+      <div class="detail__actions"><div class="btn" data-action="play">{{=it.playLabel}}</div></div>
+      <div class="episodes">
+        <div class="episodes__seasons">{{=it.seasonTabs}}</div>
+        <div class="episodes__list">{{=it.episodes}}</div>
+      </div>
+    </div>
+  </div>
+`);
 
-const tplSeasonTab = doT.template(
-  '<div class="episodes__season-tab{{?it.active}} active{{?}}" data-season="{{=it.idx}}">Сезон {{=it.num}}</div>'
-);
+const tplSeasonTab = doT.template(`
+  <div class="episodes__season-tab{{?it.active}} active{{?}}" data-season="{{=it.idx}}">Сезон {{=it.num}}</div>
+`);
 
-const tplEpisode = doT.template(
-  '<div class="episode" data-ep="{{=it.idx}}">' +
-    '<span class="episode__number">{{=it.number}}</span>' +
-    '<span class="episode__title">{{=it.title}}</span>' +
-    '<span class="episode__status">{{=it.status}}</span>' +
-  '</div>'
-);
+const tplEpisode = doT.template(`
+  <div class="episode" data-ep="{{=it.idx}}">
+    <span class="episode__number">{{=it.number}}</span>
+    <span class="episode__title">{{=it.title}}</span>
+    <span class="episode__status">{{=it.status}}</span>
+  </div>
+`);
 
 function getEpisodeStatus(seasonNum: number, epNum: number): { time: number; status: number } {
   if (!watchingInfo || !watchingInfo.seasons) return { time: 0, status: -1 };

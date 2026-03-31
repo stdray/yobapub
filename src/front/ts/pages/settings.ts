@@ -50,41 +50,41 @@ const LABELS: Record<string, string> = {
   mixedPlaylist: 'Смешанный плейлист'
 };
 
-const tplPage = doT.template(
-  '<div class="settings-page">' +
-    '<div class="settings-page__title">Настройки</div>' +
-    '<div class="settings-page__list">{{=it.items}}</div>' +
-    '<div class="settings-page__hint">' +
-      '<span class="hint-key hint-key--red"></span> Уменьшить субтитры &nbsp;&nbsp; ' +
-      '<span class="hint-key hint-key--green"></span> Увеличить субтитры &nbsp;&nbsp; (во время воспроизведения)' +
-    '</div>' +
-    '<div class="settings-page__version">{{=it.version}}</div>' +
-  '</div>'
-);
+const tplPage = doT.template(`
+  <div class="settings-page">
+    <div class="settings-page__title">Настройки</div>
+    <div class="settings-page__list">{{=it.items}}</div>
+    <div class="settings-page__hint">
+      <span class="hint-key hint-key--red"></span> Уменьшить субтитры &nbsp;&nbsp;
+      <span class="hint-key hint-key--green"></span> Увеличить субтитры &nbsp;&nbsp; (во время воспроизведения)
+    </div>
+    <div class="settings-page__version">{{=it.version}}</div>
+  </div>
+`);
 
-const tplSettingItem = doT.template(
-  '<div class="sitem{{?it.focused}} focused{{?}}{{?it.stepper}} sitem--stepper{{?}}" data-idx="{{=it.idx}}">' +
-    '<span class="sitem__label">{{=it.label}}</span>' +
-    '{{?it.stepper}}' +
-      '<span class="sitem__stepper">' +
-        '<span class="sitem__step-btn sitem__step-btn--minus">&minus;</span>' +
-        '<span class="sitem__step-val">{{=it.value}}</span>' +
-        '<span class="sitem__step-btn sitem__step-btn--plus">+</span>' +
-      '</span>' +
-    '{{??}}' +
-      '<span class="sitem__value">{{=it.value}}</span>' +
-    '{{?}}' +
-  '</div>'
-);
+const tplSettingItem = doT.template(`
+  <div class="sitem{{?it.focused}} focused{{?}}{{?it.stepper}} sitem--stepper{{?}}" data-idx="{{=it.idx}}">
+    <span class="sitem__label">{{=it.label}}</span>
+    {{?it.stepper}}
+      <span class="sitem__stepper">
+        <span class="sitem__step-btn sitem__step-btn--minus">&minus;</span>
+        <span class="sitem__step-val">{{=it.value}}</span>
+        <span class="sitem__step-btn sitem__step-btn--plus">+</span>
+      </span>
+    {{??}}
+      <span class="sitem__value">{{=it.value}}</span>
+    {{?}}
+  </div>
+`);
 
-const tplOptions = doT.template(
-  '<div class="soptions">' +
-    '<div class="soptions__title">{{=it.title}}</div>' +
-    '{{~it.options :opt:i}}' +
-      '<div class="soptions__item{{?opt.selected}} selected{{?}}{{?i===it.focused}} focused{{?}}" data-oi="{{=i}}">{{=opt.label}}</div>' +
-    '{{~}}' +
-  '</div>'
-);
+const tplOptions = doT.template(`
+  <div class="soptions">
+    <div class="soptions__title">{{=it.title}}</div>
+    {{~it.options :opt:i}}
+      <div class="soptions__item{{?opt.selected}} selected{{?}}{{?i===it.focused}} focused{{?}}" data-oi="{{=i}}">{{=opt.label}}</div>
+    {{~}}
+  </div>
+`);
 
 function parseSettings(raw: Record<string, any>): SettingItem[] {
   const items: SettingItem[] = [];

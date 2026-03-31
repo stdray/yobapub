@@ -29,25 +29,25 @@ let sections: SectionData[] = [];
 let serialsData: WatchingSerialItem[] = [];
 let moviesData: WatchingMovieItem[] = [];
 
-const tplMenu = doT.template(
-  '<div class="sidebar">' +
-    '{{~it.items :item:idx}}' +
-      '<div class="sidebar__item{{?item.active}} active{{?}}{{?item.focused}} focused{{?}}" data-menu="{{=idx}}">{{=item.label}}</div>' +
-    '{{~}}' +
-  '</div>'
-);
+const tplMenu = doT.template(`
+  <div class="sidebar">
+    {{~it.items :item:idx}}
+      <div class="sidebar__item{{?item.active}} active{{?}}{{?item.focused}} focused{{?}}" data-menu="{{=idx}}">{{=item.label}}</div>
+    {{~}}
+  </div>
+`);
 
-const tplSection = doT.template(
-  '<div class="watching__section-title">{{=it.title}}</div>' +
-  '<div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>'
-);
+const tplSection = doT.template(`
+  <div class="watching__section-title">{{=it.title}}</div>
+  <div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>
+`);
 
-const tplLayout = doT.template(
-  '<div class="layout">' +
-    '{{=it.menu}}' +
-    '<div class="content"><div class="watching">{{=it.rows}}</div></div>' +
-  '</div>'
-);
+const tplLayout = doT.template(`
+  <div class="layout">
+    {{=it.menu}}
+    <div class="content"><div class="watching">{{=it.rows}}</div></div>
+  </div>
+`);
 
 function buildMenu(): string {
   const items = [];

@@ -33,14 +33,14 @@ let sections: SectionData[] = [];
 let focusedSection = 0;
 let focusedIndex = 0;
 
-const tplSection = doT.template(
-  '<div class="watching__section-title">{{=it.title}}</div>' +
-  '<div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>'
-);
+const tplSection = doT.template(`
+  <div class="watching__section-title">{{=it.title}}</div>
+  <div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>
+`);
 
-const tplLayout = doT.template(
-  '<div class="content"><div class="watching">{{=it.rows}}</div></div>'
-);
+const tplLayout = doT.template(`
+  <div class="content"><div class="watching">{{=it.rows}}</div></div>
+`);
 
 function buildRows(): string {
   if (sections.length === 0) {

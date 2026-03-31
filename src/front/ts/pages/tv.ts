@@ -16,21 +16,21 @@ const keys = pageKeys();
 let channels: TvChannel[] = [];
 let focusedIndex = 0;
 
-const tplChannelCard = doT.template(
-  '<div class="card card--channel" data-id="{{=it.id}}">' +
-    '<div class="card__poster card__poster--channel">' +
-      '<img src="{{=it.logo}}" alt="">' +
-    '</div>' +
-    '<div class="card__title">{{=it.title}}</div>' +
-  '</div>'
-);
+const tplChannelCard = doT.template(`
+  <div class="card card--channel" data-id="{{=it.id}}">
+    <div class="card__poster card__poster--channel">
+      <img src="{{=it.logo}}" alt="">
+    </div>
+    <div class="card__title">{{=it.title}}</div>
+  </div>
+`);
 
-const tplPage = doT.template(
-  '<div class="content"><div class="watching">' +
-    '<div class="watching__section-title">Телеканалы</div>' +
-    '<div class="watching__grid">{{=it.cards}}</div>' +
-  '</div></div>'
-);
+const tplPage = doT.template(`
+  <div class="content"><div class="watching">
+    <div class="watching__section-title">Телеканалы</div>
+    <div class="watching__grid">{{=it.cards}}</div>
+  </div></div>
+`);
 
 function updateFocus(): void {
   $root.find('.card').removeClass('focused');

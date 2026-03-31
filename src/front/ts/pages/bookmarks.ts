@@ -24,29 +24,29 @@ let currentFolderTitle = '';
 let itemsData: Item[] = [];
 let focusedIndex = 0;
 
-const tplFolderItem = doT.template(
-  '<div class="folder-item" data-id="{{=it.id}}">' +
-    '<div class="folder-item__icon">&#128194;</div>' +
-    '<div class="folder-item__info">' +
-      '<div class="folder-item__title">{{=it.title}}</div>' +
-      '<div class="folder-item__count">{{=it.count}}</div>' +
-    '</div>' +
-  '</div>'
-);
+const tplFolderItem = doT.template(`
+  <div class="folder-item" data-id="{{=it.id}}">
+    <div class="folder-item__icon">&#128194;</div>
+    <div class="folder-item__info">
+      <div class="folder-item__title">{{=it.title}}</div>
+      <div class="folder-item__count">{{=it.count}}</div>
+    </div>
+  </div>
+`);
 
-const tplFoldersPage = doT.template(
-  '<div class="watching">' +
-    '<div class="watching__section-title">{{=it.title}}</div>' +
-    '<div class="folder-list">{{=it.items}}</div>' +
-  '</div>'
-);
+const tplFoldersPage = doT.template(`
+  <div class="watching">
+    <div class="watching__section-title">{{=it.title}}</div>
+    <div class="folder-list">{{=it.items}}</div>
+  </div>
+`);
 
-const tplItemsPage = doT.template(
-  '<div class="watching">' +
-    '<div class="watching__section-title">{{=it.title}}</div>' +
-    '<div class="watching__grid">{{=it.cards}}</div>' +
-  '</div>'
-);
+const tplItemsPage = doT.template(`
+  <div class="watching">
+    <div class="watching__section-title">{{=it.title}}</div>
+    <div class="watching__grid">{{=it.cards}}</div>
+  </div>
+`);
 
 function renderFolders(): void {
   if (folders.length === 0) {

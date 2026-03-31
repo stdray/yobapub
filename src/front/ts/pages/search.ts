@@ -50,27 +50,27 @@ interface KbKeyData {
   wide: boolean;
 }
 
-const tplKeyboard = doT.template(
-  '<div class="kb">' +
-    '{{~it.rows :row:ri}}' +
-      '<div class="kb__row">' +
-        '{{~row :key:ci}}' +
-          '<div class="kb__key{{?key.wide}} kb__key--wide{{?}}" data-row="{{=ri}}" data-col="{{=ci}}">{{=key.label}}</div>' +
-        '{{~}}' +
-      '</div>' +
-    '{{~}}' +
-  '</div>'
-);
+const tplKeyboard = doT.template(`
+  <div class="kb">
+    {{~it.rows :row:ri}}
+      <div class="kb__row">
+        {{~row :key:ci}}
+          <div class="kb__key{{?key.wide}} kb__key--wide{{?}}" data-row="{{=ri}}" data-col="{{=ci}}">{{=key.label}}</div>
+        {{~}}
+      </div>
+    {{~}}
+  </div>
+`);
 
-const tplLayout = doT.template(
-  '<div class="search">' +
-    '<div class="search-input"><span class="search-input__text"></span><span class="search-input__cursor">|</span></div>' +
-    '<div class="search__body">' +
-      '<div class="search__keyboard"></div>' +
-      '<div class="search__results"></div>' +
-    '</div>' +
-  '</div>'
-);
+const tplLayout = doT.template(`
+  <div class="search">
+    <div class="search-input"><span class="search-input__text"></span><span class="search-input__cursor">|</span></div>
+    <div class="search__body">
+      <div class="search__keyboard"></div>
+      <div class="search__results"></div>
+    </div>
+  </div>
+`);
 
 function buildKeyboardRows(): KbKeyData[][] {
   const layout = KB_LAYOUTS[currentLayout];
