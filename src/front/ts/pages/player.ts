@@ -25,6 +25,7 @@ const $root = $('#page-player');
 const keys = pageKeys();
 let markTimer: number | null = null;
 let videoEl: HTMLVideoElement | null = null;
+let videoStalled = false;
 
 
 let currentItem: Item | null = null;
@@ -600,6 +601,7 @@ function playUrl(url: string, title: string): void {
     hideSpinner();
   });
   videoEl.addEventListener('playing', function () {
+    videoStalled = false;
     plog.info('video playing currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     hideSpinner();
   });
@@ -608,6 +610,7 @@ function playUrl(url: string, title: string): void {
     hideSpinner();
   });
   videoEl.addEventListener('stalled', function () {
+    videoStalled = true;
     plog.warn('video stalled currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
   });
   videoEl.addEventListener('error', function () {
@@ -691,6 +694,7 @@ function markWatched(): void {
 }
 
 function destroyPlayer(): void {
+  videoStalled = false;
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
@@ -739,7 +743,7 @@ function handleKey(e: JQuery.Event): void {
 
     case TvKey.Enter: case TvKey.PlayPause:
       if (!playbackStarted) break;
-      if (videoEl.paused) { videoEl.play(); state.paused = false; showOsd('play'); }
+      if (videoEl.paused || videoStalled) { videoStalled = false; safePlay(videoEl); state.paused = false; showOsd('play'); }
       else { videoEl.pause(); state.paused = true; showOsd('pause'); }
       showBar(); break;
 
