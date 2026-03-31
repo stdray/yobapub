@@ -30,6 +30,8 @@ public class AuthController(IOptions<AdminOptions> options) : Controller
             return LocalRedirect(returnUrl ?? "/admin");
         }
         ViewData["Error"] = "Неверный логин или пароль";
+        ViewData["Username"] = username;
+        ViewData["ReturnUrl"] = returnUrl;
         return View();
     }
 

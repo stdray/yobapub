@@ -6,9 +6,9 @@
   <h1>YobaPub Logs</h1>
   <form asp-action="Login" method="post" autocomplete="on">
     @Html.AntiForgeryToken()
-    <input type="hidden" name="returnUrl" value="@Context.Request.Query["returnUrl"]">
+    <input type="hidden" name="returnUrl" value="@(ViewData["ReturnUrl"] ?? Context.Request.Query["returnUrl"])">
     <label for="username">Логин</label>
-    <input type="text" id="username" name="username" autofocus autocomplete="username" required>
+    <input type="text" id="username" name="username" value="@ViewData["Username"]" autofocus autocomplete="username" required>
     <label for="password">Пароль</label>
     <input type="password" id="password" name="password" autocomplete="current-password" required>
     <button type="submit">Войти</button>
