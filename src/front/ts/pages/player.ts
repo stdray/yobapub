@@ -470,6 +470,7 @@ function safePlay(v: HTMLVideoElement): void {
   }
 }
 
+
 function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
@@ -702,9 +703,13 @@ function scheduleStallRecovery(): void {
   cancelStallRecovery();
   stallRecoveryTimer = window.setTimeout(function () {
     stallRecoveryTimer = null;
-    if (!videoEl || state.paused) return;
-    plog.warn('stall recovery: nudging currentTime={currentTime}', { currentTime: videoEl.currentTime });
-    videoEl.currentTime = videoEl.currentTime + 0.1;
+    if (!videoEl || state.paused || !videoStalled) return;
+    const ct = videoEl.currentTime;
+    plog.warn('stall recovery: restarting hls load at {pos}', { pos: ct });
+    if (hlsInstance) {
+      hlsInstance.stopLoad();
+      hlsInstance.startLoad(ct);
+    }
     safePlay(videoEl);
   }, 5000);
 }
