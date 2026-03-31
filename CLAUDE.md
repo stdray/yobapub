@@ -1,0 +1,76 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+KinoPub client for Samsung Tizen TVs (2.3 / 3.0). SPA without frameworks — jQuery for DOM/AJAX, doT.js for templating, custom router for page navigation. Russian language UI. API docs: https://kinoapi.com/
+
+## Build Commands
+
+All commands run from `src/front/`:
+
+```bash
+npm run dev          # webpack-dev-server on 0.0.0.0:8080
+npm run build:dev    # development build
+npm run build:release # production build (minified)
+npm run typecheck    # TypeScript check (tsc --noEmit)
+npm run release      # typecheck + production build
+```
+
+Backend (.NET proxy) is in `src/back/YobaPub.Proxy/`. No frontend tests exist.
+
+## Build Target
+
+Runtime target is Chromium 28 (Tizen 2.3), ES5 only. SWC transpiles all source code (including node_modules) to strict ES5 automatically — modern TypeScript syntax is fine. `core-js@3` polyfills (`Promise`, `Object.assign`, etc.) are injected by SWC via `mode: 'usage'`.
+
+## Architecture
+
+### Router (`ts/router.ts`)
+- `registerPage(name, page)` — registers a page by name
+- `navigate(route, params?)` — unmounts current, pushes to history, mounts new
+- `goBack()` — pops history, remounts previous page
+- `setParams(params)` — updates current route params (for focus restoration on back)
+- Each page is a `<div id="page-{name}" class="page hidden">` in `index.html`
+
+### Page Interface (`types/app.ts`)
+Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind keys. On unmount: unbind keys, clear DOM, reset state.
+
+### Adding a New Page
+1. Add route name to `RouteName` union in `types/app.ts`
+2. Add any new params to `RouteParams` interface
+3. Create `pages/{name}.ts` implementing `Page`
+4. Add `<div id="page-{name}" class="page hidden">` to `index.html`
+5. Import and `registerPage()` in `main.ts`
+
+### TV Remote Navigation
+- `pageKeys()` from `utils/page.ts` — binds/unbinds `$(window).on('keydown')`
+- `TvKey` enum in `utils/platform.ts` — key codes (Enter, Return, Backspace, Escape, arrows, Stop, etc.)
+- `gridMove(index, total, direction)` from `utils/grid.ts` — returns next index or -1 for card grids
+- `CARDS_PER_ROW = 4` from `settings.ts`
+
+### API Layer
+- `apiGetWithRefresh(path, params?)` / `apiPostWithRefresh(path, data)` in `api/client.ts`
+- Auto-refreshes OAuth token on 401
+- Base URL: `https://api.service-kp.com`
+- Proxy mode: `isProxyEnabled()` / `proxyUrl(url)` from `utils/storage.ts`
+
+### Templates
+- `doT.template(string)` returns a compiled render function
+- Templates are string concatenations in TypeScript, not separate files
+- Reusable templates in `utils/templates.ts`: `tplCard`, `tplRating`, `tplEmptyText`
+
+### External Libs (loaded as vendor scripts, not bundled)
+- `vendor/jquery.min.js` (jQuery 2.x)
+- `vendor/hls.min.js` (hls.js 0.14.x) — accessed via `window.Hls`
+
+## Backend Proxy
+
+`src/back/YobaPub.Proxy/` — .NET reverse proxy with HLS manifest rewriting (`HlsRewriter.cs`). Rewrites m3u8 URLs for audio track selection. Config in `appsettings.json`.
+
+## Task Plans
+
+Detailed implementation plans for upcoming features are in `doc/tasks/`:
+- `novelties.md` — New releases page
+- `search.md` — Search with virtual keyboard
+- `tv.md` — Live TV channels + player

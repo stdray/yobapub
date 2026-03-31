@@ -12,6 +12,10 @@ obj/
 # IDE
 .idea/
 .vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docuser
 *.swp
 *.swo
 *~
@@ -40,12 +44,20 @@ npm-debug.log*
 
 # Source maps
 *.map
-old
 
-# Local debug artifacts
-err/
+# .NET
+*.nupkg
+*.snupkg
+project.lock.json
+TestResults/
 
 # Android build output and cache
 src/apk/.gradle/
 src/apk/build/
 src/apk/app/build/
+local.properties
+
+# Misc
+old
+err/
+.claude
