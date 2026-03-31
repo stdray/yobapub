@@ -485,13 +485,10 @@ function onSourceReady(): void {
     safePlay(v);
     const onPlaying = () => {
       v.removeEventListener('playing', onPlaying);
-      // Delay seek to let hls.js stream controller fully initialize.
-      // Immediate seek is ignored on Chromium 28; manual seek works because
-      // hls.js has been active for a while by then.
       window.setTimeout(function () {
         if (v !== videoEl) return;
-        plog.info('seeking to resume pos={pos}', { pos });
-        v.currentTime = pos;
+        plog.info('resume seek to {pos} via continuePlaying', { pos });
+        continuePlaying({ quality: state.quality, audio: state.audio, sub: state.sub, position: pos, paused: false });
       }, 1500);
     };
     v.addEventListener('playing', onPlaying);
