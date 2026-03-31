@@ -48,6 +48,28 @@ export function loadMediaLinks(mid: number, cb: (files: VideoFile[], subs: Subti
 
 
 
+export function isEpisodeWatched(item: Item, seasonNum: number, epNum: number): boolean {
+  if (!item.seasons) return false;
+  for (let i = 0; i < item.seasons.length; i++) {
+    const s = item.seasons[i];
+    if (s.number === seasonNum) {
+      for (let j = 0; j < s.episodes.length; j++) {
+        const ep = s.episodes[j];
+        if (ep.number === epNum) {
+          return ep.watching !== undefined && ep.watching.status === 1;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+export function isVideoWatched(item: Item, videoNum: number): boolean {
+  if (!item.videos) return false;
+  const idx = videoNum - 1;
+  return idx >= 0 && idx < item.videos.length && item.videos[idx].watched === 1;
+}
+
 export function getResumeTime(item: Item, seasonNum?: number, epNum?: number, videoNum?: number): number {
   if (seasonNum !== undefined && epNum !== undefined && item.seasons) {
     for (var i = 0; i < item.seasons.length; i++) {

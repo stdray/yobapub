@@ -13,7 +13,7 @@ const plog = new Logger('player');
 
 import Hls from 'hls.js';
 import { tplPlayer } from './player/template';
-import { MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime } from './player/media';
+import { MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime, isEpisodeWatched, isVideoWatched } from './player/media';
 import { getRewrittenHlsUrl } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
@@ -258,9 +258,11 @@ function remountTrack(): void {
   if (currentSeason !== undefined && currentEpisode !== undefined) {
     media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
     pos = getResumeTime(currentItem, currentSeason, currentEpisode);
+    wasWatched = isEpisodeWatched(currentItem, currentSeason, currentEpisode);
   } else if (currentVideo !== undefined) {
     media = findVideoMedia(currentItem, currentVideo);
     pos = getResumeTime(currentItem, undefined, undefined, currentVideo);
+    wasWatched = isVideoWatched(currentItem, currentVideo);
   }
 
   if (!media) return;
@@ -638,6 +640,7 @@ function playUrl(url: string, title: string): void {
 // --- Mark time ---
 
 var markedWatched = false;
+var wasWatched = false;
 
 function startMarkTimer(): void {
   stopMarkTimer();
@@ -650,6 +653,17 @@ function startMarkTimer(): void {
       markTime(currentItem.id, currentEpisode, time, currentSeason);
     } else if (currentVideo !== undefined) {
       markTime(currentItem.id, currentVideo, time);
+    }
+    // After ~30s of playback, reset watched status so the item
+    // reappears as "in progress" instead of "watched".
+    if (wasWatched) {
+      wasWatched = false;
+      plog.info('resetting watched status after 30s of playback');
+      if (currentSeason !== undefined && currentEpisode !== undefined) {
+        toggleWatched(currentItem.id, currentEpisode, currentSeason);
+      } else if (currentVideo !== undefined) {
+        toggleWatched(currentItem.id, currentVideo);
+      }
     }
     if (!markedWatched) {
       syncProgressState();
@@ -803,9 +817,11 @@ export var playerPage: Page = {
         if (currentSeason !== undefined && currentEpisode !== undefined) {
           media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
           pos = getResumeTime(currentItem, currentSeason, currentEpisode);
+          wasWatched = isEpisodeWatched(currentItem, currentSeason, currentEpisode);
         } else if (currentVideo !== undefined) {
           media = findVideoMedia(currentItem, currentVideo);
           pos = getResumeTime(currentItem, undefined, undefined, currentVideo);
+          wasWatched = isVideoWatched(currentItem, currentVideo);
         }
 
         if (!media) {
