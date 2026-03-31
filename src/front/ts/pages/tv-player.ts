@@ -4,12 +4,26 @@ import { goBack } from '../router';
 import { TvKey } from '../utils/platform';
 import { pageKeys, clearPage } from '../utils/page';
 import { Logger } from '../utils/log';
+import { getAccessToken, isProxyAll } from '../utils/storage';
 
 const $root = $('#page-tv-player');
 const keys = pageKeys();
 const plog = new Logger('tv-player');
 let hls: any = null;
 let video: HTMLVideoElement | null = null;
+
+function getProcessedStreamUrl(streamUrl: string): string {
+  // Для TV потоков HLS всегда нужна переписка манифеста (для абсолютных путей и CORS)
+  // используем /hls/rewrite, как и для фильмов
+  const token = getAccessToken() || '';
+  const proxiedUrl = window.location.origin + '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0' +
+    (token ? '&access_token=' + encodeURIComponent(token) : '');
+  plog.debug('Stream URL processed through /hls/rewrite', {
+    original: streamUrl.substring(0, 80),
+    processed: proxiedUrl.substring(0, 80)
+  });
+  return proxiedUrl;
+}
 
 function render(title: string): void {
   plog.debug('render called', { title });
@@ -60,7 +74,7 @@ function render(title: string): void {
 }
 
 function startPlayback(streamUrl: string): void {
-  plog.debug('startPlayback called', { streamUrl, videoExists: !!video });
+  plog.debug('startPlayback called', { streamUrl: streamUrl.substring(0, 80), videoExists: !!video });
   if (!video) {
     plog.error('video element not found');
     return;
@@ -74,8 +88,9 @@ function startPlayback(streamUrl: string): void {
       maxMaxBufferLength: 60
     });
     plog.debug('HLS instance created');
-    hls.loadSource(streamUrl);
-    plog.debug('HLS source loaded', { streamUrl });
+    const processedUrl = getProcessedStreamUrl(streamUrl);
+    hls.loadSource(processedUrl);
+    plog.debug('HLS source loaded', { processedUrl: processedUrl.substring(0, 80) });
     hls.attachMedia(video);
     plog.debug('HLS attached to video element');
     hls.on(HlsCtor.Events.ERROR, (event: unknown, data: any) => {
@@ -103,7 +118,8 @@ function startPlayback(streamUrl: string): void {
     });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     plog.info('Using native HLS playback');
-    video.src = streamUrl;
+    const processedUrl = getProcessedStreamUrl(streamUrl);
+    video.src = processedUrl;
   } else {
     plog.error('HLS not supported and native playback not available');
   }
