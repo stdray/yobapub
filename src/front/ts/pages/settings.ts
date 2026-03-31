@@ -4,7 +4,7 @@ import { Page, RouteParams } from '../types/app';
 import { getDeviceSettings, saveDeviceSettings } from '../api/device';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, isProxyEnabled, setProxyEnabled, isProxyAll, setProxyAll } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, isProxyEnabled, setProxyEnabled, isProxyAll, setProxyAll, getStartPage, setStartPage, START_PAGE_OPTIONS } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-settings');
@@ -136,6 +136,16 @@ function buildSubSizeSetting(): SettingItem {
   return { key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: getSubSize() };
 }
 
+function buildStartPageSetting(): SettingItem {
+  var savedId = getStartPage();
+  var opts: SettingOption[] = [];
+  for (var i = 0; i < START_PAGE_OPTIONS.length; i++) {
+    var o = START_PAGE_OPTIONS[i];
+    opts.push({ id: i, label: o.label, description: '', selected: o.id === savedId ? 1 : 0 });
+  }
+  return { key: '_startPage', label: 'Стартовая страница', type: 'list', value: null, options: opts };
+}
+
 function buildProxySetting(): SettingItem {
   return { key: '_proxy', label: 'Прокси', type: 'checkbox', value: isProxyEnabled() ? 1 : 0 };
 }
@@ -216,6 +226,17 @@ function applyOption(): void {
         item.options[j].selected = (j === focusedOptionIndex) ? 1 : 0;
       }
       setDefaultQuality(item.options[focusedOptionIndex].id);
+    }
+    closeOptions();
+    return;
+  }
+
+  if (item.key === '_startPage') {
+    if (item.options) {
+      for (var k = 0; k < item.options.length; k++) {
+        item.options[k].selected = (k === focusedOptionIndex) ? 1 : 0;
+      }
+      setStartPage(START_PAGE_OPTIONS[focusedOptionIndex].id);
     }
     closeOptions();
     return;
@@ -364,6 +385,7 @@ export var settingsPage: Page = {
         allSettings.unshift(buildProxySetting());
         allSettings.unshift(buildSubSizeSetting());
         allSettings.unshift(buildQualitySetting());
+        allSettings.unshift(buildStartPageSetting());
         render();
       },
       function () {

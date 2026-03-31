@@ -3,7 +3,7 @@ import '../css/app.css';
 import { configure } from './api/client';
 import { registerPage, navigate, setExitHandler } from './router';
 import { registerTizenKeys, getDeviceInfo } from './utils/platform';
-import { getAccessToken } from './utils/storage';
+import { getAccessToken, getStartPage } from './utils/storage';
 import { apiPostWithRefresh } from './api/client';
 import { loginPage } from './pages/login';
 import { watchingPage } from './pages/watching';
@@ -12,6 +12,7 @@ import { moviePage } from './pages/movie';
 import { serialPage } from './pages/serial';
 import { playerPage } from './pages/player';
 import { settingsPage } from './pages/settings';
+import { noveltiesPage } from './pages/novelties';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
 
 objectFitImages();
@@ -27,6 +28,7 @@ registerPage('movie', moviePage);
 registerPage('serial', serialPage);
 registerPage('player', playerPage);
 registerPage('settings', settingsPage);
+registerPage('novelties', noveltiesPage);
 
 function notifyDevice(): void {
   var info = getDeviceInfo();
@@ -43,7 +45,7 @@ function notifyDevice(): void {
 
 if (getAccessToken()) {
   notifyDevice();
-  navigate('watching');
+  navigate(getStartPage());
 } else {
   navigate('login');
 }

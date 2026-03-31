@@ -7,6 +7,12 @@ export function getItem(id: number): JQueryDeferred<any> {
   return apiGetWithRefresh('/v1/items/' + id);
 }
 
+export function getItems(type: string, sort?: string): JQueryDeferred<any> {
+  var params: Record<string, any> = { type: type };
+  if (sort) params.sort = sort;
+  return apiGetWithRefresh('/v1/items', params);
+}
+
 export function loadItemWithWatching(
   id: number,
   onSuccess: (item: Item, watching: WatchingInfoItem | null) => void,

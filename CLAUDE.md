@@ -64,6 +64,11 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 - `vendor/jquery.min.js` (jQuery 2.x)
 - `vendor/hls.min.js` (hls.js 0.14.x) — accessed via `window.Hls`
 
+## Code Style
+
+- **No `any`** — all variables, parameters, and return types must be explicitly typed. Use `unknown` + type guards if the shape is truly unknown.
+- **Immutability** — prefer `const` for all declarations that are never reassigned. Use `readonly` on interface properties that are not meant to be mutated. Never mutate function arguments.
+
 ## Backend Proxy
 
 `src/back/YobaPub.Proxy/` — .NET reverse proxy with HLS manifest rewriting (`HlsRewriter.cs`). Rewrites m3u8 URLs for audio track selection. Config in `appsettings.json`.

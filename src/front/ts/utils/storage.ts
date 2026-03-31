@@ -1,3 +1,5 @@
+import { RouteName } from '../types/app';
+
 var KEYS = {
   ACCESS_TOKEN: 'kp_access_token',
   REFRESH_TOKEN: 'kp_refresh_token',
@@ -6,7 +8,8 @@ var KEYS = {
   SUB_SIZE: 'kp_sub_size',
   STREAMING_TYPE: 'kp_streaming_type',
   PROXY_BASE: 'kp_proxy_base',
-  PROXY_ALL: 'kp_proxy_all'
+  PROXY_ALL: 'kp_proxy_all',
+  START_PAGE: 'kp_start_page'
 };
 
 export function getAccessToken(): string | null {
@@ -151,6 +154,23 @@ export function setProxyAll(on: boolean): void {
   } else {
     localStorage.removeItem(KEYS.PROXY_ALL);
   }
+}
+
+export var START_PAGE_OPTIONS: Array<{ id: RouteName; label: string }> = [
+  { id: 'watching',  label: 'Я смотрю' },
+  { id: 'novelties', label: 'Новинки' }
+];
+
+export function getStartPage(): RouteName {
+  var val = localStorage.getItem(KEYS.START_PAGE);
+  for (var i = 0; i < START_PAGE_OPTIONS.length; i++) {
+    if (START_PAGE_OPTIONS[i].id === val) return val as RouteName;
+  }
+  return 'watching';
+}
+
+export function setStartPage(id: RouteName): void {
+  localStorage.setItem(KEYS.START_PAGE, id);
 }
 
 export function proxyUrl(url: string): string {
