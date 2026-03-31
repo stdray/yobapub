@@ -16,6 +16,7 @@ import { noveltiesPage } from './pages/novelties';
 import { searchPage } from './pages/search';
 import { tvPage } from './pages/tv';
 import { tvPlayerPage } from './pages/tv-player';
+import { historyPage } from './pages/history';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
 
 objectFitImages();
@@ -35,6 +36,7 @@ registerPage('novelties', noveltiesPage);
 registerPage('search', searchPage);
 registerPage('tv', tvPage);
 registerPage('tv-player', tvPlayerPage);
+registerPage('history', historyPage);
 
 function notifyDevice(): void {
   var info = getDeviceInfo();

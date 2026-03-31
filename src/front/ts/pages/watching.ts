@@ -15,7 +15,7 @@ import { tplCard, tplEmptyText } from '../utils/templates';
 var $root = $('#page-watching');
 var keys = pageKeys();
 
-var MENU_ITEMS = ['Новинки', 'Я смотрю', 'Закладки', 'ТВ', 'Поиск', 'Настройки', 'Выход'];
+var MENU_ITEMS = ['Новинки', 'Я смотрю', 'История', 'Закладки', 'ТВ', 'Поиск', 'Настройки', 'Выход'];
 var menuFocused = false;
 var menuIndex = 0;
 var focusedSection = 0;
@@ -143,11 +143,12 @@ function handleMenuKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     case TvKey.Enter:
       if (menuIndex === 0) { navigate('novelties'); }
-      else if (menuIndex === 2) { navigate('bookmarks'); }
-      else if (menuIndex === 3) { navigate('tv'); }
-      else if (menuIndex === 4) { navigate('search'); }
-      else if (menuIndex === 5) { navigate('settings'); }
-      else if (menuIndex === 6) { unlinkDevice().always(function () { clearTokens(); navigate('login'); }); }
+      else if (menuIndex === 2) { navigate('history'); }
+      else if (menuIndex === 3) { navigate('bookmarks'); }
+      else if (menuIndex === 4) { navigate('tv'); }
+      else if (menuIndex === 5) { navigate('search'); }
+      else if (menuIndex === 6) { navigate('settings'); }
+      else if (menuIndex === 7) { unlinkDevice().always(function () { clearTokens(); navigate('login'); }); }
       e.preventDefault(); break;
   }
 }
