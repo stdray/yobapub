@@ -42,7 +42,6 @@ let currentHlsUrl = '';
 let hlsInstance: Hls | null = null;
 let playSourceDebug = '';
 let playbackStarted = false;
-let pendingSeekPos = -1;
 
 interface PlayState {
   quality: number;
@@ -475,48 +474,42 @@ function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
   if (state.position > 0) {
-    // Don't play yet — wait for FRAG_BUFFERED at target position.
-    // Keep setting currentTime to nudge hls.js into loading fragments near pos.
-    // On Chromium 28, currentTime assignment is ignored until data is buffered,
-    // but hls.js watches it to decide which fragments to fetch.
     const pos = state.position;
     const v = videoEl;
-    pendingSeekPos = pos;
-    const isBuffered = (time: number): boolean => {
-      for (let i = 0; i < v.buffered.length; i++) {
-        if (time >= v.buffered.start(i) && time <= v.buffered.end(i)) return true;
-      }
-      return false;
-    };
-    const nudgeSeek = () => {
-      if (pendingSeekPos < 0 || v !== videoEl) return;
-      if (isBuffered(pos)) {
-        pendingSeekPos = -1;
-        plog.info('data buffered at {pos}, seeking and playing', { pos });
-        v.currentTime = pos;
-        hideSpinner();
+    let retries = 0;
+    const trySeekThenPlay = () => {
+      const diff = Math.abs(v.currentTime - pos);
+      plog.debug('trySeekThenPlay retry={retries} currentTime={currentTime} target={target} diff={diff}', {
+        retries, currentTime: v.currentTime, target: pos, diff,
+      });
+      if (diff <= 2) {
+        plog.info('resume seek done retries={retries} currentTime={currentTime}', { retries, currentTime: v.currentTime });
         if (!state.paused) safePlay(v);
         return;
       }
+      if (retries >= 3) {
+        plog.warn('resume seek failed after {retries} retries, playing from currentTime={currentTime}', {
+          retries, currentTime: v.currentTime,
+        });
+        if (!state.paused) safePlay(v);
+        return;
+      }
+      retries++;
       v.currentTime = pos;
-      plog.debug('nudgeSeek pos={pos} currentTime={ct} buffered={buffered}', {
-        pos, ct: v.currentTime,
-        buffered: v.buffered.length > 0 ? v.buffered.start(0) + '-' + v.buffered.end(0) : 'none',
-      });
-      window.setTimeout(nudgeSeek, 500);
+      window.setTimeout(trySeekThenPlay, 500);
     };
+    plog.info('onSourceReady seeking to pos={pos} paused={paused}', { pos, paused: state.paused });
     v.currentTime = pos;
-    plog.info('onSourceReady waiting for data at pos={pos}', { pos });
-    window.setTimeout(nudgeSeek, 500);
+    window.setTimeout(trySeekThenPlay, 500);
   } else {
-    pendingSeekPos = -1;
-    plog.info('onSourceReady pos=0, playing paused={paused}', { paused: state.paused });
+    plog.info('onSourceReady no resume pos, calling play paused={paused}', { paused: state.paused });
     if (!state.paused) safePlay(videoEl);
   }
   playbackStarted = true;
   if (state.sub >= 0 && videoEl) {
     loadSubtitleTrack(videoEl, $root, currentSubs, state.sub);
   }
+  hideSpinner();
   startMarkTimer();
   showBar();
   updateInfoBadge($root, getInfoState());
@@ -701,7 +694,6 @@ function markWatched(): void {
 
 function destroyPlayer(): void {
   videoStalled = false;
-  pendingSeekPos = -1;
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
