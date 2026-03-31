@@ -68,7 +68,8 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 
 - **No `any`** — all variables, parameters, and return types must be explicitly typed. Use `unknown` + type guards if the shape is truly unknown.
 - **Immutability** — prefer `const` for all declarations that are never reassigned. Use `readonly` on interface properties that are not meant to be mutated. Never mutate function arguments.
-- **Modern TypeScript syntax** — use arrow functions for local functions (`const f = () => {}`), `const`/`let` instead of `var`, template literals, destructuring, etc. SWC handles ES5 transpilation, so all modern syntax is fine.
+- **Arrow functions preferred** — use `const f = () => {}` syntax whenever possible. Arrow functions are more concise and modern. Avoid `function foo() {}` declarations except for class methods. Example: prefer `export const tpl = (data: Data) => compiled(data)` over `export function tpl(data: Data) { return compiled(data); }`.
+- **Modern TypeScript syntax** — use `const`/`let` instead of `var`, template literals, destructuring, etc. SWC handles ES5 transpilation, so all modern syntax is fine.
 - **Classes over factory functions** — prefer `class Foo { ... }` over `function makeFoo()` / object literals when defining reusable stateful objects.
 
 ## Backend Proxy
