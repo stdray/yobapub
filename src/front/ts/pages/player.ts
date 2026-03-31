@@ -391,9 +391,7 @@ function doSavePrefs(): void {
 
 function buildHlsConfig(): Record<string, any> {
   var cfg: Record<string, any> = {};
-  // startPosition intentionally omitted: onSourceReady handles seeking via manual
-  // retry loop (needed for Tizen 2.3). Setting startPosition here would conflict
-  // with that seek and cause fragParsingError on some browsers.
+  if (state.position > 0) cfg.startPosition = state.position;
   cfg.maxBufferLength = 10;
   cfg.maxMaxBufferLength = 30;
   cfg.maxBufferHole = 1.0;
@@ -451,6 +449,15 @@ function playSource(url: string): void {
   hls.attachMedia(videoEl);
 }
 
+function safePlay(v: HTMLVideoElement): void {
+  var pr = v.play();
+  if (pr && typeof (pr as any).catch === 'function') {
+    (pr as any).catch(function (err: Error) {
+      plog.error('play() rejected {name} {message}', { name: err.name, message: err.message });
+    });
+  }
+}
+
 function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
@@ -481,16 +488,6 @@ function onSourceReady(): void {
             plog.info('attemptSeek done retries={retries} currentTime={currentTime} success={success}', {
               retries, currentTime: v.currentTime, success: diff <= 2,
             });
-            hideSpinner();
-            if (!state.paused) {
-              plog.info('attemptSeek resuming play after seek paused={paused}', { paused: v.paused });
-              var pr = v.play();
-              if (pr && typeof (pr as any).catch === 'function') {
-                (pr as any).catch(function (err: Error) {
-                  plog.error('play() after seek rejected {name} {message}', { name: err.name, message: err.message });
-                });
-              }
-            }
             return;
           }
           retries++;
@@ -499,17 +496,7 @@ function onSourceReady(): void {
         };
         attemptSeek();
       } else {
-        plog.info('doSeek: already at position, no seek needed currentTime={currentTime}', { currentTime: v.currentTime });
-        hideSpinner();
-        if (!state.paused) {
-          plog.info('doSeek resuming play paused={paused}', { paused: v.paused });
-          var pr2 = v.play();
-          if (pr2 && typeof (pr2 as any).catch === 'function') {
-            (pr2 as any).catch(function (err: Error) {
-              plog.error('play() doSeek rejected {name} {message}', { name: err.name, message: err.message });
-            });
-          }
-        }
+        plog.debug('doSeek: already at position currentTime={currentTime}', { currentTime: v.currentTime });
       }
     };
     var doSeekPlaying = function () { doSeek('playing'); };
@@ -518,24 +505,10 @@ function onSourceReady(): void {
     v.addEventListener('canplay', doSeekCanplay);
     seekTimer = window.setTimeout(function () { doSeek('timeout-3s'); }, 3000);
     plog.info('onSourceReady calling play paused={paused}', { paused: state.paused });
-    if (!state.paused) {
-      var playResult = v.play();
-      if (playResult && typeof (playResult as any).catch === 'function') {
-        (playResult as any).catch(function (err: Error) {
-          plog.error('play() rejected {name} {message}', { name: err.name, message: err.message });
-        });
-      }
-    }
+    if (!state.paused) safePlay(v);
   } else {
     plog.info('onSourceReady no resume pos, calling play paused={paused}', { paused: state.paused });
-    if (!state.paused) {
-      var playResult2 = videoEl.play();
-      if (playResult2 && typeof (playResult2 as any).catch === 'function') {
-        (playResult2 as any).catch(function (err: Error) {
-          plog.error('play() rejected {name} {message}', { name: err.name, message: err.message });
-        });
-      }
-    }
+    if (!state.paused) safePlay(videoEl);
   }
   playbackStarted = true;
   if (state.sub >= 0 && videoEl) {
