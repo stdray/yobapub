@@ -623,7 +623,6 @@ function playUrl(url: string, title: string): void {
   });
   videoEl.addEventListener('playing', function () {
     videoStalled = false;
-    cancelStallRecovery();
     plog.info('video playing currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     hideSpinner();
   });
@@ -633,10 +632,8 @@ function playUrl(url: string, title: string): void {
   });
   videoEl.addEventListener('stalled', function () {
     videoStalled = true;
-    const ct = videoEl ? videoEl.currentTime : -1;
-    plog.warn('video stalled currentTime={currentTime}', { currentTime: ct });
+    plog.warn('video stalled currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     showSpinner();
-    scheduleStallRecovery();
   });
   videoEl.addEventListener('error', function () {
     const err2 = videoEl ? videoEl.error : null;
@@ -718,30 +715,8 @@ function markWatched(): void {
   }
 }
 
-function scheduleStallRecovery(): void {
-  cancelStallRecovery();
-  stallRecoveryTimer = window.setTimeout(function () {
-    stallRecoveryTimer = null;
-    if (!videoEl || state.paused || !videoStalled) return;
-    const ct = videoEl.currentTime;
-    plog.warn('stall recovery: restarting hls load at {pos} paused={paused} readyState={readyState}', {
-      pos: ct, paused: videoEl.paused, readyState: videoEl.readyState,
-    });
-    if (hlsInstance) {
-      hlsInstance.stopLoad();
-      hlsInstance.startLoad(ct);
-    }
-    safePlay(videoEl);
-  }, 5000);
-}
-
-function cancelStallRecovery(): void {
-  if (stallRecoveryTimer !== null) { clearTimeout(stallRecoveryTimer); stallRecoveryTimer = null; }
-}
-
 function destroyPlayer(): void {
   videoStalled = false;
-  cancelStallRecovery();
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
