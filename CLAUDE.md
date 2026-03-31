@@ -52,8 +52,8 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 ### API Layer
 - `apiGetWithRefresh(path, params?)` / `apiPostWithRefresh(path, data)` in `api/client.ts`
 - Auto-refreshes OAuth token on 401
-- Base URL: `https://api.service-kp.com`
-- Proxy mode: `isProxyEnabled()` / `proxyUrl(url)` from `utils/storage.ts`
+- All API requests use relative URLs — they always go through the .NET proxy (`src/back/YobaPub.Proxy/`)
+- Media content URLs (posters, video) are optionally rewritten via `proxyUrl(url)` from `utils/storage.ts`, gated by `isProxyAll()`
 
 ### Templates
 - `doT.template(string)` returns a compiled render function

@@ -2,46 +2,50 @@ using System.Net;
 
 namespace YobaPub.Proxy;
 
-public class UniversalProxyMiddleware(RequestDelegate next, IHttpClientFactory httpClientFactory)
+public class UniversalProxyMiddleware(RequestDelegate next, IHttpClientFactory httpClientFactory, ProxyConfig config)
 {
-    private const string Prefix = "/proxy/";
+    private static readonly string[] UpstreamPrefixes = ["/v1/", "/oauth2/"];
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var path = context.Request.Path.Value;
-        if (path == null || !path.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+        var path = context.Request.Path.Value ?? "";
+
+        if (UpstreamPrefixes.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
         {
-            await next(context);
+            await ForwardToUpstream(context, config.Upstream.TrimEnd('/') + path + context.Request.QueryString);
             return;
         }
 
-        var rest = path[Prefix.Length..];
-        var slashIdx = rest.IndexOf('/');
-        if (slashIdx < 0)
+        if (path.Equals("/proxy", StringComparison.OrdinalIgnoreCase))
         {
-            context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+            await HandleExplicitProxy(context);
             return;
         }
 
-        var scheme = rest[..slashIdx];
-        if (scheme is not ("http" or "https"))
-        {
-            context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-            return;
-        }
+        await next(context);
+    }
 
-        var hostAndPath = rest[(slashIdx + 1)..];
-        if (string.IsNullOrEmpty(hostAndPath))
+    private async Task HandleExplicitProxy(HttpContext context)
+    {
+        var rawUrl = context.Request.Query["url"].FirstOrDefault();
+        if (string.IsNullOrEmpty(rawUrl) || !Uri.TryCreate(rawUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != "http" && uri.Scheme != "https"))
         {
             context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
             return;
         }
 
-        var targetUrl = $"{scheme}://{hostAndPath}";
-        var qs = context.Request.QueryString;
-        if (qs.HasValue)
-            targetUrl += qs.Value;
+        if (!config.AllowedProxyHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+            return;
+        }
 
+        await ForwardToUpstream(context, rawUrl);
+    }
+
+    private async Task ForwardToUpstream(HttpContext context, string targetUrl)
+    {
         using var client = httpClientFactory.CreateClient("proxy");
         using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), targetUrl);
 

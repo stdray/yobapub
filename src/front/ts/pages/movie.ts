@@ -8,7 +8,7 @@ import { TvKey } from '../utils/platform';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 import { renderRatings } from '../utils/templates';
 import { formatDuration } from '../utils/format';
-import { proxyUrl } from '../utils/storage';
+import { proxyPosterUrl } from '../utils/storage';
 
 var $root = $('#page-movie');
 var keys = pageKeys();
@@ -52,7 +52,7 @@ function render(item: Item): void {
   var ratings = renderRatings(item);
 
   $root.html(tplDetail({
-    poster: proxyUrl(item.posters.big),
+    poster: proxyPosterUrl(item.posters.big),
     titleRu: title[0],
     titleEn: title.length > 1 ? title[1] : '',
     year: item.year,

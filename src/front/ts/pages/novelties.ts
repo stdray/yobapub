@@ -8,7 +8,7 @@ import { CARDS_PER_ROW } from '../settings';
 import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
 import { gridMove, gridPos } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
-import { proxyUrl } from '../utils/storage';
+import { proxyPosterUrl } from '../utils/storage';
 import { getItems } from '../api/items';
 
 var $root = $('#page-novelties');
@@ -53,7 +53,7 @@ function buildRows(): string {
       var item = sections[i].items[j] as any;
       cards += tplCard({
         id: item.id,
-        poster: proxyUrl(item.poster),
+        poster: proxyPosterUrl(item.poster),
         title: item.title,
         extra: ''
       });

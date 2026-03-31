@@ -11,16 +11,12 @@ builder.Services.AddHttpClient("proxy")
         AutomaticDecompression = System.Net.DecompressionMethods.All,
         AllowAutoRedirect = true
     });
-builder.Services.AddReverseProxy().LoadFromMemory(
-    ProxyRoutes.BuildRoutes(proxyConfig),
-    ProxyRoutes.BuildClusters(proxyConfig));
 
 var app = builder.Build();
 
 app.UseMiddleware<UniversalProxyMiddleware>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.MapReverseProxy();
 app.MapFallbackToFile("index.html");
 app.MapGet("/api/proxy-config", (ProxyConfig cfg) => Results.Json(new { cfg.ProxyAll, cfg.Upstream }));
 

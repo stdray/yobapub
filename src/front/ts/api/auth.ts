@@ -1,11 +1,11 @@
 import $ from 'jquery';
-import { getApiBase, getClientId, getClientSecret } from './client';
+import { getClientId, getClientSecret } from './client';
 import { DeviceCodeResponse, TokenResponse, AuthErrorResponse } from '../types/api';
 import { saveTokens } from '../utils/storage';
 
 export function requestDeviceCode(): JQueryXHR {
   return $.ajax({
-    url: getApiBase() + '/oauth2/device',
+    url: '/oauth2/device',
     method: 'POST',
     data: {
       grant_type: 'device_code',
@@ -36,7 +36,7 @@ export function pollDeviceToken(
     }
 
     $.ajax({
-      url: getApiBase() + '/oauth2/device',
+      url: '/oauth2/device',
       method: 'POST',
       data: {
         grant_type: 'device_token',

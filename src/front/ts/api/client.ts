@@ -1,7 +1,6 @@
 import $ from 'jquery';
-import { getAccessToken, getRefreshToken, saveTokens, clearTokens, isProxyEnabled } from '../utils/storage';
+import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from '../utils/storage';
 
-var API_BASE = 'https://api.service-kp.com';
 var CLIENT_ID = '';
 var CLIENT_SECRET = '';
 
@@ -18,10 +17,6 @@ export function getClientSecret(): string {
   return CLIENT_SECRET;
 }
 
-export function getApiBase(): string {
-  return isProxyEnabled() ? '' : API_BASE;
-}
-
 function refreshToken(): JQueryXHR {
   var rt = getRefreshToken();
   if (!rt) {
@@ -32,7 +27,7 @@ function refreshToken(): JQueryXHR {
   }
 
   return $.ajax({
-    url: getApiBase() + '/oauth2/token',
+    url: '/oauth2/token',
     method: 'POST',
     data: {
       grant_type: 'refresh_token',
@@ -51,7 +46,7 @@ export function apiGet(path: string, params?: Record<string, any>): JQueryXHR {
     data['access_token'] = token;
   }
   return $.ajax({
-    url: getApiBase() + path,
+    url: path,
     method: 'GET',
     data: data,
     dataType: 'json'
@@ -60,7 +55,7 @@ export function apiGet(path: string, params?: Record<string, any>): JQueryXHR {
 
 export function apiPost(path: string, data?: Record<string, any>): JQueryXHR {
   var token = getAccessToken();
-  var url = getApiBase() + path;
+  var url = path;
   if (token) {
     url += '?access_token=' + encodeURIComponent(token);
   }

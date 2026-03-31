@@ -6,7 +6,7 @@ import { WatchingSerialItem, WatchingMovieItem } from '../types/api';
 import { navigate, setParams } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
-import { clearTokens, proxyUrl } from '../utils/storage';
+import { clearTokens, proxyPosterUrl } from '../utils/storage';
 import { unlinkDevice } from '../api/device';
 import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
 import { gridMove, gridPos } from '../utils/grid';
@@ -70,7 +70,7 @@ function buildRows(): string {
     for (var j = 0; j < moviesData.length; j++) {
       mCards += tplCard({
         id: moviesData[j].id,
-        poster: proxyUrl(moviesData[j].posters.medium),
+        poster: proxyPosterUrl(moviesData[j].posters.medium),
         title: moviesData[j].title,
         extra: ''
       });
@@ -85,7 +85,7 @@ function buildRows(): string {
       var s = serialsData[i];
       cards += tplCard({
         id: s.id,
-        poster: proxyUrl(s.posters.medium),
+        poster: proxyPosterUrl(s.posters.medium),
         title: s.title,
         extra: s.watched + ' / ' + s.total + (s.new > 0 ? ' +' + s.new : '')
       });

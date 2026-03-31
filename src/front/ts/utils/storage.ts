@@ -7,8 +7,8 @@ var KEYS = {
   DEFAULT_QUALITY: 'kp_default_quality',
   SUB_SIZE: 'kp_sub_size',
   STREAMING_TYPE: 'kp_streaming_type',
-  PROXY_BASE: 'kp_proxy_base',
   PROXY_ALL: 'kp_proxy_all',
+  PROXY_POSTERS: 'kp_proxy_posters',
   START_PAGE: 'kp_start_page'
 };
 
@@ -132,18 +132,6 @@ export function saveTitlePrefs(prefs: TitlePrefs): void {
 
 // --- Proxy ---
 
-export function isProxyEnabled(): boolean {
-  return localStorage.getItem(KEYS.PROXY_BASE) === '1';
-}
-
-export function setProxyEnabled(on: boolean): void {
-  if (on) {
-    localStorage.setItem(KEYS.PROXY_BASE, '1');
-  } else {
-    localStorage.removeItem(KEYS.PROXY_BASE);
-  }
-}
-
 export function isProxyAll(): boolean {
   return localStorage.getItem(KEYS.PROXY_ALL) === '1';
 }
@@ -173,9 +161,25 @@ export function setStartPage(id: RouteName): void {
   localStorage.setItem(KEYS.START_PAGE, id);
 }
 
+export function isProxyPosters(): boolean {
+  var val = localStorage.getItem(KEYS.PROXY_POSTERS);
+  return val === null || val === '1';
+}
+
+export function setProxyPosters(on: boolean): void {
+  localStorage.setItem(KEYS.PROXY_POSTERS, on ? '1' : '0');
+}
+
+function rewriteUrl(url: string): string {
+  return '/proxy?url=' + encodeURIComponent(url);
+}
+
+export function proxyPosterUrl(url: string): string {
+  if (!isProxyPosters() || !url) return url;
+  return rewriteUrl(url);
+}
+
 export function proxyUrl(url: string): string {
-  if (!isProxyEnabled() || !url) return url;
-  var m = url.match(/^(https?):\/\/(.*)$/);
-  if (!m) return url;
-  return '/proxy/' + m[1] + '/' + m[2];
+  if (!isProxyAll() || !url) return url;
+  return rewriteUrl(url);
 }

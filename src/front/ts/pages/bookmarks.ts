@@ -8,7 +8,7 @@ import { TvKey } from '../utils/platform';
 import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
-import { proxyUrl } from '../utils/storage';
+import { proxyPosterUrl } from '../utils/storage';
 
 var $root = $('#page-bookmarks');
 var keys = pageKeys();
@@ -83,7 +83,7 @@ function renderItems(): void {
   for (var i = 0; i < itemsData.length; i++) {
     cards += tplCard({
       id: itemsData[i].id,
-      poster: proxyUrl(itemsData[i].posters.medium),
+      poster: proxyPosterUrl(itemsData[i].posters.medium),
       title: itemsData[i].title
     });
   }

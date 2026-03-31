@@ -4,7 +4,7 @@ import { Page, RouteParams } from '../types/app';
 import { getDeviceSettings, saveDeviceSettings } from '../api/device';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, isProxyEnabled, setProxyEnabled, isProxyAll, setProxyAll, getStartPage, setStartPage, START_PAGE_OPTIONS } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, isProxyAll, setProxyAll, isProxyPosters, setProxyPosters, getStartPage, setStartPage, START_PAGE_OPTIONS } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 var $root = $('#page-settings');
@@ -146,8 +146,8 @@ function buildStartPageSetting(): SettingItem {
   return { key: '_startPage', label: 'Стартовая страница', type: 'list', value: null, options: opts };
 }
 
-function buildProxySetting(): SettingItem {
-  return { key: '_proxy', label: 'Прокси', type: 'checkbox', value: isProxyEnabled() ? 1 : 0 };
+function buildProxyPostersSetting(): SettingItem {
+  return { key: '_proxyPosters', label: 'Проксировать постеры', type: 'checkbox', value: isProxyPosters() ? 1 : 0 };
 }
 
 function buildProxyAllSetting(): SettingItem {
@@ -242,9 +242,9 @@ function applyOption(): void {
     return;
   }
 
-  if (item.key === '_proxy') {
+  if (item.key === '_proxyPosters') {
     item.value = focusedOptionIndex === 1 ? 1 : 0;
-    setProxyEnabled(!!item.value);
+    setProxyPosters(!!item.value);
     closeOptions();
     return;
   }
@@ -382,7 +382,7 @@ export var settingsPage: Page = {
           }
         }
         allSettings.unshift(buildProxyAllSetting());
-        allSettings.unshift(buildProxySetting());
+        allSettings.unshift(buildProxyPostersSetting());
         allSettings.unshift(buildSubSizeSetting());
         allSettings.unshift(buildQualitySetting());
         allSettings.unshift(buildStartPageSetting());
