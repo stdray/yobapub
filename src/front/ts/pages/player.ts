@@ -42,6 +42,7 @@ let currentHlsUrl = '';
 let hlsInstance: Hls | null = null;
 let playSourceDebug = '';
 let playbackStarted = false;
+let pendingSeekPos = -1;
 
 interface PlayState {
   quality: number;
@@ -441,13 +442,20 @@ function playSource(url: string): void {
     });
   });
   hls.on(Hls.Events.FRAG_BUFFERED, function (_e: any, data: any) {
-    plog.debug('hls FRAG_BUFFERED sn={sn} start={start}', {
+    const fragStart = data.frag ? data.frag.start : 0;
+    const fragDuration = data.frag ? (data.frag.duration || 10) : 0;
+    plog.debug('hls FRAG_BUFFERED sn={sn} start={start} dur={dur}', {
       sn: data.frag ? data.frag.sn : null,
-      start: data.frag ? data.frag.start : null,
+      start: fragStart,
+      dur: fragDuration,
     });
-    if (videoStalled && videoEl && !state.paused) {
-      plog.info('prodding stalled video after frag buffered');
-      safePlay(videoEl);
+    if (pendingSeekPos >= 0 && videoEl && fragStart <= pendingSeekPos && pendingSeekPos < fragStart + fragDuration) {
+      const pos = pendingSeekPos;
+      pendingSeekPos = -1;
+      plog.info('data ready, seeking to {pos} and playing', { pos });
+      videoEl.currentTime = pos;
+      hideSpinner();
+      if (!state.paused) safePlay(videoEl);
     }
   });
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
@@ -498,45 +506,20 @@ function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
   if (state.position > 0) {
-    // Seek first (while paused), then play once position is confirmed.
-    // On Tizen 2.3 (Chromium 28) currentTime assignment may be silently ignored
-    // if the fragment at that position isn't buffered yet — retry until it lands.
-    let pos = state.position;
-    const v = videoEl;
-    let retries = 0;
-    const trySeekThenPlay = () => {
-      const diff = Math.abs(v.currentTime - pos);
-      plog.debug('trySeekThenPlay retry={retries} currentTime={currentTime} target={target} diff={diff}', {
-        retries, currentTime: v.currentTime, target: pos, diff,
-      });
-      if (diff <= 2) {
-        plog.info('resume seek done retries={retries} currentTime={currentTime}', { retries, currentTime: v.currentTime });
-        if (!state.paused) safePlay(v);
-        return;
-      }
-      if (retries >= 3) {
-        plog.warn('resume seek failed after {retries} retries, playing from currentTime={currentTime}', {
-          retries, currentTime: v.currentTime,
-        });
-        if (!state.paused) safePlay(v);
-        return;
-      }
-      retries++;
-      v.currentTime = pos;
-      window.setTimeout(trySeekThenPlay, 500);
-    };
-    plog.info('onSourceReady seeking to pos={pos} paused={paused}', { pos, paused: state.paused });
-    v.currentTime = pos;
-    window.setTimeout(trySeekThenPlay, 500);
+    // Don't play yet — wait for FRAG_BUFFERED at target position.
+    // Set currentTime as a hint so hls.js loads fragments near this position.
+    pendingSeekPos = state.position;
+    videoEl.currentTime = state.position;
+    plog.info('onSourceReady waiting for data at pos={pos}', { pos: state.position });
   } else {
-    plog.info('onSourceReady no resume pos, calling play paused={paused}', { paused: state.paused });
+    pendingSeekPos = -1;
+    plog.info('onSourceReady pos=0, playing paused={paused}', { paused: state.paused });
     if (!state.paused) safePlay(videoEl);
   }
   playbackStarted = true;
   if (state.sub >= 0 && videoEl) {
     loadSubtitleTrack(videoEl, $root, currentSubs, state.sub);
   }
-  hideSpinner();
   startMarkTimer();
   showBar();
   updateInfoBadge($root, getInfoState());
@@ -721,6 +704,7 @@ function markWatched(): void {
 
 function destroyPlayer(): void {
   videoStalled = false;
+  pendingSeekPos = -1;
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
