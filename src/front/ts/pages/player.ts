@@ -26,6 +26,7 @@ const keys = pageKeys();
 let markTimer: number | null = null;
 let videoEl: HTMLVideoElement | null = null;
 let videoStalled = false;
+let stallRecoveryTimer: number | null = null;
 
 
 let currentItem: Item | null = null;
@@ -602,6 +603,7 @@ function playUrl(url: string, title: string): void {
   });
   videoEl.addEventListener('playing', function () {
     videoStalled = false;
+    cancelStallRecovery();
     plog.info('video playing currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     hideSpinner();
   });
@@ -611,7 +613,10 @@ function playUrl(url: string, title: string): void {
   });
   videoEl.addEventListener('stalled', function () {
     videoStalled = true;
-    plog.warn('video stalled currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+    const ct = videoEl ? videoEl.currentTime : -1;
+    plog.warn('video stalled currentTime={currentTime}', { currentTime: ct });
+    showSpinner();
+    scheduleStallRecovery();
   });
   videoEl.addEventListener('error', function () {
     const err2 = videoEl ? videoEl.error : null;
@@ -693,8 +698,24 @@ function markWatched(): void {
   }
 }
 
+function scheduleStallRecovery(): void {
+  cancelStallRecovery();
+  stallRecoveryTimer = window.setTimeout(function () {
+    stallRecoveryTimer = null;
+    if (!videoEl || state.paused) return;
+    plog.warn('stall recovery: nudging currentTime={currentTime}', { currentTime: videoEl.currentTime });
+    videoEl.currentTime = videoEl.currentTime + 0.1;
+    safePlay(videoEl);
+  }, 5000);
+}
+
+function cancelStallRecovery(): void {
+  if (stallRecoveryTimer !== null) { clearTimeout(stallRecoveryTimer); stallRecoveryTimer = null; }
+}
+
 function destroyPlayer(): void {
   videoStalled = false;
+  cancelStallRecovery();
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
