@@ -432,6 +432,14 @@ function playSource(url: string): void {
         fragSn: data.frag ? data.frag.sn : null,
         fragStart: data.frag ? data.frag.start : null,
       });
+      // If the fragment covering our resume position can't be parsed,
+      // skip past it so hls.js loads the next one.
+      if (data.details === 'fragParsingError' && data.frag && videoEl
+          && videoEl.readyState < 2 /* HAVE_CURRENT_DATA */) {
+        var skipTo = (data.frag.start || 0) + (data.frag.duration || 10) + 0.5;
+        plog.warn('skipping broken fragment, seeking to {skipTo}', { skipTo });
+        videoEl.currentTime = skipTo;
+      }
       return;
     }
     plog.error('hls fatal {type} {details} {status}', {
