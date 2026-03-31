@@ -427,37 +427,6 @@ function playSource(url: string): void {
     plog.info('hls MANIFEST_PARSED');
     onSourceReady();
   });
-  hls.on(Hls.Events.FRAG_LOADING, function (_e: any, data: any) {
-    plog.debug('hls FRAG_LOADING sn={sn} start={start} url={url}', {
-      sn: data.frag ? data.frag.sn : null,
-      start: data.frag ? data.frag.start : null,
-      url: data.frag ? (data.frag.url || '').substring(0, 80) : null,
-    });
-  });
-  hls.on(Hls.Events.FRAG_LOADED, function (_e: any, data: any) {
-    plog.debug('hls FRAG_LOADED sn={sn} start={start} size={size}', {
-      sn: data.frag ? data.frag.sn : null,
-      start: data.frag ? data.frag.start : null,
-      size: data.stats ? data.stats.total : null,
-    });
-  });
-  hls.on(Hls.Events.FRAG_BUFFERED, function (_e: any, data: any) {
-    plog.debug('hls FRAG_BUFFERED sn={sn} start={start}', {
-      sn: data.frag ? data.frag.sn : null,
-      start: data.frag ? data.frag.start : null,
-    });
-    if (pendingSeekPos >= 0 && videoEl) {
-      const diff = Math.abs(videoEl.currentTime - pendingSeekPos);
-      if (diff <= 2) {
-        const pos = pendingSeekPos;
-        pendingSeekPos = -1;
-        plog.info('data ready at currentTime={ct}, playing from {pos}', { ct: videoEl.currentTime, pos });
-        videoEl.currentTime = pos;
-        hideSpinner();
-        if (!state.paused) safePlay(videoEl);
-      }
-    }
-  });
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
     if (!data.fatal) {
       plog.debug('hls error (non-fatal) {type} {details} {reason} {fragUrl}', {
@@ -513,19 +482,27 @@ function onSourceReady(): void {
     const pos = state.position;
     const v = videoEl;
     pendingSeekPos = pos;
+    const isBuffered = (time: number): boolean => {
+      for (let i = 0; i < v.buffered.length; i++) {
+        if (time >= v.buffered.start(i) && time <= v.buffered.end(i)) return true;
+      }
+      return false;
+    };
     const nudgeSeek = () => {
       if (pendingSeekPos < 0 || v !== videoEl) return;
-      const diff = Math.abs(v.currentTime - pos);
-      if (diff <= 2) {
+      if (isBuffered(pos)) {
         pendingSeekPos = -1;
-        plog.info('seek confirmed currentTime={ct}, playing', { ct: v.currentTime });
+        plog.info('data buffered at {pos}, seeking and playing', { pos });
         v.currentTime = pos;
         hideSpinner();
         if (!state.paused) safePlay(v);
         return;
       }
       v.currentTime = pos;
-      plog.debug('nudgeSeek pos={pos} currentTime={currentTime}', { pos, currentTime: v.currentTime });
+      plog.debug('nudgeSeek pos={pos} currentTime={ct} buffered={buffered}', {
+        pos, ct: v.currentTime,
+        buffered: v.buffered.length > 0 ? v.buffered.start(0) + '-' + v.buffered.end(0) : 'none',
+      });
       window.setTimeout(nudgeSeek, 500);
     };
     v.currentTime = pos;
