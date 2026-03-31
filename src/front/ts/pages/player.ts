@@ -427,11 +427,13 @@ function playSource(url: string): void {
   });
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
     if (!data.fatal) {
-      plog.debug('hls error (non-fatal) {type} {details}', { type: data.type, details: data.details });
-      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-        plog.warn('hls non-fatal mediaError, recovering');
-        hls.recoverMediaError();
-      }
+      plog.debug('hls error (non-fatal) {type} {details} {reason} {fragUrl}', {
+        type: data.type, details: data.details,
+        reason: data.reason || null,
+        fragUrl: data.frag ? (data.frag.url || '').substring(0, 120) : null,
+        fragSn: data.frag ? data.frag.sn : null,
+        fragStart: data.frag ? data.frag.start : null,
+      });
       return;
     }
     plog.error('hls fatal {type} {details} {status}', {
