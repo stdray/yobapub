@@ -7,8 +7,8 @@ import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, isProxyAll, setProxyAll, isProxyPosters, setProxyPosters, getStartPage, setStartPage, START_PAGE_OPTIONS } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
-var $root = $('#page-settings');
-var keys = pageKeys();
+const $root = $('#page-settings');
+const keys = pageKeys();
 
 interface SettingOption {
   id: number;
@@ -25,12 +25,12 @@ interface SettingItem {
   options?: SettingOption[];
 }
 
-var allSettings: SettingItem[] = [];
-var focusedIndex = 0;
-var focusedOptionIndex = 0;
-var optionsOpen = false;
+let allSettings: SettingItem[] = [];
+let focusedIndex = 0;
+let focusedOptionIndex = 0;
+let optionsOpen = false;
 
-var DISPLAY_KEYS: Record<string, boolean> = {
+const DISPLAY_KEYS: Record<string, boolean> = {
   serverLocation: true,
   streamingType: true,
   supportSsl: true,
@@ -40,7 +40,7 @@ var DISPLAY_KEYS: Record<string, boolean> = {
   mixedPlaylist: true
 };
 
-var LABELS: Record<string, string> = {
+const LABELS: Record<string, string> = {
   serverLocation: 'Сервер',
   streamingType: 'Тип стриминга',
   supportSsl: 'SSL',
@@ -50,7 +50,7 @@ var LABELS: Record<string, string> = {
   mixedPlaylist: 'Смешанный плейлист'
 };
 
-var tplPage = doT.template(
+const tplPage = doT.template(
   '<div class="settings-page">' +
     '<div class="settings-page__title">Настройки</div>' +
     '<div class="settings-page__list">{{=it.items}}</div>' +
@@ -62,7 +62,7 @@ var tplPage = doT.template(
   '</div>'
 );
 
-var tplSettingItem = doT.template(
+const tplSettingItem = doT.template(
   '<div class="sitem{{?it.focused}} focused{{?}}{{?it.stepper}} sitem--stepper{{?}}" data-idx="{{=it.idx}}">' +
     '<span class="sitem__label">{{=it.label}}</span>' +
     '{{?it.stepper}}' +
@@ -77,7 +77,7 @@ var tplSettingItem = doT.template(
   '</div>'
 );
 
-var tplOptions = doT.template(
+const tplOptions = doT.template(
   '<div class="soptions">' +
     '<div class="soptions__title">{{=it.title}}</div>' +
     '{{~it.options :opt:i}}' +
@@ -87,19 +87,19 @@ var tplOptions = doT.template(
 );
 
 function parseSettings(raw: Record<string, any>): SettingItem[] {
-  var items: SettingItem[] = [];
+  const items: SettingItem[] = [];
   for (var key in raw) {
     if (!raw.hasOwnProperty(key)) continue;
     if (!DISPLAY_KEYS[key]) continue;
 
-    var setting = raw[key];
-    var label = LABELS[key] || (setting.label || key);
+    const setting = raw[key];
+    let label = LABELS[key] || (setting.label || key);
 
     if (setting.type === 'list') {
-      var opts: SettingOption[] = [];
+      const opts: SettingOption[] = [];
       if (Array.isArray(setting.value)) {
         for (var i = 0; i < setting.value.length; i++) {
-          var optLabel = String(setting.value[i].label || setting.value[i].id || '').toLowerCase();
+          const optLabel = String(setting.value[i].label || setting.value[i].id || '').toLowerCase();
           if (key === 'streamingType' && optLabel === 'http') continue;
           if (key === 'streamingType' && isLegacyTizen() && optLabel === 'hls4') continue;
           opts.push({
@@ -119,14 +119,14 @@ function parseSettings(raw: Record<string, any>): SettingItem[] {
 }
 
 function buildQualitySetting(): SettingItem {
-  var savedId = getDefaultQuality();
+  let savedId = getDefaultQuality();
   if (savedId === -1) {
     savedId = isLegacyTizen() ? 3 : 0;
     setDefaultQuality(savedId);
   }
-  var opts: SettingOption[] = [];
+  const opts: SettingOption[] = [];
   for (var i = 0; i < QUALITY_OPTIONS.length; i++) {
-    var q = QUALITY_OPTIONS[i];
+    const q = QUALITY_OPTIONS[i];
     opts.push({ id: q.id, label: q.label, description: '', selected: q.id === savedId ? 1 : 0 });
   }
   return { key: '_defaultQuality', label: 'Качество по умолчанию', type: 'list', value: null, options: opts };
@@ -137,10 +137,10 @@ function buildSubSizeSetting(): SettingItem {
 }
 
 function buildStartPageSetting(): SettingItem {
-  var savedId = getStartPage();
-  var opts: SettingOption[] = [];
+  let savedId = getStartPage();
+  const opts: SettingOption[] = [];
   for (var i = 0; i < START_PAGE_OPTIONS.length; i++) {
-    var o = START_PAGE_OPTIONS[i];
+    const o = START_PAGE_OPTIONS[i];
     opts.push({ id: i, label: o.label, description: '', selected: o.id === savedId ? 1 : 0 });
   }
   return { key: '_startPage', label: 'Стартовая страница', type: 'list', value: null, options: opts };
@@ -156,8 +156,8 @@ function buildProxyAllSetting(): SettingItem {
 
 function getDisplayValue(item: SettingItem): string {
   if (item.type === 'stepper') {
-    var v = item.value as number;
-    var lbl = v + 'px';
+    const v = item.value as number;
+    let lbl = v + 'px';
     if (v === DEFAULT_SUB_SIZE) lbl += ' (стандарт)';
     return lbl;
   }
@@ -171,7 +171,7 @@ function getDisplayValue(item: SettingItem): string {
 }
 
 function render(): void {
-  var html = '';
+  let html = '';
   for (var i = 0; i < allSettings.length; i++) {
     html += tplSettingItem({
       idx: i,
@@ -185,11 +185,11 @@ function render(): void {
 }
 
 function renderOptions(): void {
-  var item = allSettings[focusedIndex];
+  const item = allSettings[focusedIndex];
   if (!item) return;
 
   if (item.type === 'list' && item.options) {
-    var opts = item.options.map(function (o) {
+    const opts = item.options.map(function (o) {
       return { label: o.label, selected: o.selected === 1 };
     });
     $root.find('.settings-page__list').append(
@@ -198,7 +198,7 @@ function renderOptions(): void {
       '</div>'
     );
   } else {
-    var checkOpts = [
+    const checkOpts = [
       { label: 'Выкл', selected: !item.value },
       { label: 'Вкл', selected: !!item.value }
     ];
@@ -217,7 +217,7 @@ function closeOptions(): void {
 }
 
 function applyOption(): void {
-  var item = allSettings[focusedIndex];
+  const item = allSettings[focusedIndex];
   if (!item) return;
 
   if (item.key === '_defaultQuality') {
@@ -258,7 +258,7 @@ function applyOption(): void {
 
 
 
-  var saveData: Record<string, any> = {};
+  const saveData: Record<string, any> = {};
 
   if (item.type === 'list' && item.options) {
     for (var i = 0; i < item.options.length; i++) {
@@ -271,7 +271,7 @@ function applyOption(): void {
   }
 
   if (item.key === 'streamingType' && item.options) {
-    var stOpt = item.options[focusedOptionIndex];
+    const stOpt = item.options[focusedOptionIndex];
     setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
   }
 
@@ -280,9 +280,9 @@ function applyOption(): void {
 }
 
 function stepSubSize(dir: number): void {
-  var item = allSettings[focusedIndex];
+  const item = allSettings[focusedIndex];
   if (!item || item.key !== '_subSize') return;
-  var size = item.value as number;
+  let size = item.value as number;
   size = Math.max(SUB_SIZE_MIN, Math.min(SUB_SIZE_MAX, size + dir * SUB_SIZE_STEP));
   item.value = size;
   setSubSize(size);
@@ -295,7 +295,7 @@ function handleKey(e: JQuery.Event): void {
     return;
   }
 
-  var item = allSettings[focusedIndex];
+  const item = allSettings[focusedIndex];
 
   switch (e.keyCode) {
     case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
@@ -319,7 +319,7 @@ function handleKey(e: JQuery.Event): void {
 }
 
 function openOptions(): void {
-  var item = allSettings[focusedIndex];
+  const item = allSettings[focusedIndex];
   if (!item) return;
 
   optionsOpen = true;
@@ -337,8 +337,8 @@ function openOptions(): void {
 }
 
 function handleOptionsKey(e: JQuery.Event): void {
-  var item = allSettings[focusedIndex];
-  var count = (item.type === 'list' && item.options) ? item.options.length : 2;
+  const item = allSettings[focusedIndex];
+  const count = (item.type === 'list' && item.options) ? item.options.length : 2;
 
   switch (e.keyCode) {
     case TvKey.Up:
@@ -371,11 +371,11 @@ export var settingsPage: Page = {
 
     getDeviceSettings().then(
       function (res: any) {
-        var data = Array.isArray(res) ? res[0] : res;
+        const data = Array.isArray(res) ? res[0] : res;
         if (data && data.settings) {
           allSettings = parseSettings(data.settings);
           if (data.settings.streamingType && data.settings.streamingType.value) {
-            var stValues = data.settings.streamingType.value;
+            const stValues = data.settings.streamingType.value;
             for (var si = 0; si < stValues.length; si++) {
               if (stValues[si].selected) { setStreamingType(String(stValues[si].label || stValues[si].id).toLowerCase()); break; }
             }

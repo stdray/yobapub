@@ -10,18 +10,18 @@ import { renderRatings } from '../utils/templates';
 import { formatTimeShort } from '../utils/format';
 import { proxyPosterUrl } from '../utils/storage';
 
-var $root = $('#page-serial');
-var keys = pageKeys();
-var currentItem: Item | null = null;
-var watchingInfo: WatchingInfoItem | null = null;
+const $root = $('#page-serial');
+const keys = pageKeys();
+let currentItem: Item | null = null;
+let watchingInfo: WatchingInfoItem | null = null;
 
 type FocusArea = 'seasons' | 'episodes' | 'play';
-var focusArea: FocusArea = 'play';
-var selectedSeason = 0;
-var focusedEpisode = 0;
-var focusedSeasonTab = 0;
+let focusArea: FocusArea = 'play';
+let selectedSeason = 0;
+let focusedEpisode = 0;
+let focusedSeasonTab = 0;
 
-var tplDetail = doT.template(
+const tplDetail = doT.template(
   '<div class="detail">' +
     '<div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>' +
     '<div class="detail__info">' +
@@ -40,11 +40,11 @@ var tplDetail = doT.template(
   '</div>'
 );
 
-var tplSeasonTab = doT.template(
+const tplSeasonTab = doT.template(
   '<div class="episodes__season-tab{{?it.active}} active{{?}}" data-season="{{=it.idx}}">Сезон {{=it.num}}</div>'
 );
 
-var tplEpisode = doT.template(
+const tplEpisode = doT.template(
   '<div class="episode" data-ep="{{=it.idx}}">' +
     '<span class="episode__number">{{=it.number}}</span>' +
     '<span class="episode__title">{{=it.title}}</span>' +
@@ -55,7 +55,7 @@ var tplEpisode = doT.template(
 function getEpisodeStatus(seasonNum: number, epNum: number): { time: number; status: number } {
   if (!watchingInfo || !watchingInfo.seasons) return { time: 0, status: -1 };
   for (var i = 0; i < watchingInfo.seasons.length; i++) {
-    var ws = watchingInfo.seasons[i];
+    const ws = watchingInfo.seasons[i];
     if (ws.number === seasonNum) {
       for (var j = 0; j < ws.episodes.length; j++) {
         if (ws.episodes[j].number === epNum) {
@@ -70,7 +70,7 @@ function getEpisodeStatus(seasonNum: number, epNum: number): { time: number; sta
 function findEpisodeById(episodeId: number): { seasonIdx: number; episodeIdx: number } | null {
   if (!currentItem || !currentItem.seasons) return null;
   for (var i = 0; i < currentItem.seasons.length; i++) {
-    var s = currentItem.seasons[i];
+    const s = currentItem.seasons[i];
     for (var j = 0; j < s.episodes.length; j++) {
       if (s.episodes[j].id === episodeId) {
         return { seasonIdx: i, episodeIdx: j };
@@ -83,9 +83,9 @@ function findEpisodeById(episodeId: number): { seasonIdx: number; episodeIdx: nu
 function findResumeEpisode(): { season: number; episode: number; seasonIdx: number; episodeIdx: number } | null {
   if (!currentItem || !currentItem.seasons) return null;
   for (var i = 0; i < currentItem.seasons.length; i++) {
-    var s = currentItem.seasons[i];
+    const s = currentItem.seasons[i];
     for (var j = 0; j < s.episodes.length; j++) {
-      var st = getEpisodeStatus(s.number, s.episodes[j].number);
+      const st = getEpisodeStatus(s.number, s.episodes[j].number);
       if (st.status === 0 || st.status === -1) {
         return { season: s.number, episode: s.episodes[j].number, seasonIdx: i, episodeIdx: j };
       }
@@ -96,11 +96,11 @@ function findResumeEpisode(): { season: number; episode: number; seasonIdx: numb
 
 function buildEpisodes(season: Season | undefined): string {
   if (!season) return '';
-  var html = '';
+  let html = '';
   for (var j = 0; j < season.episodes.length; j++) {
-    var ep = season.episodes[j];
-    var st = getEpisodeStatus(season.number, ep.number);
-    var statusText = '';
+    const ep = season.episodes[j];
+    const st = getEpisodeStatus(season.number, ep.number);
+    let statusText = '';
     if (st.status === 1) statusText = '\u2713';
     else if (st.status === 0 && st.time > 0) statusText = formatTimeShort(st.time);
     html += tplEpisode({ idx: j, number: ep.number, title: ep.title || 'Эпизод ' + ep.number, status: statusText });
@@ -109,19 +109,19 @@ function buildEpisodes(season: Season | undefined): string {
 }
 
 function render(item: Item): void {
-  var title = item.title.split(' / ');
-  var seasons = item.seasons || [];
+  let title = item.title.split(' / ');
+  const seasons = item.seasons || [];
 
-  var resumeEp = findResumeEpisode();
-  var playLabel = resumeEp ? 'Продолжить S' + resumeEp.season + 'E' + resumeEp.episode : 'Смотреть';
+  const resumeEp = findResumeEpisode();
+  const playLabel = resumeEp ? 'Продолжить S' + resumeEp.season + 'E' + resumeEp.episode : 'Смотреть';
 
   if (resumeEp) {
     selectedSeason = resumeEp.seasonIdx;
   }
 
-  var ratings = renderRatings(item);
+  const ratings = renderRatings(item);
 
-  var seasonTabs = '';
+  let seasonTabs = '';
   for (var i = 0; i < seasons.length; i++) {
     seasonTabs += tplSeasonTab({ idx: i, num: seasons[i].number, active: i === selectedSeason });
   }
@@ -161,9 +161,9 @@ function updateFocus(): void {
   } else if (focusArea === 'seasons') {
     $root.find('.episodes__season-tab').eq(focusedSeasonTab).addClass('focused');
   } else if (focusArea === 'episodes') {
-    var $eps = $root.find('.episode');
+    const $eps = $root.find('.episode');
     if ($eps.length > 0) {
-      var $ep = $eps.eq(focusedEpisode);
+      const $ep = $eps.eq(focusedEpisode);
       $ep.addClass('focused');
       scrollIntoView($ep[0], $root.find('.detail__info')[0], 20);
     }
@@ -181,7 +181,7 @@ function switchSeason(idx: number): void {
 }
 
 function handleKey(e: JQuery.Event): void {
-  var seasons = (currentItem && currentItem.seasons) || [];
+  const seasons = (currentItem && currentItem.seasons) || [];
 
   switch (e.keyCode) {
     case TvKey.Return:
@@ -197,12 +197,12 @@ function handleKey(e: JQuery.Event): void {
         e.preventDefault(); break;
       case TvKey.Enter:
         if (currentItem) {
-          var resume = findResumeEpisode();
+          const resume = findResumeEpisode();
           if (resume) {
-            var resumeEpObj = seasons[resume.seasonIdx] && seasons[resume.seasonIdx].episodes[resume.episodeIdx];
+            const resumeEpObj = seasons[resume.seasonIdx] && seasons[resume.seasonIdx].episodes[resume.episodeIdx];
             navigate('player', { id: currentItem.id, season: resume.season, episode: resume.episode });
           } else if (seasons.length > 0 && seasons[0].episodes.length > 0) {
-            var firstEp = seasons[0].episodes[0];
+            const firstEp = seasons[0].episodes[0];
             navigate('player', { id: currentItem.id, season: seasons[0].number, episode: firstEp.number });
           }
         }
@@ -227,7 +227,7 @@ function handleKey(e: JQuery.Event): void {
         switchSeason(focusedSeasonTab); e.preventDefault(); break;
     }
   } else if (focusArea === 'episodes') {
-    var epCount = $root.find('.episode').length;
+    const epCount = $root.find('.episode').length;
     switch (e.keyCode) {
       case TvKey.Down:
         if (focusedEpisode < epCount - 1) { focusedEpisode++; updateFocus(); }
@@ -238,7 +238,7 @@ function handleKey(e: JQuery.Event): void {
         e.preventDefault(); break;
       case TvKey.Enter:
         if (currentItem && seasons[selectedSeason]) {
-          var ep = seasons[selectedSeason].episodes[focusedEpisode];
+          const ep = seasons[selectedSeason].episodes[focusedEpisode];
           if (ep) { navigate('player', { id: currentItem.id, season: seasons[selectedSeason].number, episode: ep.number }); }
         }
         e.preventDefault(); break;
@@ -250,9 +250,9 @@ export var serialPage: Page = {
   mount: function (params: RouteParams) {
     currentItem = null; watchingInfo = null; selectedSeason = 0;
     showSpinnerIn($root);
-    var id = params.id!;
+    let id = params.id!;
 
-    var targetEpisodeId = params.episodeId;
+    const targetEpisodeId = params.episodeId;
 
     loadItemWithWatching(id,
       function (item, watching) {
@@ -260,7 +260,7 @@ export var serialPage: Page = {
         watchingInfo = watching;
         render(currentItem);
         if (targetEpisodeId) {
-          var found = findEpisodeById(targetEpisodeId);
+          const found = findEpisodeById(targetEpisodeId);
           if (found) {
             if (found.seasonIdx !== selectedSeason) {
               switchSeason(found.seasonIdx);

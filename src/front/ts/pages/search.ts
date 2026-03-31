@@ -10,24 +10,24 @@ import { pageKeys, clearPage, scrollIntoView } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 
-var $root = $('#page-search');
-var keys = pageKeys();
+const $root = $('#page-search');
+const keys = pageKeys();
 
-var query = '';
-var results: Item[] = [];
-var focusedIndex = 0;
-var loading = false;
-var noResults = false;
-var searchTimer: number | null = null;
+let query = '';
+let results: Item[] = [];
+let focusedIndex = 0;
+let loading = false;
+let noResults = false;
+let searchTimer: number | null = null;
 
 type FocusArea = 'keyboard' | 'results';
-var focusArea: FocusArea = 'keyboard';
+let focusArea: FocusArea = 'keyboard';
 
-var kbRow = 0;
-var kbCol = 0;
-var currentLayout: 'ru' | 'en' = 'ru';
+let kbRow = 0;
+let kbCol = 0;
+let currentLayout: 'ru' | 'en' = 'ru';
 
-var KB_LAYOUTS: Record<'ru' | 'en', string[][]> = {
+const KB_LAYOUTS: Record<'ru' | 'en', string[][]> = {
   ru: [
     ['1','2','3','4','5','6','7','8','9','0'],
     ['й','ц','у','к','е','н','г','ш','щ','з','х','ъ'],
@@ -50,7 +50,7 @@ interface KbKeyData {
   wide: boolean;
 }
 
-var tplKeyboard = doT.template(
+const tplKeyboard = doT.template(
   '<div class="kb">' +
     '{{~it.rows :row:ri}}' +
       '<div class="kb__row">' +
@@ -62,7 +62,7 @@ var tplKeyboard = doT.template(
   '</div>'
 );
 
-var tplLayout = doT.template(
+const tplLayout = doT.template(
   '<div class="search">' +
     '<div class="search-input"><span class="search-input__text"></span><span class="search-input__cursor">|</span></div>' +
     '<div class="search__body">' +
@@ -73,13 +73,13 @@ var tplLayout = doT.template(
 );
 
 function buildKeyboardRows(): KbKeyData[][] {
-  var layout = KB_LAYOUTS[currentLayout];
-  var rows: KbKeyData[][] = [];
+  const layout = KB_LAYOUTS[currentLayout];
+  const rows: KbKeyData[][] = [];
   for (var ri = 0; ri < layout.length; ri++) {
-    var rowChars = layout[ri];
-    var rowKeys: KbKeyData[] = [];
+    const rowChars = layout[ri];
+    const rowKeys: KbKeyData[] = [];
     for (var ci = 0; ci < rowChars.length; ci++) {
-      var char = rowChars[ci];
+      const char = rowChars[ci];
       rowKeys.push({
         char: char,
         label: char === '⎵' ? ' ' : char,
@@ -108,7 +108,7 @@ function renderInput(): void {
 }
 
 function renderResults(): void {
-  var $el = $root.find('.search__results');
+  const $el = $root.find('.search__results');
   if (loading) {
     $el.html('<div class="spinner"><div class="spinner__circle"></div></div>');
     return;
@@ -121,7 +121,7 @@ function renderResults(): void {
     $el.empty();
     return;
   }
-  var html = '';
+  let html = '';
   for (var i = 0; i < results.length; i++) {
     html += tplCard({
       id: results[i].id,
@@ -137,10 +137,10 @@ function renderResults(): void {
 }
 
 function updateResultsFocus(): void {
-  var $cards = $root.find('.search-grid .card');
+  const $cards = $root.find('.search-grid .card');
   $cards.removeClass('focused');
   if (focusArea === 'results' && focusedIndex < $cards.length) {
-    var $card = $cards.eq(focusedIndex);
+    const $card = $cards.eq(focusedIndex);
     $card.addClass('focused');
     scrollIntoView($card[0], $root.find('.search__results')[0]);
   }
@@ -215,8 +215,8 @@ function pressKey(char: string): void {
 }
 
 function handleKeyboardKey(e: JQuery.Event): void {
-  var layout = KB_LAYOUTS[currentLayout];
-  var row = layout[kbRow];
+  const layout = KB_LAYOUTS[currentLayout];
+  const row = layout[kbRow];
 
   switch (e.keyCode) {
     case TvKey.Left:
@@ -256,27 +256,27 @@ function handleKeyboardKey(e: JQuery.Event): void {
 }
 
 function handleResultsKey(e: JQuery.Event): void {
-  var $cards = $root.find('.search-grid .card');
-  var total = $cards.length;
+  const $cards = $root.find('.search-grid .card');
+  const total = $cards.length;
 
   switch (e.keyCode) {
     case TvKey.Right: {
-      var nr = gridMove(focusedIndex, total, 'right');
+      const nr = gridMove(focusedIndex, total, 'right');
       if (nr >= 0) { focusedIndex = nr; updateResultsFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Left: {
-      var nl = gridMove(focusedIndex, total, 'left');
+      const nl = gridMove(focusedIndex, total, 'left');
       if (nl >= 0) { focusedIndex = nl; updateResultsFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Down: {
-      var nd = gridMove(focusedIndex, total, 'down');
+      const nd = gridMove(focusedIndex, total, 'down');
       if (nd >= 0) { focusedIndex = nd; updateResultsFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Up: {
-      var nu = gridMove(focusedIndex, total, 'up');
+      const nu = gridMove(focusedIndex, total, 'up');
       if (nu >= 0) { focusedIndex = nu; updateResultsFocus(); }
       else {
         focusArea = 'keyboard';
@@ -286,9 +286,9 @@ function handleResultsKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     }
     case TvKey.Enter: {
-      var item = results[focusedIndex];
+      const item = results[focusedIndex];
       if (item) {
-        var isSerial = item.type === 'serial' || item.type === 'docuserial';
+        const isSerial = item.type === 'serial' || item.type === 'docuserial';
         navigate(isSerial ? 'serial' : 'movie', { id: item.id });
       }
       e.preventDefault(); break;

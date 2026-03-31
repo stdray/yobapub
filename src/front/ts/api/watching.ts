@@ -13,7 +13,7 @@ export function getWatchingInfo(id: number): JQueryDeferred<any> {
 }
 
 export function markTime(id: number, video: number, time: number, season?: number): JQueryDeferred<any> {
-  var params: Record<string, any> = { id: id, video: video, time: time };
+  const params: Record<string, any> = { id: id, video: video, time: time };
   if (season !== undefined) {
     params.season = season;
   }
@@ -21,7 +21,7 @@ export function markTime(id: number, video: number, time: number, season?: numbe
 }
 
 export function toggleWatched(id: number, video: number, season?: number): JQueryDeferred<any> {
-  var params: Record<string, any> = { id: id, video: video };
+  const params: Record<string, any> = { id: id, video: video };
   if (season !== undefined) {
     params.season = season;
   }

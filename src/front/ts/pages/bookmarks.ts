@@ -10,21 +10,21 @@ import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 import { proxyPosterUrl } from '../utils/storage';
 
-var $root = $('#page-bookmarks');
-var keys = pageKeys();
+const $root = $('#page-bookmarks');
+const keys = pageKeys();
 
 type ViewMode = 'folders' | 'items';
-var viewMode: ViewMode = 'folders';
+let viewMode: ViewMode = 'folders';
 
-var folders: BookmarkFolder[] = [];
-var folderFocused = 0;
+let folders: BookmarkFolder[] = [];
+let folderFocused = 0;
 
-var currentFolderId = 0;
-var currentFolderTitle = '';
-var itemsData: Item[] = [];
-var focusedIndex = 0;
+let currentFolderId = 0;
+let currentFolderTitle = '';
+let itemsData: Item[] = [];
+let focusedIndex = 0;
 
-var tplFolderItem = doT.template(
+const tplFolderItem = doT.template(
   '<div class="folder-item" data-id="{{=it.id}}">' +
     '<div class="folder-item__icon">&#128194;</div>' +
     '<div class="folder-item__info">' +
@@ -34,14 +34,14 @@ var tplFolderItem = doT.template(
   '</div>'
 );
 
-var tplFoldersPage = doT.template(
+const tplFoldersPage = doT.template(
   '<div class="watching">' +
     '<div class="watching__section-title">{{=it.title}}</div>' +
     '<div class="folder-list">{{=it.items}}</div>' +
   '</div>'
 );
 
-var tplItemsPage = doT.template(
+const tplItemsPage = doT.template(
   '<div class="watching">' +
     '<div class="watching__section-title">{{=it.title}}</div>' +
     '<div class="watching__grid">{{=it.cards}}</div>' +
@@ -53,7 +53,7 @@ function renderFolders(): void {
     $root.html('<div class="watching">' + tplEmptyText({ text: 'Нет папок' }) + '</div>');
     return;
   }
-  var html = '';
+  let html = '';
   for (var i = 0; i < folders.length; i++) {
     html += tplFolderItem({
       id: folders[i].id,
@@ -68,7 +68,7 @@ function renderFolders(): void {
 function updateFolderFocus(): void {
   $root.find('.folder-item').removeClass('focused');
   if (folders.length > 0) {
-    var $item = $root.find('.folder-item').eq(folderFocused);
+    const $item = $root.find('.folder-item').eq(folderFocused);
     $item.addClass('focused');
     scrollIntoView($item[0], $root.find('.watching')[0]);
   }
@@ -79,7 +79,7 @@ function renderItems(): void {
     $root.html('<div class="watching">' + tplEmptyText({ text: 'Папка пуста' }) + '</div>');
     return;
   }
-  var cards = '';
+  let cards = '';
   for (var i = 0; i < itemsData.length; i++) {
     cards += tplCard({
       id: itemsData[i].id,
@@ -94,7 +94,7 @@ function renderItems(): void {
 function updateItemFocus(): void {
   $root.find('.card').removeClass('focused');
   if (itemsData.length > 0 && focusedIndex < itemsData.length) {
-    var $card = $root.find('.card').eq(focusedIndex);
+    const $card = $root.find('.card').eq(focusedIndex);
     $card.addClass('focused');
     scrollIntoView($card[0], $root.find('.watching')[0]);
   }
@@ -118,7 +118,7 @@ function handleFolderKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     case TvKey.Enter:
       if (folders.length > 0) {
-        var folder = folders[folderFocused];
+        const folder = folders[folderFocused];
         currentFolderId = folder.id;
         currentFolderTitle = folder.title;
         openFolder(folder.id);
@@ -132,13 +132,13 @@ function handleFolderKey(e: JQuery.Event): void {
 }
 
 function handleItemKey(e: JQuery.Event): void {
-  var dir = e.keyCode === TvKey.Right ? 'right' as const
+  const dir = e.keyCode === TvKey.Right ? 'right' as const
     : e.keyCode === TvKey.Left ? 'left' as const
     : e.keyCode === TvKey.Down ? 'down' as const
     : e.keyCode === TvKey.Up ? 'up' as const
     : null;
   if (dir) {
-    var next = gridMove(focusedIndex, itemsData.length, dir);
+    const next = gridMove(focusedIndex, itemsData.length, dir);
     if (next >= 0) { focusedIndex = next; updateItemFocus(); }
     e.preventDefault();
     return;
@@ -147,10 +147,10 @@ function handleItemKey(e: JQuery.Event): void {
   switch (e.keyCode) {
     case TvKey.Enter:
       if (itemsData.length > 0) {
-        var item = itemsData[focusedIndex];
+        const item = itemsData[focusedIndex];
         if (item) {
           setParams({ folderId: currentFolderId, folderTitle: currentFolderTitle, focusedIndex: focusedIndex });
-          var isSerial = item.type === 'serial' || item.type === 'docuserial';
+          const isSerial = item.type === 'serial' || item.type === 'docuserial';
           navigate(isSerial ? 'serial' : 'movie', { id: item.id });
         }
       }

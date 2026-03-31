@@ -1,21 +1,21 @@
 import $ from 'jquery';
 import { apiGet, apiPost, apiGetWithRefresh, apiPostWithRefresh } from './client';
 
-var cachedDeviceId: number | null = null;
+let cachedDeviceId: number | null = null;
 
 export function getCurrentDeviceInfo(): JQueryDeferred<any> {
   return apiGetWithRefresh('/v1/device/info');
 }
 
 export function getDeviceId(): JQueryDeferred<number> {
-  var d = $.Deferred<number>();
+  let d = $.Deferred<number>();
   if (cachedDeviceId) {
     d.resolve(cachedDeviceId);
     return d;
   }
   getCurrentDeviceInfo().then(
     function (res: any) {
-      var data = Array.isArray(res) ? res[0] : res;
+      const data = Array.isArray(res) ? res[0] : res;
       if (data && data.device && data.device.id) {
         cachedDeviceId = data.device.id;
         d.resolve(cachedDeviceId!);
@@ -29,7 +29,7 @@ export function getDeviceId(): JQueryDeferred<number> {
 }
 
 export function getDeviceSettings(): JQueryDeferred<any> {
-  var d = $.Deferred();
+  let d = $.Deferred();
   getDeviceId().then(
     function (id: number) {
       apiGetWithRefresh('/v1/device/' + id + '/settings').then(
@@ -47,7 +47,7 @@ export function unlinkDevice(): JQueryDeferred<any> {
 }
 
 export function saveDeviceSettings(settings: Record<string, any>): JQueryDeferred<any> {
-  var d = $.Deferred();
+  let d = $.Deferred();
   getDeviceId().then(
     function (id: number) {
       apiPost('/v1/device/' + id + '/settings', settings).then(

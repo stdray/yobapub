@@ -13,9 +13,9 @@ export interface ProgressState {
 }
 
 export function getVideoDuration(state: ProgressState): number {
-  var api = state.currentDuration || 0;
+  let api = state.currentDuration || 0;
   if (state.videoEl) {
-    var d = state.videoEl.duration;
+    let d = state.videoEl.duration;
     if (d && !isNaN(d) && isFinite(d) && d > 0) {
       // Tizen 2.3 (Chrome 28) may report duration in ms instead of seconds
       if (api > 0 && d > api * 100) d = d / 1000;
@@ -36,10 +36,10 @@ export function cacheBarElements($root: JQuery, state: ProgressState): void {
 export function updateProgress($root: JQuery, state: ProgressState): void {
   if (!state.videoEl) return;
   cacheBarElements($root, state);
-  var cur = state.seeking ? state.seekPos : state.videoEl.currentTime;
-  var dur = getVideoDuration(state);
+  let cur = state.seeking ? state.seekPos : state.videoEl.currentTime;
+  const dur = getVideoDuration(state);
   if (cur < 0) cur = 0;
-  var pct = dur > 0 ? (cur / dur) * 100 : 0;
+  let pct = dur > 0 ? (cur / dur) * 100 : 0;
   if (pct > 100) pct = 100;
   if (state.barValueEl) {
     state.barValueEl.style.width = pct + '%';

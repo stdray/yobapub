@@ -5,7 +5,7 @@ export function getBookmarkFolders(): JQueryDeferred<any> {
 }
 
 export function getBookmarkItems(folderId: number, page?: number): JQueryDeferred<any> {
-  var params: Record<string, any> = {};
+  const params: Record<string, any> = {};
   if (page) { params.page = page; }
   return apiGetWithRefresh('/v1/bookmarks/' + folderId, params);
 }

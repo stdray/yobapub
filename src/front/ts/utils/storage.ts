@@ -1,6 +1,6 @@
 import { RouteName } from '../types/app';
 
-var KEYS = {
+const KEYS = {
   ACCESS_TOKEN: 'kp_access_token',
   REFRESH_TOKEN: 'kp_refresh_token',
   TOKEN_EXPIRES: 'kp_token_expires',
@@ -14,10 +14,10 @@ var KEYS = {
 };
 
 export function getDeviceId(): string {
-  var id = localStorage.getItem(KEYS.DEVICE_ID);
+  let id = localStorage.getItem(KEYS.DEVICE_ID);
   if (id) return id;
   id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0;
+    const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
   localStorage.setItem(KEYS.DEVICE_ID, id);
@@ -39,7 +39,7 @@ export function saveTokens(accessToken: string, refreshToken: string, expiresIn:
 }
 
 export function isTokenExpired(): boolean {
-  var expires = localStorage.getItem(KEYS.TOKEN_EXPIRES);
+  const expires = localStorage.getItem(KEYS.TOKEN_EXPIRES);
   if (!expires) return true;
   return Date.now() > parseInt(expires, 10);
 }
@@ -59,7 +59,7 @@ export var QUALITY_OPTIONS = [
 ];
 
 export function getDefaultQuality(): number {
-  var val = localStorage.getItem(KEYS.DEFAULT_QUALITY);
+  const val = localStorage.getItem(KEYS.DEFAULT_QUALITY);
   if (val !== null) return parseInt(val, 10) || 0;
   return -1;
 }
@@ -74,7 +74,7 @@ export var SUB_SIZE_MIN = 22;
 export var SUB_SIZE_MAX = 82;
 
 export function getSubSize(): number {
-  var val = localStorage.getItem(KEYS.SUB_SIZE);
+  const val = localStorage.getItem(KEYS.SUB_SIZE);
   return val !== null ? (parseInt(val, 10) || DEFAULT_SUB_SIZE) : DEFAULT_SUB_SIZE;
 }
 
@@ -82,11 +82,11 @@ export function setSubSize(size: number): void {
   localStorage.setItem(KEYS.SUB_SIZE, String(size));
 }
 
-var STREAMING_TYPES: Record<string, string> = { 'hls': 'hls', 'hls2': 'hls2', 'hls4': 'hls4' };
+const STREAMING_TYPES: Record<string, string> = { 'hls': 'hls', 'hls2': 'hls2', 'hls4': 'hls4' };
 
 export function getStreamingType(): string {
-  var val = localStorage.getItem(KEYS.STREAMING_TYPE) || 'hls4';
-  var code = STREAMING_TYPES[val];
+  const val = localStorage.getItem(KEYS.STREAMING_TYPE) || 'hls4';
+  let code = STREAMING_TYPES[val];
   if (!code) {
     code = 'hls4';
     localStorage.setItem(KEYS.STREAMING_TYPE, code);
@@ -100,8 +100,8 @@ export function setStreamingType(type: string): void {
 
 // --- Per-title playback preferences (LRU, max 100) ---
 
-var TITLE_PREFS_KEY = 'kp_title_prefs';
-var TITLE_PREFS_MAX = 100;
+const TITLE_PREFS_KEY = 'kp_title_prefs';
+const TITLE_PREFS_MAX = 100;
 
 export interface TitlePrefs {
   id: number;
@@ -113,7 +113,7 @@ export interface TitlePrefs {
 
 function loadTitlePrefsArr(): TitlePrefs[] {
   try {
-    var raw = localStorage.getItem(TITLE_PREFS_KEY);
+    const raw = localStorage.getItem(TITLE_PREFS_KEY);
     if (raw) return JSON.parse(raw) as TitlePrefs[];
   } catch (e) { /* ignore */ }
   return [];
@@ -124,7 +124,7 @@ function saveTitlePrefsArr(arr: TitlePrefs[]): void {
 }
 
 export function getTitlePrefs(itemId: number): TitlePrefs | null {
-  var arr = loadTitlePrefsArr();
+  const arr = loadTitlePrefsArr();
   for (var i = 0; i < arr.length; i++) {
     if (arr[i].id === itemId) return arr[i];
   }
@@ -132,8 +132,8 @@ export function getTitlePrefs(itemId: number): TitlePrefs | null {
 }
 
 export function saveTitlePrefs(prefs: TitlePrefs): void {
-  var arr = loadTitlePrefsArr();
-  var filtered: TitlePrefs[] = [];
+  const arr = loadTitlePrefsArr();
+  const filtered: TitlePrefs[] = [];
   for (var i = 0; i < arr.length; i++) {
     if (arr[i].id !== prefs.id) filtered.push(arr[i]);
   }
@@ -162,7 +162,7 @@ export var START_PAGE_OPTIONS: Array<{ id: RouteName; label: string }> = [
 ];
 
 export function getStartPage(): RouteName {
-  var val = localStorage.getItem(KEYS.START_PAGE);
+  const val = localStorage.getItem(KEYS.START_PAGE);
   for (var i = 0; i < START_PAGE_OPTIONS.length; i++) {
     if (START_PAGE_OPTIONS[i].id === val) return val as RouteName;
   }
@@ -174,7 +174,7 @@ export function setStartPage(id: RouteName): void {
 }
 
 export function isProxyPosters(): boolean {
-  var val = localStorage.getItem(KEYS.PROXY_POSTERS);
+  const val = localStorage.getItem(KEYS.PROXY_POSTERS);
   return val === null || val === '1';
 }
 

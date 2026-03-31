@@ -15,7 +15,7 @@ export function gridPos(index: number, totalItems: number): GridPos {
 }
 
 export function gridMove(index: number, totalItems: number, dir: 'up' | 'down' | 'left' | 'right'): number {
-  var g = gridPos(index, totalItems);
+  const g = gridPos(index, totalItems);
   switch (dir) {
     case 'right':
       if (index < totalItems - 1 && g.col < CARDS_PER_ROW - 1) return index + 1;

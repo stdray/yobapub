@@ -11,10 +11,10 @@ import { tplCard, tplEmptyText } from '../utils/templates';
 import { proxyPosterUrl } from '../utils/storage';
 import { getItems } from '../api/items';
 
-var $root = $('#page-novelties');
-var keys = pageKeys();
+const $root = $('#page-novelties');
+const keys = pageKeys();
 
-var SECTIONS_CONFIG = [
+const SECTIONS_CONFIG = [
   { type: 'movie',      title: 'Новые фильмы' },
   { type: 'serial',     title: 'Новые сериалы' },
   { type: 'documovie',  title: 'Новые документальные фильмы' },
@@ -29,16 +29,16 @@ interface SectionData {
   items: Array<{ id: number; type: string }>;
 }
 
-var sections: SectionData[] = [];
-var focusedSection = 0;
-var focusedIndex = 0;
+let sections: SectionData[] = [];
+let focusedSection = 0;
+let focusedIndex = 0;
 
-var tplSection = doT.template(
+const tplSection = doT.template(
   '<div class="watching__section-title">{{=it.title}}</div>' +
   '<div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>'
 );
 
-var tplLayout = doT.template(
+const tplLayout = doT.template(
   '<div class="content"><div class="watching">{{=it.rows}}</div></div>'
 );
 
@@ -46,11 +46,11 @@ function buildRows(): string {
   if (sections.length === 0) {
     return tplEmptyText({ text: 'Нет данных' });
   }
-  var html = '';
+  let html = '';
   for (var i = 0; i < sections.length; i++) {
-    var cards = '';
+    let cards = '';
     for (var j = 0; j < sections[i].items.length; j++) {
-      var item = sections[i].items[j] as any;
+      const item = sections[i].items[j] as any;
       cards += tplCard({
         id: item.id,
         poster: proxyPosterUrl(item.poster),
@@ -72,10 +72,10 @@ function updateFocus(): void {
   $root.find('.card').removeClass('focused');
   if (sections.length === 0) return;
 
-  var $grid = $root.find('.watching__grid[data-section="' + focusedSection + '"]');
-  var $cards = $grid.find('.card');
+  const $grid = $root.find('.watching__grid[data-section="' + focusedSection + '"]');
+  const $cards = $grid.find('.card');
   if ($cards.length > 0 && focusedIndex < $cards.length) {
-    var $card = $cards.eq(focusedIndex);
+    const $card = $cards.eq(focusedIndex);
     $card.addClass('focused');
     scrollIntoView($card[0], $root.find('.watching')[0]);
   }
@@ -84,22 +84,22 @@ function updateFocus(): void {
 function handleKey(e: JQuery.Event): void {
   if (sections.length === 0) return;
 
-  var currentItems = sections[focusedSection].items;
-  var g = gridPos(focusedIndex, currentItems.length);
+  const currentItems = sections[focusedSection].items;
+  const g = gridPos(focusedIndex, currentItems.length);
 
   switch (e.keyCode) {
     case TvKey.Right: {
-      var nr = gridMove(focusedIndex, currentItems.length, 'right');
+      const nr = gridMove(focusedIndex, currentItems.length, 'right');
       if (nr >= 0) { focusedIndex = nr; updateFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Left: {
-      var nl = gridMove(focusedIndex, currentItems.length, 'left');
+      const nl = gridMove(focusedIndex, currentItems.length, 'left');
       if (nl >= 0) { focusedIndex = nl; updateFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Down: {
-      var nd = gridMove(focusedIndex, currentItems.length, 'down');
+      const nd = gridMove(focusedIndex, currentItems.length, 'down');
       if (nd >= 0) { focusedIndex = nd; updateFocus(); }
       else if (focusedSection < sections.length - 1) {
         focusedSection++;
@@ -109,21 +109,21 @@ function handleKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     }
     case TvKey.Up: {
-      var nu = gridMove(focusedIndex, currentItems.length, 'up');
+      const nu = gridMove(focusedIndex, currentItems.length, 'up');
       if (nu >= 0) { focusedIndex = nu; updateFocus(); }
       else if (focusedSection > 0) {
         focusedSection--;
-        var pg = gridPos(0, sections[focusedSection].items.length);
+        const pg = gridPos(0, sections[focusedSection].items.length);
         focusedIndex = Math.min((pg.totalRows - 1) * CARDS_PER_ROW + g.col, sections[focusedSection].items.length - 1);
         updateFocus();
       }
       e.preventDefault(); break;
     }
     case TvKey.Enter: {
-      var item = currentItems[focusedIndex];
+      const item = currentItems[focusedIndex];
       if (item) {
         setParams({ focusedSection: focusedSection, focusedIndex: focusedIndex });
-        var isSerial = item.type === 'serial' || item.type === 'docuserial';
+        const isSerial = item.type === 'serial' || item.type === 'docuserial';
         navigate(isSerial ? 'serial' : 'movie', { id: item.id });
       }
       e.preventDefault(); break;
@@ -138,25 +138,25 @@ function handleKey(e: JQuery.Event): void {
 
 export var noveltiesPage: Page = {
   mount: function (params: RouteParams) {
-    var savedSection = params.focusedSection;
-    var savedIndex = params.focusedIndex;
+    const savedSection = params.focusedSection;
+    const savedIndex = params.focusedIndex;
     showSpinnerIn($root);
 
-    var requests = [];
+    const requests = [];
     for (var i = 0; i < SECTIONS_CONFIG.length; i++) {
       requests.push(getItems(SECTIONS_CONFIG[i].type, 'created-'));
     }
 
     ($.when as any).apply($, requests).then(function () {
       sections = [];
-      var args = arguments;
-      var n = SECTIONS_CONFIG.length;
+      const args = arguments;
+      const n = SECTIONS_CONFIG.length;
       for (var i = 0; i < n; i++) {
-        var raw = n === 1 ? args[0] : args[i];
-        var res = Array.isArray(raw) ? raw[0] : raw;
-        var items: Item[] = (res && res.items) || [];
+        const raw = n === 1 ? args[0] : args[i];
+        const res = Array.isArray(raw) ? raw[0] : raw;
+        const items: Item[] = (res && res.items) || [];
         if (items.length > 0) {
-          var sectionItems = items.map(function (it: Item) {
+          const sectionItems = items.map(function (it: Item) {
             return { id: it.id, type: it.type, title: it.title, poster: it.posters.medium };
           });
           sections.push({ title: SECTIONS_CONFIG[i].title, items: sectionItems });

@@ -24,9 +24,9 @@ export function pollDeviceToken(
   onExpired: () => void,
   onError: (msg: string) => void
 ): { stop: () => void } {
-  var stopped = false;
-  var elapsed = 0;
-  var timerId: number | null = null;
+  let stopped = false;
+  let elapsed = 0;
+  let timerId: number | null = null;
 
   function poll(): void {
     if (stopped) return;
@@ -54,7 +54,7 @@ export function pollDeviceToken(
       function (xhr: JQueryXHR) {
         if (stopped) return;
         try {
-          var body: AuthErrorResponse = JSON.parse(xhr.responseText);
+          const body: AuthErrorResponse = JSON.parse(xhr.responseText);
           if (body.error === 'authorization_pending') {
             elapsed += interval;
             timerId = window.setTimeout(poll, interval * 1000);

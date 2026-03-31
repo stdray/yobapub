@@ -12,20 +12,20 @@ export interface InfoState {
 }
 
 export function getStreamInfo(state: InfoState): string {
-  var parts: string[] = [];
+  const parts: string[] = [];
 
   parts.push('HLS');
 
   if (state.files.length > 0 && state.selectedQuality < state.files.length) {
-    var f = state.files[state.selectedQuality];
-    var ql = f.quality || (f.h + 'p');
+    const f = state.files[state.selectedQuality];
+    const ql = f.quality || (f.h + 'p');
     parts.push(ql + ' ' + f.w + '\u00d7' + f.h);
     if (f.codec) parts.push(f.codec.toUpperCase());
   }
 
   if (state.audios.length > 0 && state.selectedAudio < state.audios.length) {
-    var a = state.audios[state.selectedAudio];
-    var albl = a.lang;
+    const a = state.audios[state.selectedAudio];
+    let albl = a.lang;
     if (a.author && a.author.title) albl += ' (' + a.author.title + ')';
     albl += ' ' + a.codec + ' ' + a.channels + 'ch';
     parts.push(albl);

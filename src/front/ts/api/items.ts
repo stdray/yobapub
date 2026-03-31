@@ -8,13 +8,13 @@ export function getItem(id: number): JQueryDeferred<any> {
 }
 
 export function getItems(type: string, sort?: string): JQueryDeferred<any> {
-  var params: Record<string, any> = { type: type };
+  const params: Record<string, any> = { type: type };
   if (sort) params.sort = sort;
   return apiGetWithRefresh('/v1/items', params);
 }
 
 export function searchItems(query: string, page?: number, perpage?: number): JQueryDeferred<ItemsResponse> {
-  var params: Record<string, string | number> = { q: query, field: 'title' };
+  const params: Record<string, string | number> = { q: query, field: 'title' };
   if (page !== undefined) params.page = page;
   if (perpage !== undefined) params.perpage = perpage;
   return apiGetWithRefresh('/v1/items/search', params);
@@ -27,10 +27,10 @@ export function loadItemWithWatching(
 ): void {
   $.when(getItem(id), getWatchingInfo(id)).then(
     function (itemRes: any, watchRes: any) {
-      var iData = Array.isArray(itemRes) ? itemRes[0] : itemRes;
-      var wData = Array.isArray(watchRes) ? watchRes[0] : watchRes;
-      var item: Item = iData.item;
-      var watching: WatchingInfoItem | null = (wData && wData.item) || null;
+      const iData = Array.isArray(itemRes) ? itemRes[0] : itemRes;
+      const wData = Array.isArray(watchRes) ? watchRes[0] : watchRes;
+      const item: Item = iData.item;
+      const watching: WatchingInfoItem | null = (wData && wData.item) || null;
       if (item) { onSuccess(item, watching); }
       else { onError(); }
     },

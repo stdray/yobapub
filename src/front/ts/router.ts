@@ -1,10 +1,10 @@
 import $ from 'jquery';
 import { RouteName, RouteParams, Page } from './types/app';
 
-var pages: Record<string, Page> = {};
-var currentRoute: RouteName | null = null;
-var currentParams: RouteParams = {};
-var history: Array<{ route: RouteName; params: RouteParams }> = [];
+const pages: Record<string, Page> = {};
+let currentRoute: RouteName | null = null;
+let currentParams: RouteParams = {};
+const history: Array<{ route: RouteName; params: RouteParams }> = [];
 
 export function registerPage(name: RouteName, page: Page): void {
   pages[name] = page;
@@ -23,7 +23,7 @@ export function navigate(route: RouteName, params?: RouteParams): void {
   pages[route].mount(currentParams);
 }
 
-var exitHandler: (() => void) | null = null;
+let exitHandler: (() => void) | null = null;
 
 export function setExitHandler(fn: () => void): void {
   exitHandler = fn;
@@ -40,7 +40,7 @@ export function goBack(): boolean {
     $('#page-' + currentRoute).addClass('hidden');
   }
 
-  var prev = history.pop()!;
+  const prev = history.pop()!;
   currentRoute = prev.route;
   $('#page-' + prev.route).removeClass('hidden');
   pages[prev.route].mount(prev.params);

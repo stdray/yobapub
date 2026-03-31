@@ -7,19 +7,19 @@ import { TvKey, getDeviceInfo } from '../utils/platform';
 import { apiPost } from '../api/client';
 import { pageKeys, clearPage } from '../utils/page';
 
-var $root = $('#page-login');
-var keys = pageKeys();
-var poller: { stop: () => void } | null = null;
-var countdownTimer: number | null = null;
+const $root = $('#page-login');
+const keys = pageKeys();
+let poller: { stop: () => void } | null = null;
+let countdownTimer: number | null = null;
 
-var tplLoading = doT.template(
+const tplLoading = doT.template(
   '<div class="login">' +
     '<div class="login__title">YobaPub</div>' +
     '<div class="login__status">Загрузка...</div>' +
   '</div>'
 );
 
-var tplCode = doT.template(
+const tplCode = doT.template(
   '<div class="login">' +
     '<div class="login__title">Вход в аккаунт</div>' +
     '<div class="login__url">Перейдите на <b>{{=it.uri}}</b></div>' +
@@ -29,7 +29,7 @@ var tplCode = doT.template(
   '</div>'
 );
 
-var tplExpired = doT.template(
+const tplExpired = doT.template(
   '<div class="login">' +
     '<div class="login__title">YobaPub</div>' +
     '<div class="login__expired">Срок активации истёк!</div>' +
@@ -37,7 +37,7 @@ var tplExpired = doT.template(
   '</div>'
 );
 
-var tplError = doT.template(
+const tplError = doT.template(
   '<div class="login">' +
     '<div class="login__title">YobaPub</div>' +
     '<div class="login__error">{{=it.message}}</div>' +
@@ -64,10 +64,10 @@ function startAuth(): void {
     function (data) {
       $root.html(tplCode({ code: data.user_code, uri: data.verification_uri, expires: data.expires_in }));
 
-      var remaining = data.expires_in;
+      let remaining = data.expires_in;
       countdownTimer = window.setInterval(function () {
         remaining--;
-        var $el = $('#login-countdown');
+        const $el = $('#login-countdown');
         if ($el.length) { $el.text(String(remaining)); }
         if (remaining <= 0 && countdownTimer !== null) { clearInterval(countdownTimer); }
       }, 1000);
@@ -78,7 +78,7 @@ function startAuth(): void {
         data.expires_in,
         function () {
           cleanup();
-          var info = getDeviceInfo();
+          const info = getDeviceInfo();
           apiPost('/v1/device/notify', { title: info.title, hardware: info.hardware, software: info.software });
           navigate('watching');
         },
@@ -87,10 +87,10 @@ function startAuth(): void {
       );
     },
     function (xhr: JQueryXHR) {
-      var msg = 'Ошибка подключения к серверу';
+      let msg = 'Ошибка подключения к серверу';
       try {
         if (xhr && xhr.responseText) {
-          var body = JSON.parse(xhr.responseText);
+          const body = JSON.parse(xhr.responseText);
           msg = body.error_description || body.error || msg;
         }
         if (xhr && xhr.status) { msg += ' (' + xhr.status + ')'; }

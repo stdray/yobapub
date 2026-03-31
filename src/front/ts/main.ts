@@ -39,7 +39,7 @@ registerPage('tv-player', tvPlayerPage);
 registerPage('history', historyPage);
 
 function notifyDevice(): void {
-  var info = getDeviceInfo();
+  const info = getDeviceInfo();
   console.log('[notify] title:', info.title, 'hw:', info.hardware, 'sw:', info.software);
   apiPostWithRefresh('/v1/device/notify', {
     title: info.title,

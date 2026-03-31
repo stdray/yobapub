@@ -37,7 +37,7 @@ declare var webapis: any;
 export function registerTizenKeys(): void {
   try {
     if (typeof tizen !== 'undefined' && tizen.tvinputdevice) {
-      var keysToRegister = [
+      const keysToRegister = [
         'MediaPlay', 'MediaPause', 'MediaPlayPause', 'MediaStop',
         'MediaFastForward', 'MediaRewind',
         'MediaTrackNext', 'MediaTrackPrevious',
@@ -64,14 +64,14 @@ export interface DeviceInfo {
 }
 
 export function getDeviceInfo(): DeviceInfo {
-  var title = 'YobaPub Tizen';
-  var hardware = 'Unknown';
-  var software = 'Unknown';
+  let title = 'YobaPub Tizen';
+  let hardware = 'Unknown';
+  let software = 'Unknown';
 
   try {
     if (typeof webapis !== 'undefined' && webapis.productinfo) {
-      var model = webapis.productinfo.getModel ? webapis.productinfo.getModel() : '';
-      var firmware = webapis.productinfo.getFirmware ? webapis.productinfo.getFirmware() : '';
+      const model = webapis.productinfo.getModel ? webapis.productinfo.getModel() : '';
+      const firmware = webapis.productinfo.getFirmware ? webapis.productinfo.getFirmware() : '';
       hardware = 'Samsung ' + (model || 'Smart TV');
       software = 'Tizen' + (firmware ? ' ' + firmware : '');
       title = 'YobaPub ' + hardware;
@@ -82,15 +82,15 @@ export function getDeviceInfo(): DeviceInfo {
 
   // Fallback for browser testing
   if (hardware === 'Unknown') {
-    var ua = navigator.userAgent;
+    const ua = navigator.userAgent;
     if (ua.indexOf('Tizen') !== -1) {
       hardware = 'Samsung Smart TV';
-      var tizenMatch = ua.match(/Tizen\s*([\d.]+)/);
+      const tizenMatch = ua.match(/Tizen\s*([\d.]+)/);
       software = 'Tizen' + (tizenMatch ? ' ' + tizenMatch[1] : '');
       title = 'YobaPub Samsung TV';
     } else {
-      var browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge)\/([\d.]+)/);
-      var osMatch = ua.match(/(Windows|Mac OS X|Linux|Android|iOS)[^\s;)]*/);
+      const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge)\/([\d.]+)/);
+      const osMatch = ua.match(/(Windows|Mac OS X|Linux|Android|iOS)[^\s;)]*/);
       hardware = osMatch ? osMatch[0] : 'Browser';
       software = browserMatch ? browserMatch[1] + ' ' + browserMatch[2] : navigator.userAgent.substring(0, 50);
       title = 'YobaPub Web';
@@ -103,16 +103,16 @@ export function getDeviceInfo(): DeviceInfo {
 export function getTizenVersion(): number {
   try {
     if (typeof tizen !== 'undefined' && tizen.systeminfo) {
-      var cap = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
+      const cap = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
       if (cap) return parseFloat(cap) || 0;
     }
   } catch (e) { /* ignore */ }
-  var m = navigator.userAgent.match(/Tizen\s*([\d.]+)/);
+  const m = navigator.userAgent.match(/Tizen\s*([\d.]+)/);
   return m ? (parseFloat(m[1]) || 0) : 0;
 }
 
 export function isLegacyTizen(): boolean {
-  var v = getTizenVersion();
+  const v = getTizenVersion();
   return v > 0 && v < 3;
 }
 

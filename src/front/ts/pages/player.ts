@@ -21,26 +21,26 @@ import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQ
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
 import { InfoState, updateInfoBadge, showInfo, hideInfo } from './player/info';
 
-var $root = $('#page-player');
-var keys = pageKeys();
-var markTimer: number | null = null;
-var videoEl: HTMLVideoElement | null = null;
+const $root = $('#page-player');
+const keys = pageKeys();
+let markTimer: number | null = null;
+let videoEl: HTMLVideoElement | null = null;
 
 
-var currentItem: Item | null = null;
-var currentSeason: number | undefined;
-var currentEpisode: number | undefined;
-var currentVideo: number | undefined;
+let currentItem: Item | null = null;
+let currentSeason: number | undefined;
+let currentEpisode: number | undefined;
+let currentVideo: number | undefined;
 
-var currentFiles: VideoFile[] = [];
-var currentAudios: AudioTrack[] = [];
-var currentSubs: Subtitle[] = [];
-var currentTitle = '';
-var currentDuration = 0;
-var currentHlsUrl = '';
-var hlsInstance: Hls | null = null;
-var playSourceDebug = '';
-var playbackStarted = false;
+let currentFiles: VideoFile[] = [];
+let currentAudios: AudioTrack[] = [];
+let currentSubs: Subtitle[] = [];
+let currentTitle = '';
+let currentDuration = 0;
+let currentHlsUrl = '';
+let hlsInstance: Hls | null = null;
+let playSourceDebug = '';
+let playbackStarted = false;
 
 interface PlayState {
   quality: number;
@@ -50,11 +50,11 @@ interface PlayState {
   paused: boolean;
 }
 
-var state: PlayState = { quality: 0, audio: 0, sub: -1, position: 0, paused: false };
+let state: PlayState = { quality: 0, audio: 0, sub: -1, position: 0, paused: false };
 
 // --- Progress state ---
 
-var progressState: ProgressState = {
+const progressState: ProgressState = {
   videoEl: null,
   currentDuration: 0,
   seeking: false,
@@ -74,7 +74,7 @@ function syncProgressState(): void {
 
 // --- Panel state ---
 
-var panelState: PanelState = {
+const panelState: PanelState = {
   open: false,
   btnIndex: 0,
   listOpen: false,
@@ -108,7 +108,7 @@ function getPanelData(): PanelData {
   };
 }
 
-var panelCallbacks: PanelCallbacks = {
+const panelCallbacks: PanelCallbacks = {
   onShowBar: function () { showBar(); },
   onHideBar: function () { hideBar(); },
   onClearBarTimer: function () { clearBarTimer(); },
@@ -129,11 +129,11 @@ var panelCallbacks: PanelCallbacks = {
 
 // --- Toast / OSD ---
 
-var toastTimer: number | null = null;
-var osdTimer: number | null = null;
+let toastTimer: number | null = null;
+let osdTimer: number | null = null;
 
 function showToast(text: string): void {
-  var $toast = $root.find('.player__toast');
+  let $toast = $root.find('.player__toast');
   if ($toast.length === 0) {
     $root.find('.player').append('<div class="player__toast"></div>');
     $toast = $root.find('.player__toast');
@@ -144,7 +144,7 @@ function showToast(text: string): void {
 }
 
 function showOsd(icon: string): void {
-  var symbols: Record<string, string> = { play: '\u25B6', pause: '\u275A\u275A', rw: '\u23EA', ff: '\u23E9' };
+  const symbols: Record<string, string> = { play: '\u25B6', pause: '\u275A\u275A', rw: '\u23EA', ff: '\u23E9' };
   $root.find('.player__osd').text(symbols[icon] || icon).removeClass('hidden');
   if (osdTimer) clearTimeout(osdTimer);
   osdTimer = window.setTimeout(function () {
@@ -155,11 +155,11 @@ function showOsd(icon: string): void {
 
 // --- Seek ---
 
-var seekPos = -1;
-var seekCount = 0;
-var seekDir = '';
-var seeking = false;
-var seekApplyTimer: number | null = null;
+let seekPos = -1;
+let seekCount = 0;
+let seekDir = '';
+let seeking = false;
+let seekApplyTimer: number | null = null;
 
 function startSeek(dir: string): void {
   seeking = true;
@@ -167,8 +167,8 @@ function startSeek(dir: string): void {
   if (seekPos === -1 && videoEl) seekPos = videoEl.currentTime;
 
   syncProgressState();
-  var step = 10 + Math.pow(Math.min(seekCount, 3000), 3) / 1000;
-  var dur = getVideoDuration(progressState);
+  const step = 10 + Math.pow(Math.min(seekCount, 3000), 3) / 1000;
+  const dur = getVideoDuration(progressState);
   seekPos += dir === 'right' ? step : -step;
   seekPos = Math.max(0, dur > 0 ? Math.min(seekPos, dur - 2) : seekPos);
   seekCount++;
@@ -189,10 +189,10 @@ function startSeek(dir: string): void {
 function applySeek(): void {
   if (!seeking || seekPos < 0 || !videoEl) return;
   syncProgressState();
-  var dur = getVideoDuration(progressState);
+  const dur = getVideoDuration(progressState);
   if (dur > 0) seekPos = Math.min(seekPos, dur - 2);
   seekPos = Math.max(0, seekPos);
-  var pos = seekPos;
+  let pos = seekPos;
   plog.info('applySeek pos={pos} dur={dur}', { pos, dur });
   resetSeek();
   continuePlaying({ quality: state.quality, audio: state.audio, sub: state.sub, position: pos, paused: state.paused });
@@ -212,21 +212,21 @@ function navigateTrack(dir: number): boolean {
 
   if (currentSeason !== undefined && currentEpisode !== undefined && currentItem.seasons) {
     for (var si = 0; si < currentItem.seasons.length; si++) {
-      var s = currentItem.seasons[si];
+      const s = currentItem.seasons[si];
       if (s.number !== currentSeason) continue;
       for (var ei = 0; ei < s.episodes.length; ei++) {
         if (s.episodes[ei].number !== currentEpisode) continue;
-        var targetIdx = ei + dir;
+        const targetIdx = ei + dir;
         if (targetIdx >= 0 && targetIdx < s.episodes.length) {
           savePosition(); destroyPlayer();
           currentEpisode = s.episodes[targetIdx].number;
           remountTrack();
           return true;
         }
-        var targetSeason = si + dir;
+        const targetSeason = si + dir;
         if (targetSeason >= 0 && targetSeason < currentItem.seasons.length) {
-          var ts = currentItem.seasons[targetSeason];
-          var ep = dir > 0 ? ts.episodes[0] : ts.episodes[ts.episodes.length - 1];
+          const ts = currentItem.seasons[targetSeason];
+          const ep = dir > 0 ? ts.episodes[0] : ts.episodes[ts.episodes.length - 1];
           if (ep) {
             savePosition(); destroyPlayer();
             currentSeason = ts.number;
@@ -239,7 +239,7 @@ function navigateTrack(dir: number): boolean {
       }
     }
   } else if (currentVideo !== undefined && currentItem.videos) {
-    var newVideo = currentVideo + dir;
+    const newVideo = currentVideo + dir;
     if (newVideo >= 1 && newVideo <= currentItem.videos.length) {
       savePosition(); destroyPlayer();
       currentVideo = newVideo;
@@ -252,8 +252,8 @@ function navigateTrack(dir: number): boolean {
 
 function remountTrack(): void {
   if (!currentItem) return;
-  var media: MediaInfo | null = null;
-  var pos = 0;
+  let media: MediaInfo | null = null;
+  let pos = 0;
 
   if (currentSeason !== undefined && currentEpisode !== undefined) {
     media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
@@ -267,18 +267,18 @@ function remountTrack(): void {
 
   if (!media) return;
 
-  var itemTitle = currentItem.title.split(' / ')[0];
+  const itemTitle = currentItem.title.split(' / ')[0];
   currentTitle = media.title;
   currentDuration = media.duration;
   currentAudios = media.audios;
-  var prefs = currentItem ? getTitlePrefs(currentItem.id) : null;
+  const prefs = currentItem ? getTitlePrefs(currentItem.id) : null;
 
   loadMediaLinks(media.mid, function (files, subs) {
     currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
     currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-    var q = restoreQualityIndex(currentFiles, prefs);
-    var a = restoreAudioIndex(currentAudios, prefs);
-    var s = restoreSubIndex(currentSubs, prefs);
+    const q = restoreQualityIndex(currentFiles, prefs);
+    const a = restoreAudioIndex(currentAudios, prefs);
+    const s = restoreSubIndex(currentSubs, prefs);
 
     if (currentFiles.length === 0) return;
     continuePlaying({ quality: q, audio: a, sub: s, position: pos, paused: false }, itemTitle + ' - ' + currentTitle);
@@ -286,10 +286,10 @@ function remountTrack(): void {
 }
 
 function getHlsUrl(f: VideoFile): string {
-  var hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
-  var hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  const hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
+  const hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
   if (isLegacyTizen()) return hls2;
-  var sp = getStreamingType();
+  const sp = getStreamingType();
   if (sp === 'hls4') return hls4;
   if (sp === 'hls2') return hls2;
   return hls4 || hls2;
@@ -301,9 +301,9 @@ function currentPosition(): number {
 }
 
 function continuePlaying(next: PlayState, title?: string): void {
-  var needSource = next.quality !== state.quality || next.audio !== state.audio || !videoEl;
-  var needSub = next.sub !== state.sub;
-  var needSeek = !needSource && Math.abs(next.position - currentPosition()) > 2;
+  const needSource = next.quality !== state.quality || next.audio !== state.audio || !videoEl;
+  const needSub = next.sub !== state.sub;
+  const needSeek = !needSource && Math.abs(next.position - currentPosition()) > 2;
 
   plog.info('continuePlaying {needSource} {needSeek} {needSub}', {
     needSource, needSeek, needSub,
@@ -316,13 +316,13 @@ function continuePlaying(next: PlayState, title?: string): void {
 
   if (needSource) {
     if (currentFiles.length === 0) return;
-    var f = currentFiles[state.quality];
-    var hlsUrl = getHlsUrl(f);
+    const f = currentFiles[state.quality];
+    let hlsUrl = getHlsUrl(f);
     if (!hlsUrl) return;
     if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
     currentHlsUrl = hlsUrl;
-    var audioIndex = currentAudios.length > 0 ? currentAudios[state.audio].index : 1;
-    var rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
+    const audioIndex = currentAudios.length > 0 ? currentAudios[state.audio].index : 1;
+    const rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
     if (!videoEl) {
       playUrl(rewriteUrl, title || currentTitle);
     } else {
@@ -343,8 +343,8 @@ function continuePlaying(next: PlayState, title?: string): void {
 
 // --- Bar show/hide ---
 
-var barTimer: number | null = null;
-var progressTimer: number | null = null;
+let barTimer: number | null = null;
+let progressTimer: number | null = null;
 
 function startProgressTimer(): void {
   stopProgressTimer();
@@ -392,7 +392,7 @@ function doSavePrefs(): void {
 // --- Playback ---
 
 function buildHlsConfig(): Record<string, any> {
-  var cfg: Record<string, any> = {};
+  const cfg: Record<string, any> = {};
   if (state.position > 0) cfg.startPosition = state.position;
   cfg.maxBufferLength = 10;
   cfg.maxMaxBufferLength = 30;
@@ -414,12 +414,12 @@ function playSource(url: string): void {
   currentHlsUrl = url;
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   playSourceDebug = 'url=' + url.substring(0, 120);
-  var cfg = buildHlsConfig();
+  const cfg = buildHlsConfig();
   plog.info('playSource startPosition={startPosition} url={url}', {
     startPosition: cfg.startPosition || 0,
     url: url.substring(0, 120),
   });
-  var hls = new Hls(cfg);
+  const hls = new Hls(cfg);
   hlsInstance = hls;
   hls.on(Hls.Events.MANIFEST_PARSED, function () {
     plog.info('hls MANIFEST_PARSED');
@@ -438,7 +438,7 @@ function playSource(url: string): void {
       // skip past it so hls.js loads the next one.
       if (data.details === 'fragParsingError' && data.frag && videoEl
           && videoEl.readyState < 2 /* HAVE_CURRENT_DATA */) {
-        var skipTo = (data.frag.start || 0) + (data.frag.duration || 10) + 0.5;
+        const skipTo = (data.frag.start || 0) + (data.frag.duration || 10) + 0.5;
         plog.warn('skipping broken fragment, seeking to {skipTo}', { skipTo });
         videoEl.currentTime = skipTo;
       }
@@ -460,7 +460,7 @@ function playSource(url: string): void {
 }
 
 function safePlay(v: HTMLVideoElement): void {
-  var pr = v.play();
+  const pr = v.play();
   if (pr && typeof (pr as any).catch === 'function') {
     (pr as any).catch(function (err: Error) {
       plog.error('play() rejected {name} {message}', { name: err.name, message: err.message });
@@ -475,7 +475,7 @@ function onSourceReady(): void {
     // Seek first (while paused), then play once position is confirmed.
     // On Tizen 2.3 (Chromium 28) currentTime assignment may be silently ignored
     // if the fragment at that position isn't buffered yet — retry until it lands.
-    const pos = state.position;
+    let pos = state.position;
     const v = videoEl;
     let retries = 0;
     const trySeekThenPlay = () => {
@@ -541,9 +541,9 @@ function getVideoErrorMessage(error: MediaError | null): string {
 }
 
 function showPlaybackError(error: MediaError | null, url: string, debugMsg?: string): void {
-  var msg = getVideoErrorMessage(error);
-  var code = error ? error.code : 0;
-  var detail = error && (error as any).message ? (error as any).message : '';
+  let msg = getVideoErrorMessage(error);
+  let code = error ? error.code : 0;
+  const detail = error && (error as any).message ? (error as any).message : '';
   plog.error('playbackError {code} {msg} {detail} {debugMsg}', {
     code, msg, detail: detail || null, debugMsg: debugMsg || null,
     url: url.substring(0, 120), ua: navigator.userAgent,
@@ -563,7 +563,7 @@ function showPlaybackError(error: MediaError | null, url: string, debugMsg?: str
   );
   keys.unbind();
   keys.bind(function (e: JQuery.Event) {
-    var kc = getKeyCode(e);
+    const kc = getKeyCode(e);
     if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape) {
       goBack();
       e.preventDefault();
@@ -572,8 +572,8 @@ function showPlaybackError(error: MediaError | null, url: string, debugMsg?: str
 }
 
 function playUrl(url: string, title: string): void {
-  var itemTitle = title.split(' - ')[0] || title;
-  var epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
+  const itemTitle = title.split(' - ')[0] || title;
+  const epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
   $root.html(tplPlayer({ title: itemTitle, episode: epTitle }));
   videoEl = $root.find('video')[0] as HTMLVideoElement;
   progressState.barValueEl = null;
@@ -581,7 +581,7 @@ function playUrl(url: string, title: string): void {
   progressState.barDurationEl = null;
   progressState.barSeekEl = null;
 
-  var sourceUrl = url;
+  const sourceUrl = url;
   videoEl.addEventListener('ended', function () {
     plog.info('video ended currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     if (!markedWatched) markWatched();
@@ -625,15 +625,15 @@ function playUrl(url: string, title: string): void {
 
 // --- Mark time ---
 
-var markedWatched = false;
-var wasWatched = false;
+let markedWatched = false;
+let wasWatched = false;
 
 function startMarkTimer(): void {
   stopMarkTimer();
   markedWatched = false;
   markTimer = window.setInterval(function () {
     if (!videoEl || !currentItem) return;
-    var time = Math.floor(videoEl.currentTime);
+    const time = Math.floor(videoEl.currentTime);
     if (time <= 0) return;
     if (currentSeason !== undefined && currentEpisode !== undefined) {
       markTime(currentItem.id, currentEpisode, time, currentSeason);
@@ -653,10 +653,10 @@ function startMarkTimer(): void {
     }
     if (!markedWatched) {
       syncProgressState();
-      var dur = getVideoDuration(progressState);
+      const dur = getVideoDuration(progressState);
       if (dur > 0) {
-        var isSerial = currentSeason !== undefined;
-        var threshold = isSerial ? 120 : 420;
+        const isSerial = currentSeason !== undefined;
+        const threshold = isSerial ? 120 : 420;
         if (dur - time <= threshold) {
           markedWatched = true;
           markWatched();
@@ -672,7 +672,7 @@ function stopMarkTimer(): void {
 
 function savePosition(): void {
   if (!videoEl || !currentItem) return;
-  var time = Math.floor(videoEl.currentTime);
+  const time = Math.floor(videoEl.currentTime);
   if (time <= 0) return;
   if (currentSeason !== undefined && currentEpisode !== undefined) {
     markTime(currentItem.id, currentEpisode, time, currentSeason);
@@ -715,12 +715,12 @@ function destroyPlayer(): void {
 // --- Keys ---
 
 function getKeyCode(e: JQuery.Event): number {
-  var orig = (e as any).originalEvent as KeyboardEvent;
+  const orig = (e as any).originalEvent as KeyboardEvent;
   return (orig && orig.keyCode) ? orig.keyCode : (e.keyCode || 0);
 }
 
 function handleKey(e: JQuery.Event): void {
-  var kc = getKeyCode(e);
+  const kc = getKeyCode(e);
   if (!videoEl) {
     if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
       destroyPlayer(); goBack(); e.preventDefault();
@@ -789,16 +789,16 @@ export var playerPage: Page = {
     state = { quality: 0, audio: 0, sub: -1, position: 0, paused: false };
 
     showSpinnerIn($root);
-    var id = params.id!;
+    let id = params.id!;
 
     getItem(id).then(
       function (itemRes: any) {
-        var data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
+        const data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
         currentItem = data.item;
         if (!currentItem) return;
 
-        var media: MediaInfo | null = null;
-        var pos = 0;
+        let media: MediaInfo | null = null;
+        let pos = 0;
 
         if (currentSeason !== undefined && currentEpisode !== undefined) {
           media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
@@ -818,15 +818,15 @@ export var playerPage: Page = {
         currentTitle = media.title;
         currentDuration = media.duration;
         currentAudios = media.audios;
-        var itemTitle = currentItem.title.split(' / ')[0];
-        var prefs = getTitlePrefs(currentItem.id);
+        const itemTitle = currentItem.title.split(' / ')[0];
+        const prefs = getTitlePrefs(currentItem.id);
 
         loadMediaLinks(media.mid, function (files, subs) {
           currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
           currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-          var q = restoreQualityIndex(currentFiles, prefs);
-          var a = restoreAudioIndex(currentAudios, prefs);
-          var s = restoreSubIndex(currentSubs, prefs);
+          const q = restoreQualityIndex(currentFiles, prefs);
+          const a = restoreAudioIndex(currentAudios, prefs);
+          const s = restoreSubIndex(currentSubs, prefs);
 
           if (currentFiles.length === 0) {
             $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');

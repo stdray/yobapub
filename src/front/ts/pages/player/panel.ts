@@ -2,7 +2,7 @@ import $ from 'jquery';
 import { AudioTrack, Subtitle, VideoFile } from '../../types/api';
 import { TvKey } from '../../utils/platform';
 
-var PANEL_SECTIONS = ['audio', 'subs', 'quality'];
+const PANEL_SECTIONS = ['audio', 'subs', 'quality'];
 
 export interface PanelState {
   open: boolean;
@@ -22,7 +22,7 @@ export interface PanelData {
 }
 
 export function buildAudioLabel(a: AudioTrack): string {
-  var label = a.lang;
+  let label = a.lang;
   if (a.type && a.type.title) label += ' - ' + a.type.title;
   if (a.author && a.author.title) label += ' (' + a.author.title + ')';
   label += ' [' + a.codec + ' ' + a.channels + 'ch]';
@@ -34,7 +34,7 @@ export function getAudioItems(
   selectedAudio: number,
   videoEl: HTMLVideoElement | null
 ): Array<{ label: string; selected: boolean }> {
-  var items: Array<{ label: string; selected: boolean }> = [];
+  const items: Array<{ label: string; selected: boolean }> = [];
   if (audios.length > 0) {
     for (var j = 0; j < audios.length; j++) {
       items.push({ label: buildAudioLabel(audios[j]), selected: j === selectedAudio });
@@ -42,7 +42,7 @@ export function getAudioItems(
     return items;
   }
   if (videoEl) {
-    var native = (videoEl as any).audioTracks;
+    const native = (videoEl as any).audioTracks;
     if (native && native.length > 0) {
       for (var k = 0; k < native.length; k++) {
         items.push({ label: native[k].label || native[k].language || ('Дорожка ' + (k + 1)), selected: native[k].enabled });
@@ -55,7 +55,7 @@ export function getAudioItems(
 }
 
 export function getSubItems(subs: Subtitle[], selectedSub: number): Array<{ label: string; selected: boolean }> {
-  var items: Array<{ label: string; selected: boolean }> = [];
+  const items: Array<{ label: string; selected: boolean }> = [];
   if (subs.length > 0) {
     items.push({ label: 'Выкл', selected: selectedSub === -1 });
     for (var j = 0; j < subs.length; j++) {
@@ -68,9 +68,9 @@ export function getSubItems(subs: Subtitle[], selectedSub: number): Array<{ labe
 }
 
 export function getQualityItems(files: VideoFile[], selectedQuality: number): Array<{ label: string; selected: boolean }> {
-  var items: Array<{ label: string; selected: boolean }> = [];
+  const items: Array<{ label: string; selected: boolean }> = [];
   for (var i = 0; i < files.length; i++) {
-    var f = files[i];
+    const f = files[i];
     items.push({ label: f.quality + ' (' + f.w + 'x' + f.h + ')', selected: i === selectedQuality });
   }
   return items;
@@ -83,7 +83,7 @@ export function getPanelItems(data: PanelData, section: number): Array<{ label: 
 }
 
 function getSelectedLabel(data: PanelData, section: number): string {
-  var items = getPanelItems(data, section);
+  const items = getPanelItems(data, section);
   for (var i = 0; i < items.length; i++) {
     if (items[i].selected) return items[i].label;
   }
@@ -97,10 +97,10 @@ function isSectionEnabled(data: PanelData, section: number): boolean {
 }
 
 export function updatePanelButtons($root: JQuery, state: PanelState, data: PanelData): void {
-  var labels = ['Аудио: ', 'Сабы: ', 'Качество: '];
+  const labels = ['Аудио: ', 'Сабы: ', 'Качество: '];
   for (var i = 0; i < PANEL_SECTIONS.length; i++) {
-    var $btn = $root.find('.ppanel__btn').eq(i);
-    var enabled = isSectionEnabled(data, i);
+    const $btn = $root.find('.ppanel__btn').eq(i);
+    const enabled = isSectionEnabled(data, i);
     $btn.find('.ppanel__btn-label').html(labels[i] + (enabled ? getSelectedLabel(data, i) : '—'));
     $btn.toggleClass('disabled', !enabled);
     if (i === state.btnIndex && !state.listOpen) {
@@ -112,26 +112,26 @@ export function updatePanelButtons($root: JQuery, state: PanelState, data: Panel
 }
 
 export function renderPanelList($root: JQuery, state: PanelState, data: PanelData): void {
-  var items = getPanelItems(data, state.listSection);
-  var html = '';
+  const items = getPanelItems(data, state.listSection);
+  let html = '';
   for (var i = 0; i < items.length; i++) {
     html += '<div class="ppanel__list-item' +
       (items[i].selected ? ' selected' : '') +
       (i === state.listIndex ? ' focused' : '') +
       '">' + items[i].label + '</div>';
   }
-  var $list = $root.find('.ppanel__list');
+  const $list = $root.find('.ppanel__list');
   $list.html(html);
   scrollToFocused($list);
 }
 
 function scrollToFocused($list: JQuery): void {
-  var el = $list.find('.ppanel__list-item.focused')[0];
+  const el = $list.find('.ppanel__list-item.focused')[0];
   if (!el) return;
-  var container = $list[0];
+  const container = $list[0];
   if (!container) return;
-  var top = el.offsetTop - container.offsetTop;
-  var bot = top + el.offsetHeight;
+  const top = el.offsetTop - container.offsetTop;
+  const bot = top + el.offsetHeight;
   if (top < container.scrollTop) {
     container.scrollTop = top;
   } else if (bot > container.scrollTop + container.clientHeight) {
@@ -150,8 +150,8 @@ export interface PanelCallbacks {
   getData: () => PanelData;
 }
 
-var PANEL_IDLE_MS = 40000;
-var panelIdleTimer: number | null = null;
+const PANEL_IDLE_MS = 40000;
+let panelIdleTimer: number | null = null;
 
 function resetPanelIdle($root: JQuery, state: PanelState, cbs: PanelCallbacks): void {
   clearPanelIdle();
@@ -179,7 +179,7 @@ export function openPanel($root: JQuery, state: PanelState, cbs: PanelCallbacks)
   if (state.open) return;
   state.open = true;
   state.listOpen = false;
-  var data = cbs.getData();
+  const data = cbs.getData();
   state.btnIndex = 0;
   while (state.btnIndex < PANEL_SECTIONS.length - 1 && !isSectionEnabled(data, state.btnIndex)) state.btnIndex++;
   cbs.onClearBarTimer();
@@ -210,8 +210,8 @@ export function closePanel($root: JQuery, state: PanelState, cbs: PanelCallbacks
 export function openPanelList($root: JQuery, state: PanelState, cbs: PanelCallbacks): void {
   state.listOpen = true;
   state.listSection = state.btnIndex;
-  var data = cbs.getData();
-  var items = getPanelItems(data, state.listSection);
+  const data = cbs.getData();
+  const items = getPanelItems(data, state.listSection);
   state.listIndex = 0;
   for (var i = 0; i < items.length; i++) {
     if (items[i].selected) { state.listIndex = i; break; }
@@ -244,7 +244,7 @@ function applyPanelSelection($root: JQuery, state: PanelState, cbs: PanelCallbac
     cbs.onApplyQuality(state.listIndex);
   }
   cbs.onSavePrefs();
-  var data = cbs.getData();
+  const data = cbs.getData();
   updatePanelButtons($root, state, data);
   renderPanelList($root, state, data);
 }
@@ -259,8 +259,8 @@ export function handlePanelKey(
   resetPanelIdle($root, state, cbs);
 
   if (state.listOpen) {
-    var data = cbs.getData();
-    var items = getPanelItems(data, state.listSection);
+    const data = cbs.getData();
+    const items = getPanelItems(data, state.listSection);
     switch (kc) {
       case TvKey.Up:
         if (state.listIndex > 0) { state.listIndex--; renderPanelList($root, state, data); }
@@ -280,15 +280,15 @@ export function handlePanelKey(
 
   switch (kc) {
     case TvKey.Left: {
-      var data = cbs.getData();
-      var idx = state.btnIndex - 1;
+      const data = cbs.getData();
+      let idx = state.btnIndex - 1;
       while (idx >= 0 && !isSectionEnabled(data, idx)) idx--;
       if (idx >= 0) { state.btnIndex = idx; updatePanelButtons($root, state, data); }
       e.preventDefault(); break;
     }
     case TvKey.Right: {
-      var data = cbs.getData();
-      var idx = state.btnIndex + 1;
+      const data = cbs.getData();
+      let idx = state.btnIndex + 1;
       while (idx < PANEL_SECTIONS.length && !isSectionEnabled(data, idx)) idx++;
       if (idx < PANEL_SECTIONS.length) { state.btnIndex = idx; updatePanelButtons($root, state, data); }
       e.preventDefault(); break;

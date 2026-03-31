@@ -11,24 +11,24 @@ import { tplCard, tplEmptyText } from '../utils/templates';
 import { proxyPosterUrl } from '../utils/storage';
 import { getHistory } from '../api/history';
 
-var $root = $('#page-history');
-var keys = pageKeys();
+const $root = $('#page-history');
+const keys = pageKeys();
 
-var entries: HistoryEntry[] = [];
-var focusedIndex = 0;
-var currentPage = 1;
-var totalPages = 1;
-var loading = false;
-var pendingFocusCol = -1;
+let entries: HistoryEntry[] = [];
+let focusedIndex = 0;
+let currentPage = 1;
+let totalPages = 1;
+let loading = false;
+let pendingFocusCol = -1;
 
-var MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
 function formatDate(unix: number): string {
-  var d = new Date(unix * 1000);
+  let d = new Date(unix * 1000);
   return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
 }
 
-var tplLayout = doT.template(
+const tplLayout = doT.template(
   '<div class="content"><div class="watching">' +
     '<div class="watching__section-title">История просмотров</div>' +
     '<div class="watching__grid" data-section="0">{{=it.cards}}</div>' +
@@ -40,9 +40,9 @@ function buildCards(): string {
   if (entries.length === 0) {
     return tplEmptyText({ text: 'История пуста' });
   }
-  var html = '';
+  let html = '';
   for (var i = 0; i < entries.length; i++) {
-    var e = entries[i];
+    const e = entries[i];
     html += tplCard({
       id: e.item.id,
       poster: proxyPosterUrl(e.item.posters.medium),
@@ -54,7 +54,7 @@ function buildCards(): string {
 }
 
 function render(): void {
-  var pager = totalPages > 1 ? 'Страница ' + currentPage + ' из ' + totalPages : '';
+  const pager = totalPages > 1 ? 'Страница ' + currentPage + ' из ' + totalPages : '';
   $root.html(tplLayout({ cards: buildCards(), pager: pager }));
   updateFocus();
 }
@@ -62,8 +62,8 @@ function render(): void {
 function updateFocus(): void {
   $root.find('.card').removeClass('focused');
   if (entries.length === 0) { return; }
-  var idx = Math.min(focusedIndex, entries.length - 1);
-  var $card = $root.find('.card').eq(idx);
+  let idx = Math.min(focusedIndex, entries.length - 1);
+  const $card = $root.find('.card').eq(idx);
   $card.addClass('focused');
   scrollIntoView($card[0], $root.find('.watching')[0]);
 }
@@ -74,15 +74,15 @@ function loadPage(page: number): void {
   showSpinnerIn($root);
   getHistory(page).then(
     function (res: any) {
-      var data = Array.isArray(res) ? res[0] : res;
+      const data = Array.isArray(res) ? res[0] : res;
       entries = (data && data.history) || [];
-      var pagination = (data && data.pagination) || {};
+      const pagination = (data && data.pagination) || {};
       currentPage = pagination.current || page;
       totalPages = pagination.total || 1;
       loading = false;
 
       if (pendingFocusCol >= 0) {
-        var pg = gridPos(0, entries.length);
+        const pg = gridPos(0, entries.length);
         focusedIndex = Math.min((pg.totalRows - 1) * CARDS_PER_ROW + pendingFocusCol, entries.length - 1);
         pendingFocusCol = -1;
       } else if (focusedIndex >= entries.length) {
@@ -115,17 +115,17 @@ function handleKey(e: JQuery.Event): void {
 
   switch (e.keyCode) {
     case TvKey.Right: {
-      var nr = gridMove(focusedIndex, entries.length, 'right');
+      const nr = gridMove(focusedIndex, entries.length, 'right');
       if (nr >= 0) { focusedIndex = nr; updateFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Left: {
-      var nl = gridMove(focusedIndex, entries.length, 'left');
+      const nl = gridMove(focusedIndex, entries.length, 'left');
       if (nl >= 0) { focusedIndex = nl; updateFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Down: {
-      var nd = gridMove(focusedIndex, entries.length, 'down');
+      const nd = gridMove(focusedIndex, entries.length, 'down');
       if (nd >= 0) {
         focusedIndex = nd;
         updateFocus();
@@ -137,7 +137,7 @@ function handleKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     }
     case TvKey.Up: {
-      var nu = gridMove(focusedIndex, entries.length, 'up');
+      const nu = gridMove(focusedIndex, entries.length, 'up');
       if (nu >= 0) {
         focusedIndex = nu;
         updateFocus();
@@ -148,10 +148,10 @@ function handleKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     }
     case TvKey.Enter: {
-      var entry = entries[focusedIndex];
+      const entry = entries[focusedIndex];
       if (entry) {
         setParams({ historyPage: currentPage, historyFocusedIndex: focusedIndex });
-        var isSerial = entry.item.type === 'serial' || entry.item.type === 'docuserial';
+        const isSerial = entry.item.type === 'serial' || entry.item.type === 'docuserial';
         if (isSerial) {
           navigate('serial', { id: entry.item.id, episodeId: entry.media.id });
         } else {
@@ -170,7 +170,7 @@ function handleKey(e: JQuery.Event): void {
 
 export var historyPage: Page = {
   mount: function (params: RouteParams) {
-    var page = params.historyPage || 1;
+    const page = params.historyPage || 1;
     focusedIndex = params.historyFocusedIndex || 0;
     loading = false;
     pendingFocusCol = -1;

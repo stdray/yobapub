@@ -10,14 +10,14 @@ import { renderRatings } from '../utils/templates';
 import { formatDuration } from '../utils/format';
 import { proxyPosterUrl } from '../utils/storage';
 
-var $root = $('#page-movie');
-var keys = pageKeys();
-var focusedBtn = 0;
-var btnCount = 0;
-var currentItem: Item | null = null;
-var watchingInfo: WatchingInfoItem | null = null;
+const $root = $('#page-movie');
+const keys = pageKeys();
+let focusedBtn = 0;
+let btnCount = 0;
+let currentItem: Item | null = null;
+let watchingInfo: WatchingInfoItem | null = null;
 
-var tplDetail = doT.template(
+const tplDetail = doT.template(
   '<div class="detail">' +
     '<div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>' +
     '<div class="detail__info">' +
@@ -34,14 +34,14 @@ var tplDetail = doT.template(
 );
 
 function render(item: Item): void {
-  var title = item.title.split(' / ');
-  var resumeTime = 0;
+  let title = item.title.split(' / ');
+  let resumeTime = 0;
   if (watchingInfo && watchingInfo.videos && watchingInfo.videos.length > 0) {
-    var v = watchingInfo.videos[0];
+    const v = watchingInfo.videos[0];
     if (v.status === 0 && v.time > 0 && v.time < v.duration - 10) { resumeTime = v.time; }
   }
 
-  var buttons = '<div class="btn" data-action="play">' +
+  let buttons = '<div class="btn" data-action="play">' +
     (resumeTime > 0 ? 'Продолжить с ' + formatDuration(resumeTime) : 'Смотреть') + '</div>';
   btnCount = 1;
   if (item.trailer) {
@@ -49,7 +49,7 @@ function render(item: Item): void {
     btnCount++;
   }
 
-  var ratings = renderRatings(item);
+  const ratings = renderRatings(item);
 
   $root.html(tplDetail({
     poster: proxyPosterUrl(item.posters.big),
@@ -83,9 +83,9 @@ function handleKey(e: JQuery.Event): void {
       if (focusedBtn < btnCount - 1) { focusedBtn++; updateFocus(); }
       e.preventDefault(); break;
     case TvKey.Enter:
-      var action = $root.find('.btn').eq(focusedBtn).data('action');
+      const action = $root.find('.btn').eq(focusedBtn).data('action');
       if (action === 'play' && currentItem) {
-        var firstVideo = currentItem.videos && currentItem.videos[0];
+        const firstVideo = currentItem.videos && currentItem.videos[0];
         navigate('player', { id: currentItem.id, video: 1 });
       }
       e.preventDefault(); break;
@@ -101,7 +101,7 @@ export var moviePage: Page = {
     currentItem = null;
     watchingInfo = null;
     showSpinnerIn($root);
-    var id = params.id!;
+    let id = params.id!;
 
     loadItemWithWatching(id,
       function (item, watching) {

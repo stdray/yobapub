@@ -15,6 +15,6 @@ declare module 'dot' {
     templateSettings: TemplateSettings;
     template(tmpl: string, c?: Partial<TemplateSettings>, def?: any): (data: any) => string;
   }
-  var doT: DoT;
+  const doT: DoT;
   export = doT;
 }

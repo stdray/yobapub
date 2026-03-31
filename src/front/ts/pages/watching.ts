@@ -12,24 +12,24 @@ import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/pag
 import { gridMove, gridPos } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 
-var $root = $('#page-watching');
-var keys = pageKeys();
+const $root = $('#page-watching');
+const keys = pageKeys();
 
-var MENU_ITEMS = ['Новинки', 'Я смотрю', 'История', 'Закладки', 'ТВ', 'Поиск', 'Настройки', 'Выход'];
-var menuFocused = false;
-var menuIndex = 0;
-var focusedSection = 0;
-var focusedIndex = 0;
+const MENU_ITEMS = ['Новинки', 'Я смотрю', 'История', 'Закладки', 'ТВ', 'Поиск', 'Настройки', 'Выход'];
+let menuFocused = false;
+let menuIndex = 0;
+let focusedSection = 0;
+let focusedIndex = 0;
 
 interface SectionData {
   items: Array<{ id: number; type: string }>;
 }
 
-var sections: SectionData[] = [];
-var serialsData: WatchingSerialItem[] = [];
-var moviesData: WatchingMovieItem[] = [];
+let sections: SectionData[] = [];
+let serialsData: WatchingSerialItem[] = [];
+let moviesData: WatchingMovieItem[] = [];
 
-var tplMenu = doT.template(
+const tplMenu = doT.template(
   '<div class="sidebar">' +
     '{{~it.items :item:idx}}' +
       '<div class="sidebar__item{{?item.active}} active{{?}}{{?item.focused}} focused{{?}}" data-menu="{{=idx}}">{{=item.label}}</div>' +
@@ -37,12 +37,12 @@ var tplMenu = doT.template(
   '</div>'
 );
 
-var tplSection = doT.template(
+const tplSection = doT.template(
   '<div class="watching__section-title">{{=it.title}}</div>' +
   '<div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>'
 );
 
-var tplLayout = doT.template(
+const tplLayout = doT.template(
   '<div class="layout">' +
     '{{=it.menu}}' +
     '<div class="content"><div class="watching">{{=it.rows}}</div></div>' +
@@ -50,7 +50,7 @@ var tplLayout = doT.template(
 );
 
 function buildMenu(): string {
-  var items = [];
+  const items = [];
   for (var i = 0; i < MENU_ITEMS.length; i++) {
     items.push({
       label: MENU_ITEMS[i],
@@ -62,11 +62,11 @@ function buildMenu(): string {
 }
 
 function buildRows(): string {
-  var html = '';
-  var sIdx = 0;
+  let html = '';
+  let sIdx = 0;
 
   if (moviesData.length > 0) {
-    var mCards = '';
+    let mCards = '';
     for (var j = 0; j < moviesData.length; j++) {
       mCards += tplCard({
         id: moviesData[j].id,
@@ -80,9 +80,9 @@ function buildRows(): string {
   }
 
   if (serialsData.length > 0) {
-    var cards = '';
+    let cards = '';
     for (var i = 0; i < serialsData.length; i++) {
-      var s = serialsData[i];
+      const s = serialsData[i];
       cards += tplCard({
         id: s.id,
         poster: proxyPosterUrl(s.posters.medium),
@@ -116,10 +116,10 @@ function updateFocus(): void {
 
   if (sections.length === 0) return;
 
-  var $grid = $root.find('.watching__grid[data-section="' + focusedSection + '"]');
-  var $cards = $grid.find('.card');
+  const $grid = $root.find('.watching__grid[data-section="' + focusedSection + '"]');
+  const $cards = $grid.find('.card');
   if ($cards.length > 0 && focusedIndex < $cards.length) {
-    var $card = $cards.eq(focusedIndex);
+    const $card = $cards.eq(focusedIndex);
     $card.addClass('focused');
     scrollIntoView($card[0], $root.find('.watching')[0]);
   }
@@ -156,23 +156,23 @@ function handleMenuKey(e: JQuery.Event): void {
 function handleContentKey(e: JQuery.Event): void {
   if (sections.length === 0) return;
 
-  var currentItems = sections[focusedSection].items;
-  var g = gridPos(focusedIndex, currentItems.length);
+  const currentItems = sections[focusedSection].items;
+  const g = gridPos(focusedIndex, currentItems.length);
 
   switch (e.keyCode) {
     case TvKey.Right: {
-      var nr = gridMove(focusedIndex, currentItems.length, 'right');
+      const nr = gridMove(focusedIndex, currentItems.length, 'right');
       if (nr >= 0) { focusedIndex = nr; updateFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Left: {
-      var nl = gridMove(focusedIndex, currentItems.length, 'left');
+      const nl = gridMove(focusedIndex, currentItems.length, 'left');
       if (nl >= 0) { focusedIndex = nl; updateFocus(); }
       else { menuFocused = true; updateFocus(); }
       e.preventDefault(); break;
     }
     case TvKey.Down: {
-      var nd = gridMove(focusedIndex, currentItems.length, 'down');
+      const nd = gridMove(focusedIndex, currentItems.length, 'down');
       if (nd >= 0) { focusedIndex = nd; updateFocus(); }
       else if (focusedSection < sections.length - 1) {
         focusedSection++;
@@ -182,21 +182,21 @@ function handleContentKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     }
     case TvKey.Up: {
-      var nu = gridMove(focusedIndex, currentItems.length, 'up');
+      const nu = gridMove(focusedIndex, currentItems.length, 'up');
       if (nu >= 0) { focusedIndex = nu; updateFocus(); }
       else if (focusedSection > 0) {
         focusedSection--;
-        var pg = gridPos(0, sections[focusedSection].items.length);
+        const pg = gridPos(0, sections[focusedSection].items.length);
         focusedIndex = Math.min((pg.totalRows - 1) * CARDS_PER_ROW + g.col, sections[focusedSection].items.length - 1);
         updateFocus();
       }
       e.preventDefault(); break;
     }
     case TvKey.Enter:
-      var item = currentItems[focusedIndex];
+      const item = currentItems[focusedIndex];
       if (item) {
         setParams({ focusedSection: focusedSection, focusedIndex: focusedIndex });
-        var isSerial = item.type === 'serial' || item.type === 'docuserial';
+        const isSerial = item.type === 'serial' || item.type === 'docuserial';
         navigate(isSerial ? 'serial' : 'movie', { id: item.id });
       }
       e.preventDefault(); break;
@@ -205,14 +205,14 @@ function handleContentKey(e: JQuery.Event): void {
 
 export var watchingPage: Page = {
   mount: function (_params: RouteParams) {
-    var savedSection = _params.focusedSection;
-    var savedIndex = _params.focusedIndex;
+    const savedSection = _params.focusedSection;
+    const savedIndex = _params.focusedIndex;
     showSpinnerIn($root);
 
     $.when(getWatchingSerials(), getWatchingMovies()).then(
       function (serialsRes: any, moviesRes: any) {
-        var sData = Array.isArray(serialsRes) ? serialsRes[0] : serialsRes;
-        var mData = Array.isArray(moviesRes) ? moviesRes[0] : moviesRes;
+        const sData = Array.isArray(serialsRes) ? serialsRes[0] : serialsRes;
+        const mData = Array.isArray(moviesRes) ? moviesRes[0] : moviesRes;
         serialsData = (sData && sData.items) || [];
         moviesData = (mData && mData.items) || [];
 

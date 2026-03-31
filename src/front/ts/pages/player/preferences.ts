@@ -5,13 +5,13 @@ import { isLegacyTizen } from '../../utils/platform';
 export type { TitlePrefs };
 
 export function pickDefaultQualityIndex(files: VideoFile[]): number {
-  var savedId = getDefaultQuality();
+  let savedId = getDefaultQuality();
   if (savedId === -1) {
     savedId = isLegacyTizen() ? 3 : 0;
     setDefaultQuality(savedId);
   }
   if (savedId === 0 || files.length === 0) return 0;
-  var maxH = 0;
+  let maxH = 0;
   for (var q = 0; q < QUALITY_OPTIONS.length; q++) {
     if (QUALITY_OPTIONS[q].id === savedId) { maxH = QUALITY_OPTIONS[q].maxH; break; }
   }
@@ -61,12 +61,12 @@ export function saveCurrentPrefs(
   selectedAudio: number,
   selectedSub: number
 ): void {
-  var prefs: TitlePrefs = { id: itemId };
+  const prefs: TitlePrefs = { id: itemId };
   if (files.length > 0 && selectedQuality < files.length) {
     prefs.quality = files[selectedQuality].quality;
   }
   if (audios.length > 0 && selectedAudio < audios.length) {
-    var a = audios[selectedAudio];
+    const a = audios[selectedAudio];
     prefs.audioLang = a.lang;
     if (a.author) prefs.audioAuthorId = a.author.id;
   }

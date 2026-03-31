@@ -1,8 +1,8 @@
 import $ from 'jquery';
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from '../utils/storage';
 
-var CLIENT_ID = '';
-var CLIENT_SECRET = '';
+let CLIENT_ID = '';
+let CLIENT_SECRET = '';
 
 export function configure(clientId: string, clientSecret: string): void {
   CLIENT_ID = clientId;
@@ -18,10 +18,10 @@ export function getClientSecret(): string {
 }
 
 function refreshToken(): JQueryXHR {
-  var rt = getRefreshToken();
+  const rt = getRefreshToken();
   if (!rt) {
     clearTokens();
-    var d = $.Deferred();
+    let d = $.Deferred();
     d.reject(null, 'error', 'no_refresh_token');
     return d.promise() as any as JQueryXHR;
   }
@@ -40,8 +40,8 @@ function refreshToken(): JQueryXHR {
 }
 
 export function apiGet(path: string, params?: Record<string, any>): JQueryXHR {
-  var token = getAccessToken();
-  var data: Record<string, any> = params ? $.extend({}, params) : {};
+  const token = getAccessToken();
+  const data: Record<string, any> = params ? $.extend({}, params) : {};
   if (token) {
     data['access_token'] = token;
   }
@@ -54,8 +54,8 @@ export function apiGet(path: string, params?: Record<string, any>): JQueryXHR {
 }
 
 export function apiPost(path: string, data?: Record<string, any>): JQueryXHR {
-  var token = getAccessToken();
-  var url = path;
+  const token = getAccessToken();
+  let url = path;
   if (token) {
     url += '?access_token=' + encodeURIComponent(token);
   }
@@ -68,7 +68,7 @@ export function apiPost(path: string, data?: Record<string, any>): JQueryXHR {
 }
 
 export function apiGetWithRefresh(path: string, params?: Record<string, any>): JQueryDeferred<any> {
-  var d = $.Deferred();
+  let d = $.Deferred();
 
   function doRequest(): void {
     apiGet(path, params).then(
@@ -100,7 +100,7 @@ export function apiGetWithRefresh(path: string, params?: Record<string, any>): J
 }
 
 export function apiPostWithRefresh(path: string, data?: Record<string, any>): JQueryDeferred<any> {
-  var d = $.Deferred();
+  let d = $.Deferred();
 
   function doRequest(): void {
     apiPost(path, data).then(
