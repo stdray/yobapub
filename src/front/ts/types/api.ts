@@ -257,3 +257,25 @@ export interface TvChannel {
 export interface TvChannelsResponse {
   readonly channels: TvChannel[];
 }
+
+export interface HistoryMedia {
+  readonly id: number;
+  readonly title: string;
+  readonly number?: number;
+  readonly duration: number;
+  readonly thumbnail?: string;
+}
+
+export interface HistoryEntry {
+  readonly time: number;
+  readonly counter: number;
+  readonly first_seen: number;
+  readonly last_seen: number;
+  readonly item: Item;
+  readonly media: HistoryMedia;
+}
+
+export interface HistoryResponse {
+  readonly history: HistoryEntry[];
+  readonly pagination: Pagination;
+}

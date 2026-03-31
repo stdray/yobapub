@@ -976,3 +976,11 @@ video::cue {
   font-size: 36px;
   color: #fff;
 }
+
+/* --- History --- */
+.history__pager {
+  text-align: center;
+  padding: 20px 40px 40px;
+  font-size: 26px;
+  color: rgba(255, 255, 255, 0.5);
+}

@@ -1,4 +1,4 @@
-export type RouteName = 'login' | 'watching' | 'bookmarks' | 'movie' | 'serial' | 'player' | 'settings' | 'novelties' | 'search' | 'tv' | 'tv-player';
+export type RouteName = 'login' | 'watching' | 'bookmarks' | 'movie' | 'serial' | 'player' | 'settings' | 'novelties' | 'search' | 'tv' | 'tv-player' | 'history';
 
 export interface RouteParams {
   id?: number;
@@ -14,6 +14,8 @@ export interface RouteParams {
   channelTitle?: string;
   channelStream?: string;
   tvFocusedIndex?: number;
+  historyPage?: number;
+  historyFocusedIndex?: number;
 }
 
 export interface Page {
