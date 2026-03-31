@@ -5,7 +5,6 @@
 <div class="card">
   <h1>YobaPub Logs</h1>
   <form asp-action="Login" method="post" autocomplete="on">
-    @Html.AntiForgeryToken()
     <input type="hidden" name="returnUrl" value="@(ViewData["ReturnUrl"] ?? Context.Request.Query["returnUrl"])">
     <label for="username">Логин</label>
     <input type="text" id="username" name="username" value="@ViewData["Username"]" autofocus autocomplete="username" required>

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using YobaPub.Proxy;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,9 @@ var proxyConfig = builder.Configuration.GetSection("Proxy").Get<ProxyConfig>() ?
 
 builder.Services.AddSingleton(proxyConfig);
 builder.Services.AddOptions<AdminOptions>().BindConfiguration("Admin");
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(
+        builder.Configuration["DataProtection:KeysPath"] ?? "/keys/dataprotection"));
 builder.Services.AddSingleton<LogStore>();
 builder.Services.AddHostedService<LogRetentionService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
