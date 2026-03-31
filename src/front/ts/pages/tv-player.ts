@@ -94,13 +94,16 @@ function startPlayback(streamUrl: string): void {
     hls.attachMedia(video);
     plog.debug('HLS attached to video element');
     hls.on(HlsCtor.Events.ERROR, (event: unknown, data: any) => {
-      plog.error('HLS error', {
+      // Avoid serializing cyclic objects - just log key properties
+      const errorInfo: Record<string, unknown> = {
         fatal: data?.fatal,
-        type: data?.type,
-        details: data?.details,
-        error: data?.error,
-        fullData: JSON.stringify(data)
-      });
+        type: data?.type
+      };
+      if (data?.details) errorInfo.details = String(data.details).substring(0, 100);
+      if (data?.error) errorInfo.error = String(data.error).substring(0, 100);
+
+      plog.error('HLS error', errorInfo);
+
       if (data && data.fatal) {
         if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
           plog.warn('Media error, attempting recovery');
