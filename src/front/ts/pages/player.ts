@@ -375,14 +375,32 @@ function doSavePrefs(): void {
 
 // --- Playback ---
 
+function buildHlsConfig(): Record<string, any> {
+  var cfg: Record<string, any> = {};
+  if (state.position > 0) cfg.startPosition = state.position;
+  if (isLegacyTizen()) {
+    cfg.maxBufferLength = 10;
+    cfg.maxMaxBufferLength = 30;
+    cfg.maxBufferHole = 1.0;
+    cfg.highBufferWatchdogPeriod = 10;
+    cfg.nudgeMaxRetry = 10;
+    cfg.abrEwmaFastLive = 5.0;
+    cfg.abrEwmaSlowLive = 10.0;
+    cfg.abrEwmaFastVoD = 5.0;
+    cfg.abrEwmaSlowVoD = 10.0;
+    cfg.fragLoadingMaxRetry = 6;
+    cfg.manifestLoadingMaxRetry = 3;
+    cfg.levelLoadingMaxRetry = 4;
+  }
+  return cfg;
+}
+
 function playSource(url: string): void {
   if (!videoEl) return;
   currentHlsUrl = url;
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   playSourceDebug = 'url=' + url.substring(0, 120);
-  var hlsConfig: Record<string, any> = {};
-  if (state.position > 0) hlsConfig.startPosition = state.position;
-  var hls = new Hls(hlsConfig);
+  var hls = new Hls(buildHlsConfig());
   hlsInstance = hls;
   hls.on(Hls.Events.MANIFEST_PARSED, function () {
     onSourceReady();
