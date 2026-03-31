@@ -445,6 +445,10 @@ function playSource(url: string): void {
       sn: data.frag ? data.frag.sn : null,
       start: data.frag ? data.frag.start : null,
     });
+    if (videoStalled && videoEl && !state.paused) {
+      plog.info('prodding stalled video after frag buffered');
+      safePlay(videoEl);
+    }
   });
   hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
     if (!data.fatal) {
