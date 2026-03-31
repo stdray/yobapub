@@ -76,7 +76,7 @@ jobs:
             run_sudo docker run -d \
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
-              -p 8080:8080 \
+              -p 127.0.0.1:8080:8080 \
               -v /opt/yobapub/logs:/logs \
               -e Admin__Username="${{ secrets.ADMIN_USERNAME }}" \
               -e Admin__Password="${{ secrets.ADMIN_PASSWORD }}" \

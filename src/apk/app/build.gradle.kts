@@ -23,7 +23,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "APP_URL", "\"http://yobapub.3po.su\"")
+        buildConfigField("String", "APP_URL", "\"https://yobapub.3po.su\"")
     }
 
     buildTypes {

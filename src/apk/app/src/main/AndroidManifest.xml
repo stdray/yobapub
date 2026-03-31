@@ -38,7 +38,7 @@
 
             <meta-data
                 android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="http://yobapub.3po.su" />
+                android:value="https://yobapub.3po.su" />
         </activity>
 
         <!-- WebView fallback (when Chrome is unavailable) -->
@@ -51,7 +51,7 @@
         <!-- TWA asset verification -->
         <meta-data
             android:name="asset_statements"
-            android:value='[{"relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "web", "site": "http://yobapub.3po.su"}}]' />
+            android:value='[{"relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "web", "site": "https://yobapub.3po.su"}}]' />
 
     </application>
 
