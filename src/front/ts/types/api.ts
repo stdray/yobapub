@@ -244,3 +244,16 @@ export interface BookmarkItemsResponse {
   items: Item[];
   pagination: Pagination;
 }
+
+export interface TvChannel {
+  readonly id: number;
+  readonly title: string;
+  readonly logos: {
+    readonly s: string;
+  };
+  readonly stream: string;
+}
+
+export interface TvChannelsResponse {
+  readonly channels: TvChannel[];
+}
