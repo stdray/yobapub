@@ -111,10 +111,6 @@ export function getTizenVersion(): number {
   return m ? (parseFloat(m[1]) || 0) : 0;
 }
 
-export function isTizen(): boolean {
-  return getTizenVersion() > 0;
-}
-
 export function isLegacyTizen(): boolean {
   var v = getTizenVersion();
   return v > 0 && v < 3;

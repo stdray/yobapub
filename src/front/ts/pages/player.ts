@@ -4,7 +4,7 @@ import { getItem } from '../api/items';
 import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
-import { TvKey, isTizen, isLegacyTizen } from '../utils/platform';
+import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
@@ -378,20 +378,18 @@ function doSavePrefs(): void {
 function buildHlsConfig(): Record<string, any> {
   var cfg: Record<string, any> = {};
   if (state.position > 0) cfg.startPosition = state.position;
-  if (isTizen()) {
-    cfg.maxBufferLength = 10;
-    cfg.maxMaxBufferLength = 30;
-    cfg.maxBufferHole = 1.0;
-    cfg.highBufferWatchdogPeriod = 10;
-    cfg.nudgeMaxRetry = 10;
-    cfg.abrEwmaFastLive = 5.0;
-    cfg.abrEwmaSlowLive = 10.0;
-    cfg.abrEwmaFastVoD = 5.0;
-    cfg.abrEwmaSlowVoD = 10.0;
-    cfg.fragLoadingMaxRetry = 6;
-    cfg.manifestLoadingMaxRetry = 3;
-    cfg.levelLoadingMaxRetry = 4;
-  }
+  cfg.maxBufferLength = 10;
+  cfg.maxMaxBufferLength = 30;
+  cfg.maxBufferHole = 1.0;
+  cfg.highBufferWatchdogPeriod = 10;
+  cfg.nudgeMaxRetry = 10;
+  cfg.abrEwmaFastLive = 5.0;
+  cfg.abrEwmaSlowLive = 10.0;
+  cfg.abrEwmaFastVoD = 5.0;
+  cfg.abrEwmaSlowVoD = 10.0;
+  cfg.fragLoadingMaxRetry = 6;
+  cfg.manifestLoadingMaxRetry = 3;
+  cfg.levelLoadingMaxRetry = 4;
   return cfg;
 }
 
