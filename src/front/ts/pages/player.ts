@@ -17,7 +17,7 @@ import { MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeT
 import { getRewrittenHlsUrl } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
-import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, closePanel as panelClose_, handlePanelKey, clearPanelIdle } from './player/panel';
+import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, handlePanelKey, clearPanelIdle } from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
 import { InfoState, updateInfoBadge, showInfo, hideInfo } from './player/info';
 
@@ -84,12 +84,10 @@ class PlayerController {
   private state = defaultPlayState();
   private seek = defaultSeekState();
   private panel = defaultPanelState();
-
-  // Cached DOM for progress bar
-  private barValueEl: HTMLElement | null = null;
-  private barPctEl: HTMLElement | null = null;
-  private barDurationEl: HTMLElement | null = null;
-  private barSeekEl: HTMLElement | null = null;
+  private progress: ProgressState = {
+    videoEl: null, currentDuration: 0, seeking: false, seekPos: -1,
+    barValueEl: null, barPctEl: null, barDurationEl: null, barSeekEl: null,
+  };
 
   // Timers
   private markTimer: number | null = null;
@@ -104,52 +102,69 @@ class PlayerController {
   private wasWatched = false;
   private playSourceDebug = '';
 
-  // Panel callbacks (arrow fields to capture `this`)
+  // Panel callbacks
   private readonly panelCallbacks: PanelCallbacks = {
     onShowBar: () => { this.showBar(); },
     onHideBar: () => { this.hideBar(); },
     onClearBarTimer: () => { this.clearBarTimer(); },
-    onApplyAudio: (idx) => {
-      this.continuePlaying({ quality: this.state.quality, audio: idx, sub: this.state.sub, position: this.currentPosition(), paused: this.state.paused });
-    },
-    onApplySub: (menuIdx) => {
-      this.continuePlaying({ quality: this.state.quality, audio: this.state.audio, sub: menuIdx - 1, position: this.currentPosition(), paused: this.state.paused });
-    },
-    onApplyQuality: (idx) => {
-      if (idx !== this.state.quality) {
-        this.continuePlaying({ quality: idx, audio: this.state.audio, sub: this.state.sub, position: this.currentPosition(), paused: this.state.paused });
-      }
-    },
+    onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
+    onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
+    onApplyQuality: (idx) => { if (idx !== this.state.quality) this.continueWith({ quality: idx }); },
     onSavePrefs: () => { this.doSavePrefs(); },
     getData: () => this.getPanelData(),
   };
 
-  // --- Progress snapshot (replaces syncProgressState) ---
+  // --- Helpers ---
 
-  private getProgressState(): ProgressState {
-    return {
-      videoEl: this.videoEl,
-      currentDuration: this.media.duration,
-      seeking: this.seek.active,
-      seekPos: this.seek.pos,
-      barValueEl: this.barValueEl,
-      barPctEl: this.barPctEl,
-      barDurationEl: this.barDurationEl,
-      barSeekEl: this.barSeekEl,
-    };
-  }
-
-  private syncBarCache(ps: ProgressState): void {
-    this.barValueEl = ps.barValueEl;
-    this.barPctEl = ps.barPctEl;
-    this.barDurationEl = ps.barDurationEl;
-    this.barSeekEl = ps.barSeekEl;
+  private syncProgress(): void {
+    this.progress.videoEl = this.videoEl;
+    this.progress.currentDuration = this.media.duration;
+    this.progress.seeking = this.seek.active;
+    this.progress.seekPos = this.seek.pos;
   }
 
   private updateProgressBar(): void {
-    const ps = this.getProgressState();
-    updateProgress(this.$root, ps);
-    this.syncBarCache(ps);
+    this.syncProgress();
+    updateProgress(this.$root, this.progress);
+  }
+
+  private formatBuffered(v: HTMLVideoElement | null): string {
+    if (!v || v.buffered.length === 0) return '[none]';
+    const parts: string[] = [];
+    for (let i = 0; i < v.buffered.length; i++) {
+      parts.push(v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1));
+    }
+    return parts.join(',');
+  }
+
+  private continueWith(overrides: Partial<PlayState>): void {
+    this.continuePlaying({
+      quality: overrides.quality ?? this.state.quality,
+      audio: overrides.audio ?? this.state.audio,
+      sub: overrides.sub ?? this.state.sub,
+      position: overrides.position ?? this.currentPosition(),
+      paused: overrides.paused ?? this.state.paused,
+    });
+  }
+
+  private sendMarkTime(): void {
+    if (!this.videoEl || !this.media.item) return;
+    const time = Math.floor(this.videoEl.currentTime);
+    if (time <= 0) return;
+    if (this.media.season !== undefined && this.media.episode !== undefined) {
+      markTime(this.media.item.id, this.media.episode, time, this.media.season);
+    } else if (this.media.video !== undefined) {
+      markTime(this.media.item.id, this.media.video, time);
+    }
+  }
+
+  private sendToggleWatched(): void {
+    if (!this.media.item) return;
+    if (this.media.season !== undefined && this.media.episode !== undefined) {
+      toggleWatched(this.media.item.id, this.media.episode, this.media.season);
+    } else if (this.media.video !== undefined) {
+      toggleWatched(this.media.item.id, this.media.video);
+    }
   }
 
   private getInfoState(): InfoState {
@@ -204,9 +219,9 @@ class PlayerController {
     if (this.seek.dir !== dir) { this.seek.dir = dir; this.seek.count = 0; }
     if (this.seek.pos === -1 && this.videoEl) this.seek.pos = this.videoEl.currentTime;
 
-    const ps = this.getProgressState();
+    this.syncProgress();
     const step = 10 + Math.pow(Math.min(this.seek.count, 3000), 3) / 1000;
-    const dur = getVideoDuration(ps);
+    const dur = getVideoDuration(this.progress);
     this.seek.pos += dir === 'right' ? step : -step;
     this.seek.pos = Math.max(0, dur > 0 ? Math.min(this.seek.pos, dur - 2) : this.seek.pos);
     this.seek.count++;
@@ -225,14 +240,14 @@ class PlayerController {
 
   private applySeek(): void {
     if (!this.seek.active || this.seek.pos < 0 || !this.videoEl) return;
-    const ps = this.getProgressState();
-    const dur = getVideoDuration(ps);
+    this.syncProgress();
+    const dur = getVideoDuration(this.progress);
     if (dur > 0) this.seek.pos = Math.min(this.seek.pos, dur - 2);
     this.seek.pos = Math.max(0, this.seek.pos);
     const pos = this.seek.pos;
     plog.info('applySeek pos={pos} dur={dur}', { pos, dur });
     this.resetSeek();
-    this.continuePlaying({ quality: this.state.quality, audio: this.state.audio, sub: this.state.sub, position: pos, paused: this.state.paused });
+    this.continueWith({ position: pos });
     this.showBar();
   }
 
@@ -255,9 +270,9 @@ class PlayerController {
           if (s.episodes[ei].number !== this.media.episode) continue;
           const targetIdx = ei + dir;
           if (targetIdx >= 0 && targetIdx < s.episodes.length) {
-            this.savePosition(); this.destroyPlayer();
+            this.sendMarkTime(); this.destroyPlayer();
             this.media.episode = s.episodes[targetIdx].number;
-            this.remountTrack();
+            this.loadAndPlay();
             return true;
           }
           const targetSeason = si + dir;
@@ -265,10 +280,10 @@ class PlayerController {
             const ts = this.media.item.seasons[targetSeason];
             const ep = dir > 0 ? ts.episodes[0] : ts.episodes[ts.episodes.length - 1];
             if (ep) {
-              this.savePosition(); this.destroyPlayer();
+              this.sendMarkTime(); this.destroyPlayer();
               this.media.season = ts.number;
               this.media.episode = ep.number;
-              this.remountTrack();
+              this.loadAndPlay();
               return true;
             }
           }
@@ -278,16 +293,16 @@ class PlayerController {
     } else if (this.media.video !== undefined && this.media.item.videos) {
       const newVideo = this.media.video + dir;
       if (newVideo >= 1 && newVideo <= this.media.item.videos.length) {
-        this.savePosition(); this.destroyPlayer();
+        this.sendMarkTime(); this.destroyPlayer();
         this.media.video = newVideo;
-        this.remountTrack();
+        this.loadAndPlay();
         return true;
       }
     }
     return false;
   }
 
-  private remountTrack(): void {
+  private loadAndPlay(): void {
     if (!this.media.item) return;
     let found: MediaInfo | null = null;
     let pos = 0;
@@ -302,13 +317,16 @@ class PlayerController {
       this.wasWatched = isVideoWatched(this.media.item, this.media.video);
     }
 
-    if (!found) return;
+    if (!found) {
+      this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
+      return;
+    }
 
     const itemTitle = this.media.item.title.split(' / ')[0];
     this.media.title = found.title;
     this.media.duration = found.duration;
     this.media.audios = found.audios;
-    const prefs = this.media.item ? getTitlePrefs(this.media.item.id) : null;
+    const prefs = getTitlePrefs(this.media.item.id);
 
     loadMediaLinks(found.mid, (files, subs) => {
       this.media.files = files.slice().sort((a, b) => b.w - a.w);
@@ -317,7 +335,10 @@ class PlayerController {
       const a = restoreAudioIndex(this.media.audios, prefs);
       const sub = restoreSubIndex(this.media.subs, prefs);
 
-      if (this.media.files.length === 0) return;
+      if (this.media.files.length === 0) {
+        this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
+        return;
+      }
       this.continuePlaying({ quality: q, audio: a, sub, position: pos, paused: false }, itemTitle + ' - ' + this.media.title);
     });
   }
@@ -583,15 +604,15 @@ class PlayerController {
     const epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
     this.$root.html(tplPlayer({ title: itemTitle, episode: epTitle }));
     this.videoEl = this.$root.find('video')[0] as HTMLVideoElement;
-    this.barValueEl = null;
-    this.barPctEl = null;
-    this.barDurationEl = null;
-    this.barSeekEl = null;
+    this.progress.barValueEl = null;
+    this.progress.barPctEl = null;
+    this.progress.barDurationEl = null;
+    this.progress.barSeekEl = null;
 
     const sourceUrl = url;
     this.videoEl.addEventListener('ended', () => {
       plog.info('video ended currentTime={currentTime}', { currentTime: this.videoEl ? this.videoEl.currentTime : -1 });
-      if (!this.markedWatched) this.markWatched();
+      if (!this.markedWatched) this.sendToggleWatched();
       if (!this.navigateTrack(1)) goBack();
     });
     this.videoEl.addEventListener('waiting', () => {
@@ -606,30 +627,18 @@ class PlayerController {
       this.hideSpinner();
     });
     this.videoEl.addEventListener('playing', () => {
-      const v = this.videoEl;
-      const bl = v ? v.buffered.length : 0;
-      let br = '[none]';
-      if (v && bl > 0) {
-        const parts: string[] = [];
-        for (let i = 0; i < bl; i++) parts.push(v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1));
-        br = parts.join(',');
-      }
       plog.info('video playing ct={ct} readyState={rs} buffered={br}', {
-        ct: v ? v.currentTime : -1, rs: v ? v.readyState : -1, br,
+        ct: this.videoEl ? this.videoEl.currentTime : -1,
+        rs: this.videoEl ? this.videoEl.readyState : -1,
+        br: this.formatBuffered(this.videoEl),
       });
       this.hideSpinner();
     });
     this.videoEl.addEventListener('seeked', () => {
-      const v = this.videoEl;
-      const bl = v ? v.buffered.length : 0;
-      let br = '[none]';
-      if (v && bl > 0) {
-        const parts: string[] = [];
-        for (let i = 0; i < bl; i++) parts.push(v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1));
-        br = parts.join(',');
-      }
       plog.debug('video seeked ct={ct} readyState={rs} buffered={br}', {
-        ct: v ? v.currentTime : -1, rs: v ? v.readyState : -1, br,
+        ct: this.videoEl ? this.videoEl.currentTime : -1,
+        rs: this.videoEl ? this.videoEl.readyState : -1,
+        br: this.formatBuffered(this.videoEl),
       });
       this.hideSpinner();
     });
@@ -652,34 +661,21 @@ class PlayerController {
     this.stopMarkTimer();
     this.markedWatched = false;
     this.markTimer = window.setInterval(() => {
-      if (!this.videoEl || !this.media.item) return;
-      const time = Math.floor(this.videoEl.currentTime);
-      if (time <= 0) return;
-      if (this.media.season !== undefined && this.media.episode !== undefined) {
-        markTime(this.media.item.id, this.media.episode, time, this.media.season);
-      } else if (this.media.video !== undefined) {
-        markTime(this.media.item.id, this.media.video, time);
-      }
-      // After ~30s of playback, reset watched status so the item
-      // reappears as "in progress" instead of "watched".
+      this.sendMarkTime();
       if (this.wasWatched) {
         this.wasWatched = false;
         plog.info('resetting watched status after 30s of playback');
-        if (this.media.season !== undefined && this.media.episode !== undefined) {
-          toggleWatched(this.media.item.id, this.media.episode, this.media.season);
-        } else if (this.media.video !== undefined) {
-          toggleWatched(this.media.item.id, this.media.video);
-        }
+        this.sendToggleWatched();
       }
       if (!this.markedWatched) {
-        const ps = this.getProgressState();
-        const dur = getVideoDuration(ps);
+        this.syncProgress();
+        const dur = getVideoDuration(this.progress);
         if (dur > 0) {
-          const isSerial = this.media.season !== undefined;
-          const threshold = isSerial ? 120 : 420;
+          const time = this.videoEl ? Math.floor(this.videoEl.currentTime) : 0;
+          const threshold = this.media.season !== undefined ? 120 : 420;
           if (dur - time <= threshold) {
             this.markedWatched = true;
-            this.markWatched();
+            this.sendToggleWatched();
           }
         }
       }
@@ -690,28 +686,8 @@ class PlayerController {
     if (this.markTimer !== null) { clearInterval(this.markTimer); this.markTimer = null; }
   }
 
-  private savePosition(): void {
-    if (!this.videoEl || !this.media.item) return;
-    const time = Math.floor(this.videoEl.currentTime);
-    if (time <= 0) return;
-    if (this.media.season !== undefined && this.media.episode !== undefined) {
-      markTime(this.media.item.id, this.media.episode, time, this.media.season);
-    } else if (this.media.video !== undefined) {
-      markTime(this.media.item.id, this.media.video, time);
-    }
-  }
-
-  private markWatched(): void {
-    if (!this.media.item) return;
-    if (this.media.season !== undefined && this.media.episode !== undefined) {
-      toggleWatched(this.media.item.id, this.media.episode, this.media.season);
-    } else if (this.media.video !== undefined) {
-      toggleWatched(this.media.item.id, this.media.video);
-    }
-  }
-
   private destroyPlayer(): void {
-    this.savePosition();
+    this.sendMarkTime();
     this.stopMarkTimer();
     this.stopProgressTimer();
     this.clearBarTimer();
@@ -725,10 +701,10 @@ class PlayerController {
       try { this.videoEl.load(); } catch (e) { /* ignore */ }
       this.videoEl = null;
     }
-    this.barValueEl = null;
-    this.barPctEl = null;
-    this.barDurationEl = null;
-    this.barSeekEl = null;
+    this.progress.barValueEl = null;
+    this.progress.barPctEl = null;
+    this.progress.barDurationEl = null;
+    this.progress.barSeekEl = null;
     this.media.hlsUrl = '';
   }
 
@@ -737,14 +713,14 @@ class PlayerController {
     this.state = defaultPlayState();
     this.seek = defaultSeekState();
     this.panel = defaultPanelState();
+    this.progress = {
+      videoEl: null, currentDuration: 0, seeking: false, seekPos: -1,
+      barValueEl: null, barPctEl: null, barDurationEl: null, barSeekEl: null,
+    };
     this.playbackStarted = false;
     this.markedWatched = false;
     this.wasWatched = false;
     this.playSourceDebug = '';
-    this.barValueEl = null;
-    this.barPctEl = null;
-    this.barDurationEl = null;
-    this.barSeekEl = null;
   }
 
   // --- Keys ---
@@ -834,44 +810,7 @@ class PlayerController {
         const data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
         this.media.item = data.item;
         if (!this.media.item) return;
-
-        let found: MediaInfo | null = null;
-        let pos = 0;
-
-        if (this.media.season !== undefined && this.media.episode !== undefined) {
-          found = findEpisodeMedia(this.media.item, this.media.season, this.media.episode);
-          pos = getResumeTime(this.media.item, this.media.season, this.media.episode);
-          this.wasWatched = isEpisodeWatched(this.media.item, this.media.season, this.media.episode);
-        } else if (this.media.video !== undefined) {
-          found = findVideoMedia(this.media.item, this.media.video);
-          pos = getResumeTime(this.media.item, undefined, undefined, this.media.video);
-          this.wasWatched = isVideoWatched(this.media.item, this.media.video);
-        }
-
-        if (!found) {
-          this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
-          return;
-        }
-
-        this.media.title = found.title;
-        this.media.duration = found.duration;
-        this.media.audios = found.audios;
-        const itemTitle = this.media.item.title.split(' / ')[0];
-        const prefs = getTitlePrefs(this.media.item.id);
-
-        loadMediaLinks(found.mid, (files, subs) => {
-          this.media.files = files.slice().sort((a, b) => b.w - a.w);
-          this.media.subs = subs.filter((s) => s.url && !s.embed);
-          const q = restoreQualityIndex(this.media.files, prefs);
-          const a = restoreAudioIndex(this.media.audios, prefs);
-          const sub = restoreSubIndex(this.media.subs, prefs);
-
-          if (this.media.files.length === 0) {
-            this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
-            return;
-          }
-          this.continuePlaying({ quality: q, audio: a, sub, position: pos, paused: false }, itemTitle + ' - ' + this.media.title);
-        });
+        this.loadAndPlay();
       },
       () => {
         this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка загрузки</div></div>');
@@ -885,8 +824,6 @@ class PlayerController {
     this.destroyPlayer();
     this.keys.unbind();
     clearPage(this.$root);
-    this.panel.open = false;
-    this.panel.listOpen = false;
   }
 }
 

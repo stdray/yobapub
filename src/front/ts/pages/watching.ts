@@ -63,7 +63,7 @@ function buildMenu(): string {
   for (var i = 0; i < MENU_ITEMS.length; i++) {
     items.push({
       label: MENU_ITEMS[i],
-      active: i === 0,
+      active: i === 1,
       focused: menuFocused && i === menuIndex
     });
   }
