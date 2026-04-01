@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
-import { getDeviceSettings, saveDeviceSettings } from '../api/device';
+import { getDeviceSettings, saveDeviceSettings, checkVip } from '../api/device';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, isProxyAll, setProxyAll, isProxyPosters, setProxyPosters, getStartPage, setStartPage, START_PAGE_OPTIONS } from '../utils/storage';
@@ -399,8 +399,8 @@ export var settingsPage: Page = {
     optionsOpen = false;
     showSpinnerIn($root);
 
-    getDeviceSettings().then(
-      function (res: any) {
+    $.when(getDeviceSettings(), checkVip()).then(
+      function (res: any, isVip: boolean) {
         const data = Array.isArray(res) ? res[0] : res;
         if (data && data.settings) {
           allSettings = parseSettings(data.settings);
@@ -411,7 +411,11 @@ export var settingsPage: Page = {
             }
           }
         }
-        allSettings.unshift(buildProxyAllSetting());
+        if (isVip) {
+          allSettings.unshift(buildProxyAllSetting());
+        } else {
+          setProxyAll(false);
+        }
         allSettings.unshift(buildProxyPostersSetting());
         allSettings.unshift(buildSubSizeSetting());
         allSettings.unshift(buildQualitySetting());

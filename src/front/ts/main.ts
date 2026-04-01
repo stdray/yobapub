@@ -3,7 +3,7 @@ import '../css/app.css';
 import { configure } from './api/client';
 import { registerPage, navigate, setExitHandler } from './router';
 import { registerTizenKeys, getDeviceInfo } from './utils/platform';
-import { getAccessToken, getStartPage } from './utils/storage';
+import { getAccessToken, getStartPage, setProxyAll } from './utils/storage';
 import { apiPostWithRefresh } from './api/client';
 import { loginPage } from './pages/login';
 import { watchingPage } from './pages/watching';
@@ -17,6 +17,7 @@ import { searchPage } from './pages/search';
 import { tvPage } from './pages/tv';
 import { tvPlayerPage } from './pages/tv-player';
 import { historyPage } from './pages/history';
+import { checkVip } from './api/device';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
 
 objectFitImages();
@@ -53,6 +54,9 @@ function notifyDevice(): void {
 
 if (getAccessToken()) {
   notifyDevice();
+  checkVip().then((isVip: boolean) => {
+    if (!isVip) setProxyAll(false);
+  });
   navigate(getStartPage());
 } else {
   navigate('login');
