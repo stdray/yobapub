@@ -485,41 +485,37 @@ function safePlay(v: HTMLVideoElement): void {
 function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
-  if (state.position > 0) {
-    // Seek first (while paused), then play once position is confirmed.
-    // On Tizen 2.3 (Chromium 28) currentTime assignment may be silently ignored
-    // if the fragment at that position isn't buffered yet — retry until it lands.
+  if (state.position > 0 && hlsInstance) {
+    // Wait for hls.js to buffer a fragment near the resume position,
+    // then seek and play. On Tizen 2.3 (Chromium 28) seeking before data
+    // arrives causes a permanent stall.
     const pos = state.position;
     const v = videoEl;
-    let retries = 0;
-    const trySeekThenPlay = () => {
-      const diff = Math.abs(v.currentTime - pos);
-      let bufRanges = '';
-      for (let i = 0; i < v.buffered.length; i++) {
-        bufRanges += (i > 0 ? ', ' : '') + v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1);
-      }
-      plog.debug('trySeekThenPlay retry={retries} ct={currentTime} target={target} diff={diff} buffered=[{buf}] readyState={rs}', {
-        retries, currentTime: v.currentTime, target: pos, diff, buf: bufRanges || 'none', rs: v.readyState,
+    const hls = hlsInstance;
+    plog.info('onSourceReady waiting for frag near pos={pos}', { pos });
+    const onFragBuffered = (_e: any, data: any) => {
+      const frag = data.frag;
+      if (!frag) return;
+      const fragEnd = (frag.start || 0) + (frag.duration || 0);
+      plog.info('onSourceReady FRAG_BUFFERED sn={sn} start={start} end={end} target={pos}', {
+        sn: frag.sn, start: frag.start, end: fragEnd, pos,
       });
-      if (diff <= 2) {
-        plog.info('resume seek done retries={retries} currentTime={currentTime}', { retries, currentTime: v.currentTime });
-        if (!state.paused) safePlay(v);
-        return;
-      }
-      if (retries >= 3) {
-        plog.warn('resume seek failed after {retries} retries, playing from currentTime={currentTime}', {
-          retries, currentTime: v.currentTime,
+      // Skip fragments that are too far before our target
+      if (fragEnd < pos - 5) return;
+      hls.off(Hls.Events.FRAG_BUFFERED, onFragBuffered);
+      if (v !== videoEl) return;
+      plog.info('onSourceReady frag ready, seeking to {pos}', { pos });
+      v.currentTime = pos;
+      // Give the video element time to process the seek
+      window.setTimeout(() => {
+        if (v !== videoEl) return;
+        plog.info('onSourceReady post-seek ct={ct} seeking={seeking} readyState={rs}', {
+          ct: v.currentTime, seeking: v.seeking, rs: v.readyState,
         });
         if (!state.paused) safePlay(v);
-        return;
-      }
-      retries++;
-      v.currentTime = pos;
-      window.setTimeout(trySeekThenPlay, 500);
+      }, 300);
     };
-    plog.info('onSourceReady seeking to pos={pos} paused={paused}', { pos, paused: state.paused });
-    v.currentTime = pos;
-    window.setTimeout(trySeekThenPlay, 500);
+    hls.on(Hls.Events.FRAG_BUFFERED, onFragBuffered);
   } else {
     plog.info('onSourceReady no resume pos, calling play paused={paused}', { paused: state.paused });
     if (!state.paused) safePlay(videoEl);
