@@ -2,11 +2,26 @@ import $ from 'jquery';
 import { BookmarkFolder } from '../types/api';
 import { toggleWatchlist } from '../api/watching';
 import { getBookmarkFolders, getItemFolders, toggleBookmarkItem, createBookmarkFolder } from '../api/bookmarks';
+import { NumberSet } from './number-set';
+
+const findIndex = <T>(arr: readonly T[], pred: (item: T, idx: number) => boolean): number => {
+  for (let i = 0; i < arr.length; i++) {
+    if (pred(arr[i], i)) return i;
+  }
+  return -1;
+};
+
+const findLastIndex = <T>(arr: readonly T[], pred: (item: T) => boolean): number => {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (pred(arr[i])) return i;
+  }
+  return -1;
+};
 
 export class DetailControls {
   private readonly $root: JQuery;
   private allFolders: readonly BookmarkFolder[] = [];
-  private itemFolderIds: ReadonlySet<number> = new Set();
+  private itemFolderIds = new NumberSet();
   private pickerIdx = 0;
   private itemId = 0;
   private emptyState = false;
@@ -35,14 +50,14 @@ export class DetailControls {
     $.when(getBookmarkFolders(), getItemFolders(itemId)).done((foldersResp, itemFoldersResp) => {
       if (foldersResp.items.length > 0) {
         this.allFolders = foldersResp.items;
-        this.itemFolderIds = new Set(itemFoldersResp.folders.map((f) => f.id));
-        const firstBookmarked = this.allFolders.findIndex((f) => this.itemFolderIds.has(f.id));
-        this.pickerIdx = firstBookmarked >= 0 ? firstBookmarked : 0;
+        this.itemFolderIds = new NumberSet(itemFoldersResp.folders.map((f) => f.id));
+        const first = findIndex(this.allFolders, (f) => this.itemFolderIds.has(f.id));
+        this.pickerIdx = first >= 0 ? first : 0;
         this.emptyState = false;
         this.renderBookmarks();
       } else {
         this.allFolders = [];
-        this.itemFolderIds = new Set();
+        this.itemFolderIds = new NumberSet();
         this.pickerIdx = 0;
         this.emptyState = true;
         this.renderBookmarks();
@@ -57,10 +72,13 @@ export class DetailControls {
       return;
     }
 
-    const tags = this.allFolders
-      .filter((f) => this.itemFolderIds.has(f.id))
-      .map((f) => '<span class="detail__bookmark-tag">' + f.title + '</span>')
-      .join('');
+    let tags = '';
+    for (let i = 0; i < this.allFolders.length; i++) {
+      const f = this.allFolders[i];
+      if (this.itemFolderIds.has(f.id)) {
+        tags += '<span class="detail__bookmark-tag">' + f.title + '</span>';
+      }
+    }
     this.$root.find('.detail__bookmark-tags').html(tags);
 
     const folder = this.allFolders[this.pickerIdx];
@@ -87,7 +105,7 @@ export class DetailControls {
           const folder = resp.items[0];
           toggleBookmarkItem(this.itemId, folder.id).done(() => {
             this.allFolders = resp.items;
-            this.itemFolderIds = new Set([folder.id]);
+            this.itemFolderIds = new NumberSet([folder.id]);
             this.pickerIdx = 0;
             this.emptyState = false;
             this.renderBookmarks();
@@ -99,16 +117,15 @@ export class DetailControls {
     const folder = this.allFolders[this.pickerIdx];
     if (!folder) return;
     toggleBookmarkItem(this.itemId, folder.id).done(() => {
-      const updated = new Set(this.itemFolderIds);
+      const updated = this.itemFolderIds.clone();
       if (updated.has(folder.id)) {
         updated.delete(folder.id);
-        // After removal, select next bookmarked folder if available
-        const nextBookmarked = this.allFolders.findIndex((f, i) => i > this.pickerIdx && updated.has(f.id));
-        const prevBookmarked = this.findLastIndex(this.allFolders, (f) => updated.has(f.id));
-        if (nextBookmarked >= 0) {
-          this.pickerIdx = nextBookmarked;
-        } else if (prevBookmarked >= 0) {
-          this.pickerIdx = prevBookmarked;
+        const next = findIndex(this.allFolders, (f, i) => i > this.pickerIdx && updated.has(f.id));
+        const prev = findLastIndex(this.allFolders, (f) => updated.has(f.id));
+        if (next >= 0) {
+          this.pickerIdx = next;
+        } else if (prev >= 0) {
+          this.pickerIdx = prev;
         }
       } else {
         updated.add(folder.id);
@@ -116,13 +133,6 @@ export class DetailControls {
       this.itemFolderIds = updated;
       this.renderBookmarks();
     });
-  };
-
-  private readonly findLastIndex = <T>(arr: readonly T[], pred: (item: T) => boolean): number => {
-    for (let i = arr.length - 1; i >= 0; i--) {
-      if (pred(arr[i])) return i;
-    }
-    return -1;
   };
 
   // --- Watchlist ---
@@ -137,7 +147,7 @@ export class DetailControls {
 
   readonly reset = (): void => {
     this.allFolders = [];
-    this.itemFolderIds = new Set();
+    this.itemFolderIds = new NumberSet();
     this.pickerIdx = 0;
     this.emptyState = false;
   };
