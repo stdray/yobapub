@@ -336,6 +336,7 @@ function continuePlaying(next: PlayState, title?: string): void {
 
   if (needSeek && videoEl) {
     videoEl.currentTime = next.position;
+    if (!next.paused) safePlay(videoEl);
   }
 
   if (needSub && videoEl) {
@@ -400,7 +401,7 @@ function buildHlsConfig(): Record<string, any> {
   cfg.maxMaxBufferLength = 30;
   cfg.maxBufferHole = 1.0;
   cfg.highBufferWatchdogPeriod = 10;
-  cfg.nudgeMaxRetry = 10;
+  cfg.nudgeMaxRetry = 0;
   cfg.abrEwmaFastLive = 5.0;
   cfg.abrEwmaSlowLive = 10.0;
   cfg.abrEwmaFastVoD = 5.0;
@@ -504,16 +505,17 @@ function onSourceReady(): void {
       if (fragEnd < pos - 5) return;
       hls.off(Hls.Events.FRAG_BUFFERED, onFragBuffered);
       if (v !== videoEl) return;
-      plog.info('onSourceReady frag ready, seeking to {pos}', { pos });
-      v.currentTime = pos;
-      // Give the video element time to process the seek
+      // On Chromium 28, seeked event never fires on a paused video via MSE.
+      // Must call play() first, then seek — same as manual seek which works.
+      plog.info('onSourceReady frag ready, play then seek to {pos}', { pos });
+      safePlay(v);
       window.setTimeout(() => {
         if (v !== videoEl) return;
-        plog.info('onSourceReady post-seek ct={ct} seeking={seeking} readyState={rs}', {
-          ct: v.currentTime, seeking: v.seeking, rs: v.readyState,
+        plog.info('onSourceReady seeking to {pos} ct={ct} seeking={seeking}', {
+          pos, ct: v.currentTime, seeking: v.seeking,
         });
-        if (!state.paused) safePlay(v);
-      }, 300);
+        v.currentTime = pos;
+      }, 200);
     };
     hls.on(Hls.Events.FRAG_BUFFERED, onFragBuffered);
   } else {
