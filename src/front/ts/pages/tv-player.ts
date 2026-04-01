@@ -12,13 +12,28 @@ const keys = pageKeys();
 const plog = new Logger('tv-player');
 let hls: any = null;
 let video: HTMLVideoElement | null = null;
+let overlayTimer: number | null = null;
 
+const clearOverlayTimer = (): void => {
+  if (overlayTimer !== null) { clearTimeout(overlayTimer); overlayTimer = null; }
+};
+
+const showOverlay = (autoHide = true): void => {
+  clearOverlayTimer();
+  $root.find('.tv-player__overlay').removeClass('hidden');
+  if (autoHide) {
+    overlayTimer = window.setTimeout(() => {
+      $root.find('.tv-player__overlay').addClass('hidden');
+    }, 3000);
+  }
+};
 
 function render(title: string): void {
   plog.debug('render called', { title });
   $root.html(
     '<div class="tv-player">' +
       '<video class="tv-player__video" autoplay></video>' +
+      '<div class="tv-player__spinner"><div class="spinner"><div class="spinner__circle"></div></div></div>' +
       '<div class="tv-player__overlay">' +
         '<div class="tv-player__title">' + title + '</div>' +
       '</div>' +
@@ -31,8 +46,15 @@ function render(title: string): void {
     const v = video;
     // Логирование видео-событий
     video.addEventListener('play', () => plog.debug('video: play'));
-    video.addEventListener('playing', () => plog.debug('video: playing'));
-    video.addEventListener('pause', () => plog.debug('video: pause'));
+    video.addEventListener('playing', () => {
+      plog.debug('video: playing');
+      $root.find('.tv-player__spinner').hide();
+      showOverlay();
+    });
+    video.addEventListener('pause', () => {
+      plog.debug('video: pause');
+      showOverlay(false);
+    });
     video.addEventListener('ended', () => plog.debug('video: ended'));
     video.addEventListener('error', (e) => {
       const err = video?.error;
@@ -42,7 +64,10 @@ function render(title: string): void {
       });
     });
     video.addEventListener('stalled', () => plog.debug('video: stalled'));
-    video.addEventListener('waiting', () => plog.debug('video: waiting'));
+    video.addEventListener('waiting', () => {
+      plog.debug('video: waiting');
+      $root.find('.tv-player__spinner').show();
+    });
     video.addEventListener('loadstart', () => plog.debug('video: loadstart'));
     video.addEventListener('progress', () => plog.debug('video: progress'));
     video.addEventListener('suspend', () => plog.debug('video: suspend'));
@@ -239,6 +264,7 @@ export const tvPlayerPage: Page = {
   },
   unmount(): void {
     plog.debug('tvPlayerPage unmount');
+    clearOverlayTimer();
     stopPlayback();
     keys.unbind();
     clearPage($root);
