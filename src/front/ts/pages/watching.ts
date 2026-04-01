@@ -34,6 +34,7 @@ const tplMenuCompiled = doT.template(`
     {{?it.profile}}
       <div class="sidebar__profile">
         <img class="sidebar__avatar" src="{{=it.profile.avatar}}" />
+        <div class="sidebar__username">{{=it.profile.username}}</div>
         <div class="sidebar__sub">{{=it.profile.days}} дн.</div>
       </div>
     {{?}}
@@ -45,7 +46,7 @@ const tplMenuCompiled = doT.template(`
 
 interface MenuData {
   readonly items: Array<{ readonly label: string; readonly active: boolean; readonly focused: boolean }>;
-  readonly profile: { readonly avatar: string; readonly days: number } | null;
+  readonly profile: { readonly avatar: string; readonly username: string; readonly days: number } | null;
 }
 
 export const tplMenu = (data: MenuData): string => tplMenuCompiled(data);
@@ -78,7 +79,7 @@ function buildMenu(): string {
     });
   }
   const up = getUserProfile();
-  const profile = up && up.avatar ? { avatar: proxyPosterUrl(up.avatar), days: up.subscriptionDays } : null;
+  const profile = up && up.avatar ? { avatar: proxyPosterUrl(up.avatar), username: up.username, days: up.subscriptionDays } : null;
   return tplMenu({ items, profile });
 }
 

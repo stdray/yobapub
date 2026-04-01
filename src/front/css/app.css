@@ -117,6 +117,12 @@ html, body {
   margin-bottom: 8px;
 }
 
+.sidebar__username {
+  font-size: 22px;
+  color: #ccc;
+  margin-bottom: 4px;
+}
+
 .sidebar__sub {
   font-size: 20px;
   color: #888;
