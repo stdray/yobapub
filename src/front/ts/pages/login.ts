@@ -4,7 +4,7 @@ import { Page, RouteParams } from '../types/app';
 import { requestDeviceCode, pollDeviceToken } from '../api/auth';
 import { router } from '../router';
 import { TvKey, platform } from '../utils/platform';
-import { apiPost } from '../api/client';
+import { apiClient } from '../api/client';
 import { PageKeys, PageUtils } from '../utils/page';
 
 const $root = $('#page-login');
@@ -91,7 +91,7 @@ function startAuth(): void {
         function () {
           cleanup();
           const info = platform.getDeviceInfo();
-          apiPost('/v1/device/notify', { title: info.title, hardware: info.hardware, software: info.software });
+          apiClient.apiPost('/v1/device/notify', { title: info.title, hardware: info.hardware, software: info.software });
           router.navigate('watching');
         },
         function () { cleanup(); $root.html(tplExpired({})); },

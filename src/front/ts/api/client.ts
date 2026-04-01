@@ -1,132 +1,132 @@
 import $ from 'jquery';
 import { storage } from '../utils/storage';
 
-let CLIENT_ID = '';
-let CLIENT_SECRET = '';
+export class ApiClient {
+  private clientId = '';
+  private clientSecret = '';
 
-export function configure(clientId: string, clientSecret: string): void {
-  CLIENT_ID = clientId;
-  CLIENT_SECRET = clientSecret;
-}
+  readonly configure = (clientId: string, clientSecret: string): void => {
+    this.clientId = clientId;
+    this.clientSecret = clientSecret;
+  };
 
-export function getClientId(): string {
-  return CLIENT_ID;
-}
+  readonly getClientId = (): string => this.clientId;
 
-export function getClientSecret(): string {
-  return CLIENT_SECRET;
-}
+  readonly getClientSecret = (): string => this.clientSecret;
 
-function refreshToken(): JQueryXHR {
-  const rt = storage.getRefreshToken();
-  if (!rt) {
-    storage.clearTokens();
-    let d = $.Deferred();
-    d.reject(null, 'error', 'no_refresh_token');
-    return d.promise() as any as JQueryXHR;
-  }
+  private readonly refreshToken = (): JQueryXHR => {
+    const rt = storage.getRefreshToken();
+    if (!rt) {
+      storage.clearTokens();
+      const d = $.Deferred();
+      d.reject(null, 'error', 'no_refresh_token');
+      return d.promise() as any as JQueryXHR;
+    }
 
-  return $.ajax({
-    url: '/oauth2/token',
-    method: 'POST',
-    data: {
-      grant_type: 'refresh_token',
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      refresh_token: rt
-    },
-    dataType: 'json'
-  });
-}
+    return $.ajax({
+      url: '/oauth2/token',
+      method: 'POST',
+      data: {
+        grant_type: 'refresh_token',
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        refresh_token: rt
+      },
+      dataType: 'json'
+    });
+  };
 
-export function apiGet(path: string, params?: Record<string, any>): JQueryXHR {
-  const token = storage.getAccessToken();
-  const data: Record<string, any> = params ? $.extend({}, params) : {};
-  if (token) {
-    data['access_token'] = token;
-  }
-  return $.ajax({
-    url: path,
-    method: 'GET',
-    data: data,
-    dataType: 'json'
-  });
-}
+  readonly apiGet = (path: string, params?: Record<string, any>): JQueryXHR => {
+    const token = storage.getAccessToken();
+    const data: Record<string, any> = params ? $.extend({}, params) : {};
+    if (token) {
+      data['access_token'] = token;
+    }
+    return $.ajax({
+      url: path,
+      method: 'GET',
+      data: data,
+      dataType: 'json'
+    });
+  };
 
-export function apiPost(path: string, data?: Record<string, any>): JQueryXHR {
-  const token = storage.getAccessToken();
-  let url = path;
-  if (token) {
-    url += '?access_token=' + encodeURIComponent(token);
-  }
-  return $.ajax({
-    url: url,
-    method: 'POST',
-    data: data || {},
-    dataType: 'json'
-  });
-}
+  readonly apiPost = (path: string, data?: Record<string, any>): JQueryXHR => {
+    const token = storage.getAccessToken();
+    let url = path;
+    if (token) {
+      url += '?access_token=' + encodeURIComponent(token);
+    }
+    return $.ajax({
+      url: url,
+      method: 'POST',
+      data: data || {},
+      dataType: 'json'
+    });
+  };
 
-export function apiGetWithRefresh(path: string, params?: Record<string, any>): JQueryDeferred<any> {
-  let d = $.Deferred();
+  readonly apiGetWithRefresh = (path: string, params?: Record<string, any>): JQueryDeferred<any> => {
+    const d = $.Deferred();
 
-  function doRequest(): void {
-    apiGet(path, params).then(
-      function (data: any) { d.resolve(data); },
-      function (xhr: JQueryXHR) {
-        if (xhr.status === 401 && storage.getRefreshToken()) {
-          refreshToken().then(
-            function (tokenData: any) {
-              storage.saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
-              apiGet(path, params).then(
-                function (data: any) { d.resolve(data); },
-                function (xhr2: JQueryXHR) { d.reject(xhr2); }
-              );
-            },
-            function () {
-              storage.clearTokens();
-              d.reject(xhr);
-            }
-          );
-        } else {
-          d.reject(xhr);
+    const doRequest = (): void => {
+      this.apiGet(path, params).then(
+        (data: any) => { d.resolve(data); },
+        (xhr: JQueryXHR) => {
+          if (xhr.status === 401 && storage.getRefreshToken()) {
+            this.refreshToken().then(
+              (tokenData: any) => {
+                storage.saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
+                this.apiGet(path, params).then(
+                  (data: any) => { d.resolve(data); },
+                  (xhr2: JQueryXHR) => { d.reject(xhr2); }
+                );
+              },
+              () => {
+                storage.clearTokens();
+                d.reject(xhr);
+              }
+            );
+          } else {
+            d.reject(xhr);
+          }
         }
-      }
-    );
-  }
+      );
+    };
 
-  doRequest();
-  return d;
-}
+    doRequest();
+    return d;
+  };
 
-export function apiPostWithRefresh(path: string, data?: Record<string, any>): JQueryDeferred<any> {
-  let d = $.Deferred();
+  readonly apiPostWithRefresh = (path: string, data?: Record<string, any>): JQueryDeferred<any> => {
+    const d = $.Deferred();
 
-  function doRequest(): void {
-    apiPost(path, data).then(
-      function (res: any) { d.resolve(res); },
-      function (xhr: JQueryXHR) {
-        if (xhr.status === 401 && storage.getRefreshToken()) {
-          refreshToken().then(
-            function (tokenData: any) {
-              storage.saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
-              apiPost(path, data).then(
-                function (res: any) { d.resolve(res); },
-                function (xhr2: JQueryXHR) { d.reject(xhr2); }
-              );
-            },
-            function () {
-              storage.clearTokens();
-              d.reject(xhr);
-            }
-          );
-        } else {
-          d.reject(xhr);
+    const doRequest = (): void => {
+      this.apiPost(path, data).then(
+        (res: any) => { d.resolve(res); },
+        (xhr: JQueryXHR) => {
+          if (xhr.status === 401 && storage.getRefreshToken()) {
+            this.refreshToken().then(
+              (tokenData: any) => {
+                storage.saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
+                this.apiPost(path, data).then(
+                  (res: any) => { d.resolve(res); },
+                  (xhr2: JQueryXHR) => { d.reject(xhr2); }
+                );
+              },
+              () => {
+                storage.clearTokens();
+                d.reject(xhr);
+              }
+            );
+          } else {
+            d.reject(xhr);
+          }
         }
-      }
-    );
-  }
+      );
+    };
 
-  doRequest();
-  return d;
+    doRequest();
+    return d;
+  };
 }
+
+export const apiClient = new ApiClient();

@@ -4,8 +4,19 @@ import { RouteName } from './types/app';
 import { router } from './router';
 import { TvKey } from './utils/platform';
 import { storage } from './utils/storage';
-import { unlinkDevice, getUserProfile } from './api/device';
+import { deviceApi } from './api/device';
 import { gridMove } from './utils/grid';
+
+const enum MenuIndex {
+  Novelties = 0,
+  Watching = 1,
+  History = 2,
+  Bookmarks = 3,
+  Tv = 4,
+  Search = 5,
+  Settings = 6,
+  Exit = 7
+}
 
 const MENU_ITEMS = ['Новинки', 'Я смотрю', 'История', 'Закладки', 'ТВ', 'Поиск', 'Настройки', 'Выход'];
 
@@ -13,8 +24,14 @@ const MENU_ROUTES: ReadonlyArray<RouteName | null> = [
   'novelties', 'watching', 'history', 'bookmarks', 'tv', 'search', 'settings', null
 ];
 
-const ROUTE_TO_MENU: Readonly<Record<string, number>> = {
-  novelties: 0, watching: 1, history: 2, bookmarks: 3, tv: 4, search: 5, settings: 6
+const ROUTE_TO_MENU: Readonly<Record<string, MenuIndex>> = {
+  novelties: MenuIndex.Novelties,
+  watching: MenuIndex.Watching,
+  history: MenuIndex.History,
+  bookmarks: MenuIndex.Bookmarks,
+  tv: MenuIndex.Tv,
+  search: MenuIndex.Search,
+  settings: MenuIndex.Settings
 };
 
 const SIDEBAR_ROUTES: ReadonlyArray<RouteName> = [
@@ -118,7 +135,7 @@ class Sidebar {
   }
 
   private render(): void {
-    const up = getUserProfile();
+    const up = deviceApi.getUserProfile();
     const profile = up && up.avatar
       ? { avatar: storage.proxyPosterUrl(up.avatar), username: up.username, days: up.subscriptionDays }
       : null;
@@ -170,8 +187,8 @@ class Sidebar {
           } else {
             this.unfocus();
           }
-        } else if (this.menuIndex === 7) {
-          unlinkDevice().always(() => { storage.clearTokens(); router.navigate('login'); });
+        } else if (this.menuIndex === MenuIndex.Exit) {
+          deviceApi.unlinkDevice().always(() => { storage.clearTokens(); router.navigate('login'); });
         }
         e.preventDefault(); break;
       }

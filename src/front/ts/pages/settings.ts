@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
-import { getDeviceSettings, saveDeviceSettings, checkVip } from '../api/device';
+import { deviceApi } from '../api/device';
 import { TvKey, platform } from '../utils/platform';
 import { storage, Storage } from '../utils/storage';
 import { PageKeys, PageUtils } from '../utils/page';
@@ -281,7 +281,7 @@ const applyOption = (): void => {
     storage.setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
   }
 
-  saveDeviceSettings(saveData);
+  deviceApi.saveDeviceSettings(saveData);
   closeOptions();
 };
 
@@ -396,7 +396,7 @@ export const settingsPage: Page = {
 
     sidebar.setUnfocusHandler(() => render());
 
-    $.when(getDeviceSettings(), checkVip(true)).then(
+    $.when(deviceApi.getDeviceSettings(), deviceApi.checkVip(true)).then(
       (res: any, isVip: boolean) => {
         const data = Array.isArray(res) ? res[0] : res;
         if (data && data.settings) {

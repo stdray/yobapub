@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { getClientId, getClientSecret } from './client';
+import { apiClient } from './client';
 import { DeviceCodeResponse, TokenResponse, AuthErrorResponse } from '../types/api';
 import { storage } from '../utils/storage';
 
@@ -9,8 +9,8 @@ export function requestDeviceCode(): JQueryXHR {
     method: 'POST',
     data: {
       grant_type: 'device_code',
-      client_id: getClientId(),
-      client_secret: getClientSecret()
+      client_id: apiClient.getClientId(),
+      client_secret: apiClient.getClientSecret()
     },
     dataType: 'json'
   });
@@ -40,8 +40,8 @@ export function pollDeviceToken(
       method: 'POST',
       data: {
         grant_type: 'device_token',
-        client_id: getClientId(),
-        client_secret: getClientSecret(),
+        client_id: apiClient.getClientId(),
+        client_secret: apiClient.getClientSecret(),
         code: code
       },
       dataType: 'json'

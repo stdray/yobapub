@@ -1,15 +1,15 @@
-import { apiGetWithRefresh } from './client';
+import { apiClient } from './client';
 
 export function getWatchingMovies(): JQueryDeferred<any> {
-  return apiGetWithRefresh('/v1/watching/movies');
+  return apiClient.apiGetWithRefresh('/v1/watching/movies');
 }
 
 export function getWatchingSerials(): JQueryDeferred<any> {
-  return apiGetWithRefresh('/v1/watching/serials', { subscribed: 1 });
+  return apiClient.apiGetWithRefresh('/v1/watching/serials', { subscribed: 1 });
 }
 
 export function getWatchingInfo(id: number): JQueryDeferred<any> {
-  return apiGetWithRefresh('/v1/watching', { id: id });
+  return apiClient.apiGetWithRefresh('/v1/watching', { id: id });
 }
 
 export function markTime(id: number, video: number, time: number, season?: number): JQueryDeferred<any> {
@@ -17,7 +17,7 @@ export function markTime(id: number, video: number, time: number, season?: numbe
   if (season !== undefined) {
     params.season = season;
   }
-  return apiGetWithRefresh('/v1/watching/marktime', params);
+  return apiClient.apiGetWithRefresh('/v1/watching/marktime', params);
 }
 
 export function toggleWatched(id: number, video: number, season?: number): JQueryDeferred<any> {
@@ -25,5 +25,5 @@ export function toggleWatched(id: number, video: number, season?: number): JQuer
   if (season !== undefined) {
     params.season = season;
   }
-  return apiGetWithRefresh('/v1/watching/toggle', params);
+  return apiClient.apiGetWithRefresh('/v1/watching/toggle', params);
 }

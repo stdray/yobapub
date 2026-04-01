@@ -1,60 +1,13 @@
 import $ from 'jquery';
-import { apiGet, apiPost, apiGetWithRefresh, apiPostWithRefresh } from './client';
+import { apiClient } from './client';
 
 export interface UserProfile {
-  username: string;
-  avatar: string;
-  subscriptionDays: number;
+  readonly username: string;
+  readonly avatar: string;
+  readonly subscriptionDays: number;
 }
 
-let cachedDeviceId: number | null = null;
-let cachedVip: boolean | null = null;
-let cachedProfile: UserProfile | null = null;
-
-export function getCurrentDeviceInfo(): JQueryDeferred<any> {
-  return apiGetWithRefresh('/v1/device/info');
-}
-
-export function getDeviceId(): JQueryDeferred<number> {
-  let d = $.Deferred<number>();
-  if (cachedDeviceId) {
-    d.resolve(cachedDeviceId);
-    return d;
-  }
-  getCurrentDeviceInfo().then(
-    function (res: any) {
-      const data = Array.isArray(res) ? res[0] : res;
-      if (data && data.device && data.device.id) {
-        cachedDeviceId = data.device.id;
-        d.resolve(cachedDeviceId!);
-      } else {
-        d.reject();
-      }
-    },
-    function () { d.reject(); }
-  );
-  return d;
-}
-
-export function getDeviceSettings(): JQueryDeferred<any> {
-  let d = $.Deferred();
-  getDeviceId().then(
-    function (id: number) {
-      apiGetWithRefresh('/v1/device/' + id + '/settings').then(
-        function (res: any) { d.resolve(res); },
-        function (err: any) { d.reject(err); }
-      );
-    },
-    function () { d.reject(); }
-  );
-  return d;
-}
-
-export function unlinkDevice(): JQueryDeferred<any> {
-  return apiPostWithRefresh('/v1/device/unlink');
-}
-
-const parseUserData = (res: unknown): { username: string; avatar: string; days: number } => {
+const parseUserData = (res: unknown): { readonly username: string; readonly avatar: string; readonly days: number } => {
   const data = Array.isArray(res) ? res[0] : res as Record<string, unknown>;
   const user = (data && (data as Record<string, unknown>).user) as Record<string, unknown> | undefined;
   const username = user && user.username ? String(user.username) : '';
@@ -65,43 +18,92 @@ const parseUserData = (res: unknown): { username: string; avatar: string; days: 
   return { username, avatar, days };
 };
 
-export function checkVip(forceRefresh = false): JQueryDeferred<boolean> {
-  const d = $.Deferred<boolean>();
-  if (cachedVip !== null && !forceRefresh) {
-    d.resolve(cachedVip);
+export class DeviceApi {
+  private cachedDeviceId: number | null = null;
+  private cachedVip: boolean | null = null;
+  private cachedProfile: UserProfile | null = null;
+
+  readonly getCurrentDeviceInfo = (): JQueryDeferred<any> =>
+    apiClient.apiGetWithRefresh('/v1/device/info');
+
+  readonly getDeviceId = (): JQueryDeferred<number> => {
+    const d = $.Deferred<number>();
+    if (this.cachedDeviceId) {
+      d.resolve(this.cachedDeviceId);
+      return d;
+    }
+    this.getCurrentDeviceInfo().then(
+      (res: any) => {
+        const data = Array.isArray(res) ? res[0] : res;
+        if (data && data.device && data.device.id) {
+          this.cachedDeviceId = data.device.id;
+          d.resolve(this.cachedDeviceId!);
+        } else {
+          d.reject();
+        }
+      },
+      () => { d.reject(); }
+    );
     return d;
-  }
-  apiGetWithRefresh('/v1/user').then(
-    (res: unknown) => {
-      const parsed = parseUserData(res);
-      cachedProfile = { username: parsed.username, avatar: parsed.avatar, subscriptionDays: parsed.days };
-      if (!parsed.username) {
-        cachedVip = false;
-        d.resolve(false);
-        return;
-      }
-      $.ajax({ url: '/api/vip-check', method: 'GET', data: { login: parsed.username }, dataType: 'json' }).then(
-        (r: any) => { cachedVip = !!(r && r.vip); d.resolve(cachedVip!); },
-        () => { cachedVip = false; d.resolve(false); }
-      );
-    },
-    () => { cachedVip = false; d.resolve(false); }
-  );
-  return d;
+  };
+
+  readonly getDeviceSettings = (): JQueryDeferred<any> => {
+    const d = $.Deferred();
+    this.getDeviceId().then(
+      (id: number) => {
+        apiClient.apiGetWithRefresh('/v1/device/' + id + '/settings').then(
+          (res: any) => { d.resolve(res); },
+          (err: any) => { d.reject(err); }
+        );
+      },
+      () => { d.reject(); }
+    );
+    return d;
+  };
+
+  readonly unlinkDevice = (): JQueryDeferred<any> =>
+    apiClient.apiPostWithRefresh('/v1/device/unlink');
+
+  readonly checkVip = (forceRefresh = false): JQueryDeferred<boolean> => {
+    const d = $.Deferred<boolean>();
+    if (this.cachedVip !== null && !forceRefresh) {
+      d.resolve(this.cachedVip);
+      return d;
+    }
+    apiClient.apiGetWithRefresh('/v1/user').then(
+      (res: unknown) => {
+        const parsed = parseUserData(res);
+        this.cachedProfile = { username: parsed.username, avatar: parsed.avatar, subscriptionDays: parsed.days };
+        if (!parsed.username) {
+          this.cachedVip = false;
+          d.resolve(false);
+          return;
+        }
+        $.ajax({ url: '/api/vip-check', method: 'GET', data: { login: parsed.username }, dataType: 'json' }).then(
+          (r: any) => { this.cachedVip = !!(r && r.vip); d.resolve(this.cachedVip!); },
+          () => { this.cachedVip = false; d.resolve(false); }
+        );
+      },
+      () => { this.cachedVip = false; d.resolve(false); }
+    );
+    return d;
+  };
+
+  readonly getUserProfile = (): UserProfile | null => this.cachedProfile;
+
+  readonly saveDeviceSettings = (settings: Record<string, any>): JQueryDeferred<any> => {
+    const d = $.Deferred();
+    this.getDeviceId().then(
+      (id: number) => {
+        apiClient.apiPost('/v1/device/' + id + '/settings', settings).then(
+          (res: any) => { d.resolve(res); },
+          (err: any) => { d.reject(err); }
+        );
+      },
+      () => { d.reject(); }
+    );
+    return d;
+  };
 }
 
-export const getUserProfile = (): UserProfile | null => cachedProfile;
-
-export function saveDeviceSettings(settings: Record<string, any>): JQueryDeferred<any> {
-  let d = $.Deferred();
-  getDeviceId().then(
-    function (id: number) {
-      apiPost('/v1/device/' + id + '/settings', settings).then(
-        function (res: any) { d.resolve(res); },
-        function (err: any) { d.reject(err); }
-      );
-    },
-    function () { d.reject(); }
-  );
-  return d;
-}
+export const deviceApi = new DeviceApi();

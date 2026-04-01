@@ -1,11 +1,10 @@
 import objectFitImages from 'object-fit-images';
 import '../css/app.css';
-import { configure } from './api/client';
+import { apiClient } from './api/client';
 import { router } from './router';
 import { platform } from './utils/platform';
 import { showExitDialog } from './utils/exit-dialog';
 import { storage } from './utils/storage';
-import { apiPostWithRefresh } from './api/client';
 import { loginPage } from './pages/login';
 import { watchingPage } from './pages/watching';
 import { bookmarksPage } from './pages/bookmarks';
@@ -18,13 +17,13 @@ import { searchPage } from './pages/search';
 import { tvPage } from './pages/tv';
 import { tvPlayerPage } from './pages/tv-player';
 import { historyPage } from './pages/history';
-import { checkVip } from './api/device';
+import { deviceApi } from './api/device';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
 import { sidebar } from './sidebar';
 
 objectFitImages();
 
-configure(CLIENT_ID, CLIENT_SECRET);
+apiClient.configure(CLIENT_ID, CLIENT_SECRET);
 
 platform.registerTizenKeys();
 
@@ -52,7 +51,7 @@ router.onAfterNavigate((route) => {
 function notifyDevice(): void {
   const info = platform.getDeviceInfo();
   console.log('[notify] title:', info.title, 'hw:', info.hardware, 'sw:', info.software);
-  apiPostWithRefresh('/v1/device/notify', {
+  apiClient.apiPostWithRefresh('/v1/device/notify', {
     title: info.title,
     hardware: info.hardware,
     software: info.software
@@ -64,7 +63,7 @@ function notifyDevice(): void {
 
 if (storage.getAccessToken()) {
   notifyDevice();
-  checkVip().then((isVip: boolean) => {
+  deviceApi.checkVip().then((isVip: boolean) => {
     if (!isVip) storage.downgradeProxyForNonVip();
     sidebar.refresh();
   });

@@ -1,4 +1,4 @@
-import { apiGet } from '../../api/client';
+import { apiClient } from '../../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../../types/api';
 
 export interface MediaInfo {
@@ -35,7 +35,7 @@ export function findVideoMedia(item: Item, videoNum: number): MediaInfo | null {
 }
 
 export function loadMediaLinks(mid: number, cb: (files: VideoFile[], subs: Subtitle[]) => void): void {
-  apiGet('/v1/items/media-links', { mid: mid }).then(
+  apiClient.apiGet('/v1/items/media-links', { mid: mid }).then(
     function (res: any) {
       const data = Array.isArray(res) ? res[0] : res;
       const files: VideoFile[] = (data && data.files) || [];
