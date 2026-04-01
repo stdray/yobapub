@@ -416,10 +416,10 @@ function playSource(url: string): void {
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   playSourceDebug = 'url=' + url.substring(0, 120);
   const cfg = buildHlsConfig();
-  plog.info('playSource startPosition={startPosition} ua={ua} ver={ver} url={url}', {
+  plog.info('playSource startPosition={startPosition} ua={ua} yobapub_ver={yobapub_ver} url={url}', {
     startPosition: cfg.startPosition || 0,
     ua: navigator.userAgent,
-    ver: __APP_VERSION__,
+    yobapub_ver: __APP_VERSION__,
     url: url.substring(0, 120),
   });
   const hls = new Hls(cfg);
@@ -571,7 +571,6 @@ function playUrl(url: string, title: string): void {
   });
   videoEl.addEventListener('seeking', function () {
     plog.debug('video seeking currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
-    showSpinner();
   });
   videoEl.addEventListener('canplay', function () {
     plog.debug('video canplay currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });

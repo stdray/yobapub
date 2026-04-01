@@ -52,13 +52,12 @@ const LABELS: Record<string, string> = {
 
 const tplPageCompiled = doT.template(`
   <div class="settings-page">
-    <div class="settings-page__title">Настройки</div>
+    <div class="settings-page__title">Настройки <span class="settings-page__version">{{=it.version}}</span></div>
     <div class="settings-page__list">{{=it.items}}</div>
     <div class="settings-page__hint">
       <span class="hint-key hint-key--red"></span> Уменьшить субтитры &nbsp;&nbsp;
       <span class="hint-key hint-key--green"></span> Увеличить субтитры &nbsp;&nbsp; (во время воспроизведения)
     </div>
-    <div class="settings-page__version">{{=it.version}}</div>
   </div>
 `);
 
