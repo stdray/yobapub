@@ -145,7 +145,13 @@ const startPlayback = (streamUrl: string): void => {
       }
     });
 
-    hls.on(HlsCtor.Events.ERROR, (event: unknown, data: any) => {
+    hls.on(HlsCtor.Events.ERROR, (event: unknown, data: {
+      fatal: boolean; type: string; details: string; error?: unknown; reason?: string;
+      response?: { code: number; text?: string }; url?: string;
+      frag?: { sn: number; url?: string; level?: number };
+      context?: { url?: string; type?: string };
+      networkDetails?: XMLHttpRequest; level?: number; buffer?: number;
+    }) => {
       const errorInfo: Record<string, unknown> = {
         fatal: data?.fatal,
         type: data?.type

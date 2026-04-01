@@ -92,11 +92,11 @@ export class DeviceApi {
   readonly getUserProfile = (): UserProfile | null => this.cachedProfile;
 
   readonly saveDeviceSettings = (settings: Record<string, number | string>): JQueryDeferred<void> => {
-    const d = $.Deferred();
+    const d = $.Deferred<void>();
     this.getDeviceId().then(
       (id: number) => {
         apiClient.apiPost('/v1/device/' + id + '/settings', settings).then(
-          (res: unknown) => { d.resolve(res); },
+          () => { d.resolve(); },
           (err: JQueryXHR) => { d.reject(err); }
         );
       },

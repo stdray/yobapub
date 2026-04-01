@@ -20,7 +20,7 @@ interface SettingItem {
   key: string;
   label: string;
   type: string;
-  value: any;
+  value: number | string | null;
   options?: SettingOption[];
 }
 

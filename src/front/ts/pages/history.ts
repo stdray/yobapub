@@ -149,7 +149,7 @@ class HistoryPage extends SidebarPage {
     getHistory(page).then(
       (res: HistoryResponse) => {
         this.entries = (res && res.history) || [];
-        const pagination = (res && res.pagination) || {} as any;
+        const pagination = (res && res.pagination) || { current: page, total: 1 };
         this.currentPage = pagination.current || page;
         this.totalPages = pagination.total || 1;
         this.loading = false;

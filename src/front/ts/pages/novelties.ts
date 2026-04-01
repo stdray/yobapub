@@ -23,9 +23,16 @@ const SECTIONS_CONFIG = [
   { type: 'concert',    title: 'Новые концерты' }
 ];
 
+interface NoveltySectionItem {
+  id: number;
+  type: string;
+  title: string;
+  poster: string;
+}
+
 interface SectionData {
   title: string;
-  items: Array<{ id: number; type: string }>;
+  items: NoveltySectionItem[];
 }
 
 const tplSectionCompiled = doT.template(`
@@ -151,7 +158,7 @@ class NoveltiesPage extends SidebarPage {
     for (let i = 0; i < this.sections.length; i++) {
       let cards = '';
       for (let j = 0; j < this.sections[i].items.length; j++) {
-        const item = this.sections[i].items[j] as any;
+        const item = this.sections[i].items[j];
         cards += tplCard({
           id: item.id,
           poster: storage.proxyPosterUrl(item.poster),
