@@ -423,6 +423,14 @@ function playSource(url: string): void {
   });
   const hls = new Hls(cfg);
   hlsInstance = hls;
+  hls.on(Hls.Events.FRAG_LOADING, function (_e: any, data: any) {
+    const frag = data.frag;
+    if (frag) {
+      plog.info('hls FRAG_LOADING sn={sn} start={start} dur={dur}', {
+        sn: frag.sn, start: frag.start, dur: frag.duration,
+      });
+    }
+  });
   hls.on(Hls.Events.MANIFEST_PARSED, function () {
     plog.info('hls MANIFEST_PARSED');
     onSourceReady();
@@ -486,8 +494,12 @@ function onSourceReady(): void {
     let retries = 0;
     const trySeekThenPlay = () => {
       const diff = Math.abs(v.currentTime - pos);
-      plog.debug('trySeekThenPlay retry={retries} currentTime={currentTime} target={target} diff={diff}', {
-        retries, currentTime: v.currentTime, target: pos, diff,
+      let bufRanges = '';
+      for (let i = 0; i < v.buffered.length; i++) {
+        bufRanges += (i > 0 ? ', ' : '') + v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1);
+      }
+      plog.debug('trySeekThenPlay retry={retries} ct={currentTime} target={target} diff={diff} buffered=[{buf}] readyState={rs}', {
+        retries, currentTime: v.currentTime, target: pos, diff, buf: bufRanges || 'none', rs: v.readyState,
       });
       if (diff <= 2) {
         plog.info('resume seek done retries={retries} currentTime={currentTime}', { retries, currentTime: v.currentTime });
