@@ -289,6 +289,8 @@ html, body {
 .detail__ratings {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 0;
   margin-bottom: 20px;
 }
 
@@ -309,90 +311,33 @@ html, body {
   margin-bottom: 30px;
 }
 
-/* Watchlist indicator in ratings row */
-.detail__watchlist {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 16px;
-  font-size: 22px;
-  color: #888;
+/* Focusable rating-style items */
+.detail__rating.focusable {
   border: 2px solid transparent;
   border-radius: 6px;
-  margin-left: auto;
-  margin-right: 40px;
+  padding: 2px 8px;
+  margin-right: 22px;
+  cursor: pointer;
 }
 
-.detail__watchlist.focused {
+.detail__rating.focusable.focused {
   border-color: #e94560;
-  color: #fff;
-}
-
-.icon-check {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  text-align: center;
-  line-height: 20px;
-  font-size: 14px;
-  color: transparent;
-}
-
-.icon-check.checked {
-  background: #e94560;
-  color: #fff;
-}
-
-/* Bookmarks row */
-.detail__bookmarks {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 22px;
-  color: #aaa;
-  margin-bottom: 20px;
-  min-height: 32px;
-}
-
-.detail__bookmarks-label {
-  color: #888;
-  margin-right: 4px;
-}
-
-.detail__bookmark-tag {
-  padding: 2px 12px;
-  background: rgba(233, 69, 96, 0.2);
-  color: #e94560;
-  border-radius: 4px;
-  font-size: 20px;
-}
-
-.detail__bookmark-picker {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border: 2px solid transparent;
-  border-radius: 6px;
-  color: #888;
-  margin-left: auto;
-}
-
-.detail__bookmark-picker.focused {
-  border-color: #e94560;
-  color: #fff;
 }
 
 .detail__bookmark-arrow {
-  font-size: 18px;
+  font-size: 16px;
   color: #666;
+  margin: 0 2px;
 }
 
-.detail__bookmark-picker.focused .detail__bookmark-arrow {
+.detail__rating.focusable.focused .detail__bookmark-arrow {
   color: #e94560;
+}
+
+.detail__bookmark-tag {
+  font-size: 24px;
+  margin-right: 30px;
+  color: inherit;
 }
 
 .detail__actions {

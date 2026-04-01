@@ -3,11 +3,6 @@ import { BookmarkFolder } from '../types/api';
 import { toggleWatchlist } from '../api/watching';
 import { getBookmarkFolders, getItemFolders, toggleBookmarkItem, createBookmarkFolder } from '../api/bookmarks';
 
-const BOOKMARKS_HTML = '<div class="detail__bookmarks"><span class="detail__bookmarks-label">Закладки:</span><span class="detail__bookmark-picker"><span class="detail__bookmark-arrow">\u25C0</span> <span class="icon-check">\u2713</span> <span class="detail__picker-name">-</span> <span class="detail__bookmark-arrow">\u25B6</span></span><span class="detail__bookmark-tags"></span></div>';
-
-const watchlistHtml = (inWatchlist: boolean): string =>
-  '<span class="detail__watchlist" data-action="watchlist">Я смотрю <span class="icon-check' + (inWatchlist ? ' checked' : '') + '">\u2713</span></span>';
-
 export class DetailControls {
   private readonly $root: JQuery;
   private allFolders: readonly BookmarkFolder[] = [];
@@ -21,9 +16,16 @@ export class DetailControls {
 
   // --- Templates ---
 
-  readonly bookmarksTpl = (): string => BOOKMARKS_HTML;
+  readonly watchlistTpl = (inWatchlist: boolean): string =>
+    '<span class="detail__rating focusable" data-action="watchlist">Я смотрю <span class="detail__rating-value">' + (inWatchlist ? '\u2713' : '-') + '</span></span>';
 
-  readonly watchlistTpl = (inWatchlist: boolean): string => watchlistHtml(inWatchlist);
+  readonly bookmarksTpl = (): string =>
+    '<span class="detail__rating focusable" data-action="bookmark">' +
+    '<span class="detail__bookmark-arrow">\u25C0</span> ' +
+    'Закладки <span class="detail__rating-value detail__picker-name">-</span>' +
+    ' <span class="detail__bookmark-arrow">\u25B6</span>' +
+    '</span>' +
+    '<span class="detail__bookmark-tags"></span>';
 
   // --- Bookmarks ---
 
@@ -56,11 +58,10 @@ export class DetailControls {
 
     const folder = this.allFolders[this.pickerIdx];
     if (folder) {
-      this.$root.find('.detail__picker-name').text(folder.title);
-      this.$root.find('.detail__bookmark-picker .icon-check').toggleClass('checked', this.itemFolderIds.has(folder.id));
+      const isIn = this.itemFolderIds.has(folder.id);
+      this.$root.find('.detail__picker-name').text((isIn ? '\u2713 ' : '') + folder.title);
     } else {
       this.$root.find('.detail__picker-name').text('-');
-      this.$root.find('.detail__bookmark-picker .icon-check').removeClass('checked');
     }
   };
 
@@ -77,17 +78,36 @@ export class DetailControls {
     if (!folder) return;
     toggleBookmarkItem(this.itemId, folder.id).done(() => {
       const updated = new Set(this.itemFolderIds);
-      if (updated.has(folder.id)) { updated.delete(folder.id); } else { updated.add(folder.id); }
+      if (updated.has(folder.id)) {
+        updated.delete(folder.id);
+        // After removal, select next bookmarked folder if available
+        const nextBookmarked = this.allFolders.findIndex((f, i) => i > this.pickerIdx && updated.has(f.id));
+        const prevBookmarked = this.findLastIndex(this.allFolders, (f) => updated.has(f.id));
+        if (nextBookmarked >= 0) {
+          this.pickerIdx = nextBookmarked;
+        } else if (prevBookmarked >= 0) {
+          this.pickerIdx = prevBookmarked;
+        }
+      } else {
+        updated.add(folder.id);
+      }
       this.itemFolderIds = updated;
       this.renderBookmarks();
     });
+  };
+
+  private readonly findLastIndex = <T>(arr: readonly T[], pred: (item: T) => boolean): number => {
+    for (let i = arr.length - 1; i >= 0; i--) {
+      if (pred(arr[i])) return i;
+    }
+    return -1;
   };
 
   // --- Watchlist ---
 
   readonly toggleWatchlist = (itemId: number): void => {
     toggleWatchlist(itemId).done((resp) => {
-      this.$root.find('.detail__watchlist .icon-check').toggleClass('checked', resp.watching);
+      this.$root.find('[data-action="watchlist"] .detail__rating-value').text(resp.watching ? '\u2713' : '-');
     });
   };
 

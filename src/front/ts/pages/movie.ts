@@ -28,9 +28,8 @@ const tplDetailCompiled = doT.template(`
       {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
       <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
       <div class="detail__meta">{{=it.genres}}</div>
-      {{=it.bookmarksTpl}}
       {{?it.duration}}<div class="detail__meta">{{=it.duration}} &bull; {{=it.quality}}p</div>{{?}}
-      <div class="detail__ratings">{{=it.ratings}}{{=it.watchlistTpl}}</div>
+      <div class="detail__ratings">{{=it.ratings}}{{=it.watchlistTpl}}{{=it.bookmarksTpl}}</div>
       <div class="detail__actions">{{=it.buttons}}</div>
       <div class="detail__plot">{{=it.plot}}</div>
     </div>
@@ -88,13 +87,12 @@ const render = (item: Item): void => {
 
 const updateFocus = (): void => {
   $root.find('.btn').removeClass('focused');
-  $root.find('.detail__watchlist').removeClass('focused');
-  $root.find('.detail__bookmark-picker').removeClass('focused');
+  $root.find('.detail__rating.focusable').removeClass('focused');
 
   if (focusArea === 'bookmarks') {
-    $root.find('.detail__bookmark-picker').addClass('focused');
+    $root.find('[data-action="bookmark"]').addClass('focused');
   } else if (focusArea === 'watchlist') {
-    $root.find('.detail__watchlist').addClass('focused');
+    $root.find('[data-action="watchlist"]').addClass('focused');
   } else {
     $root.find('.btn').eq(0).addClass('focused');
   }
