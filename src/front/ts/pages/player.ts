@@ -464,25 +464,23 @@ function playSource(url: string): void {
 function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: state.position, paused: state.paused, ct: videoEl.currentTime });
-  if (state.position > 0) {
+  if (state.position > 0 && hlsInstance) {
     const pos = state.position;
     const v = videoEl;
-    let seekDone = false;
-    let seekTimer: number | null = null;
-    const doSeek = function () {
-      if (seekDone) return;
-      seekDone = true;
-      if (seekTimer !== null) { clearTimeout(seekTimer); seekTimer = null; }
-      v.removeEventListener('playing', doSeek);
-      v.removeEventListener('canplay', doSeek);
+    const hls = hlsInstance;
+    let done = false;
+    const onFrag = (_e: any, _data: any) => {
+      if (done) return;
+      done = true;
+      hls.off(Hls.Events.FRAG_BUFFERED, onFrag);
+      if (v !== videoEl) return;
+      plog.info('onSourceReady fragBuffered ct={ct} pos={pos}', { ct: v.currentTime, pos });
       if (Math.abs(v.currentTime - pos) > 2) {
         v.currentTime = pos;
       }
     };
-    v.addEventListener('playing', doSeek);
-    v.addEventListener('canplay', doSeek);
-    seekTimer = window.setTimeout(doSeek, 3000);
-    if (!state.paused) v.play();
+    hls.on(Hls.Events.FRAG_BUFFERED, onFrag);
+    v.play();
   } else {
     if (!state.paused) videoEl.play();
   }
