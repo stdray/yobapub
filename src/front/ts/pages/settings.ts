@@ -4,7 +4,7 @@ import { Page, RouteParams } from '../types/app';
 import { getDeviceSettings, saveDeviceSettings, checkVip } from '../api/device';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, isProxyAll, setProxyAll, isProxyPosters, setProxyPosters, getStartPage, setStartPage, START_PAGE_OPTIONS } from '../utils/storage';
+import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, setProxyAll, getStartPage, setStartPage, START_PAGE_OPTIONS, getProxyMode, setProxyMode, PROXY_MODE_OPTIONS } from '../utils/storage';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 
 const $root = $('#page-settings');
@@ -29,6 +29,7 @@ let allSettings: SettingItem[] = [];
 let focusedIndex = 0;
 let focusedOptionIndex = 0;
 let optionsOpen = false;
+let vipUser = false;
 
 const DISPLAY_KEYS: Record<string, boolean> = {
   serverLocation: true,
@@ -52,12 +53,9 @@ const LABELS: Record<string, string> = {
 
 const tplPageCompiled = doT.template(`
   <div class="settings-page">
-    <div class="settings-page__title">Настройки <span class="settings-page__version">{{=it.version}}</span></div>
+    <div class="settings-page__title">Настройки</div>
     <div class="settings-page__list">{{=it.items}}</div>
-    <div class="settings-page__hint">
-      <span class="hint-key hint-key--red"></span> Уменьшить субтитры &nbsp;&nbsp;
-      <span class="hint-key hint-key--green"></span> Увеличить субтитры &nbsp;&nbsp; (во время воспроизведения)
-    </div>
+    <div class="settings-page__version">{{=it.version}}</div>
   </div>
 `);
 
@@ -154,12 +152,16 @@ function buildStartPageSetting(): SettingItem {
   return { key: '_startPage', label: 'Стартовая страница', type: 'list', value: null, options: opts };
 }
 
-function buildProxyPostersSetting(): SettingItem {
-  return { key: '_proxyPosters', label: 'Проксировать постеры', type: 'checkbox', value: isProxyPosters() ? 1 : 0 };
-}
-
-function buildProxyAllSetting(): SettingItem {
-  return { key: '_proxyAll', label: 'Проксировать видео', type: 'checkbox', value: isProxyAll() ? 1 : 0 };
+function buildProxyModeSetting(isVip: boolean): SettingItem {
+  const mode = getProxyMode();
+  const available = isVip ? PROXY_MODE_OPTIONS : PROXY_MODE_OPTIONS.filter((o) => o.id !== 'all');
+  const opts: SettingOption[] = available.map((o, i) => ({
+    id: i,
+    label: o.label,
+    description: '',
+    selected: o.id === mode ? 1 : 0,
+  }));
+  return { key: '_proxyMode', label: 'Проксировать', type: 'list', value: null, options: opts };
 }
 
 function getDisplayValue(item: SettingItem): string {
@@ -250,16 +252,14 @@ function applyOption(): void {
     return;
   }
 
-  if (item.key === '_proxyPosters') {
-    item.value = focusedOptionIndex === 1 ? 1 : 0;
-    setProxyPosters(!!item.value);
-    closeOptions();
-    return;
-  }
-
-  if (item.key === '_proxyAll') {
-    item.value = focusedOptionIndex === 1 ? 1 : 0;
-    setProxyAll(!!item.value);
+  if (item.key === '_proxyMode') {
+    if (item.options) {
+      const available = vipUser ? PROXY_MODE_OPTIONS : PROXY_MODE_OPTIONS.filter((o) => o.id !== 'all');
+      for (let j = 0; j < item.options.length; j++) {
+        item.options[j].selected = (j === focusedOptionIndex) ? 1 : 0;
+      }
+      setProxyMode(available[focusedOptionIndex].id);
+    }
     closeOptions();
     return;
   }
@@ -297,24 +297,20 @@ function stepSubSize(dir: number): void {
   render();
 }
 
-function toggleCheckbox(dir: number): void {
+function cycleListOption(dir: number): void {
   const item = allSettings[focusedIndex];
-  if (!item || item.type !== 'checkbox') return;
+  if (!item || item.type !== 'list' || !item.options || item.options.length === 0) return;
 
-  // dir < 0 (left) = off (0), dir > 0 (right) = on (1)
-  const newValue = dir > 0 ? 1 : 0;
-  if (item.value === newValue) return; // no change
-
-  item.value = newValue;
-
-  // Save the change
-  if (item.key === '_proxyPosters') {
-    setProxyPosters(!!newValue);
-  } else if (item.key === '_proxyAll') {
-    setProxyAll(!!newValue);
+  let currentIdx = 0;
+  for (let i = 0; i < item.options.length; i++) {
+    if (item.options[i].selected) { currentIdx = i; break; }
   }
 
-  render();
+  const newIdx = currentIdx + dir;
+  if (newIdx < 0 || newIdx >= item.options.length) return;
+
+  focusedOptionIndex = newIdx;
+  applyOption();
 }
 
 function handleKey(e: JQuery.Event): void {
@@ -336,11 +332,11 @@ function handleKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     case TvKey.Left:
       if (item && item.type === 'stepper') { stepSubSize(-1); e.preventDefault(); }
-      else if (item && item.type === 'checkbox') { toggleCheckbox(-1); e.preventDefault(); }
+      else if (item && item.type === 'list') { cycleListOption(-1); e.preventDefault(); }
       break;
     case TvKey.Right:
       if (item && item.type === 'stepper') { stepSubSize(1); e.preventDefault(); }
-      else if (item && item.type === 'checkbox') { toggleCheckbox(1); e.preventDefault(); }
+      else if (item && item.type === 'list') { cycleListOption(1); e.preventDefault(); }
       break;
     case TvKey.Enter:
       if (item && item.type === 'stepper') { e.preventDefault(); break; }
@@ -411,12 +407,9 @@ export var settingsPage: Page = {
             }
           }
         }
-        if (isVip) {
-          allSettings.unshift(buildProxyAllSetting());
-        } else {
-          setProxyAll(false);
-        }
-        allSettings.unshift(buildProxyPostersSetting());
+        vipUser = isVip;
+        if (!isVip) setProxyAll(false);
+        allSettings.unshift(buildProxyModeSetting(isVip));
         allSettings.unshift(buildSubSizeSetting());
         allSettings.unshift(buildQualitySetting());
         allSettings.unshift(buildStartPageSetting());

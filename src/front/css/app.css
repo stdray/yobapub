@@ -807,37 +807,11 @@ video::cue {
   color: #e94560;
 }
 
-.settings-page__hint {
-  margin-top: 30px;
-  font-size: 22px;
-  color: #666;
-  display: flex;
-  align-items: center;
-}
-
-.hint-key {
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.hint-key--red {
-  background: #e94560;
-}
-
-.hint-key--green {
-  background: #4caf50;
-}
-
 .settings-page__version {
-  position: absolute;
-  bottom: 40px;
-  left: 120px;
+  margin-top: 30px;
   font-size: 20px;
   color: #555;
+  text-align: right;
 }
 
 /* --- Bookmarks --- */

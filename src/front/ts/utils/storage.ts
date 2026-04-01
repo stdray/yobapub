@@ -144,6 +144,30 @@ export function saveTitlePrefs(prefs: TitlePrefs): void {
 
 // --- Proxy ---
 
+export type ProxyMode = 'none' | 'posters' | 'all';
+
+export const PROXY_MODE_OPTIONS: ReadonlyArray<{ readonly id: ProxyMode; readonly label: string }> = [
+  { id: 'none', label: 'Нет' },
+  { id: 'posters', label: 'Постеры' },
+  { id: 'all', label: 'Всё' },
+];
+
+export const getProxyMode = (): ProxyMode => {
+  if (localStorage.getItem(KEYS.PROXY_ALL) === '1') return 'all';
+  const posters = localStorage.getItem(KEYS.PROXY_POSTERS);
+  if (posters === null || posters === '1') return 'posters';
+  return 'none';
+};
+
+export const setProxyMode = (mode: ProxyMode): void => {
+  localStorage.setItem(KEYS.PROXY_POSTERS, mode === 'posters' || mode === 'all' ? '1' : '0');
+  if (mode === 'all') {
+    localStorage.setItem(KEYS.PROXY_ALL, '1');
+  } else {
+    localStorage.removeItem(KEYS.PROXY_ALL);
+  }
+};
+
 export function isProxyAll(): boolean {
   return localStorage.getItem(KEYS.PROXY_ALL) === '1';
 }
