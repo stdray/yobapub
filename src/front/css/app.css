@@ -36,10 +36,6 @@ html, body {
   height: 100%;
 }
 
-.hidden {
-  display: none;
-}
-
 /* --- Login --- */
 .login {
   display: flex;
@@ -1046,4 +1042,9 @@ video::cue {
   padding: 20px 40px 40px;
   font-size: 26px;
   color: rgba(255, 255, 255, 0.5);
+}
+
+/* --- Utility (must be last to override component display values) --- */
+.hidden {
+  display: none;
 }
