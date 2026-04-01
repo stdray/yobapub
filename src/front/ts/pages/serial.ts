@@ -31,7 +31,8 @@ const tplDetailCompiled = doT.template(`
       {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
       <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
       <div class="detail__meta">{{=it.genres}}</div>
-      <div class="detail__ratings">{{=it.ratings}}{{=it.watchlistTpl}}{{=it.bookmarksTpl}}</div>
+      <div class="detail__ratings">{{=it.bookmarksTpl}}</div>
+      <div class="detail__ratings">{{=it.ratings}}{{=it.watchlistTpl}}</div>
       <div class="detail__actions"><div class="btn" data-action="play">{{=it.playLabel}}</div></div>
       <div class="detail__plot">{{=it.plot}}</div>
       <div class="episodes">

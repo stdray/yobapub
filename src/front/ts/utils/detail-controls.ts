@@ -18,7 +18,7 @@ export class DetailControls {
   // --- Templates ---
 
   readonly watchlistTpl = (inWatchlist: boolean): string =>
-    '<span class="detail__rating focusable" data-action="watchlist">Я смотрю <span class="detail__rating-value">' + (inWatchlist ? '\u2713' : '-') + '</span></span>';
+    '<span class="detail__rating focusable" data-action="watchlist">Я смотрю <span class="icon-check' + (inWatchlist ? ' checked' : '') + '">\u2713</span></span>';
 
   readonly bookmarksTpl = (): string =>
     '<span class="detail__rating focusable" data-action="bookmark">' +
@@ -129,7 +129,7 @@ export class DetailControls {
 
   readonly toggleWatchlist = (itemId: number): void => {
     toggleWatchlist(itemId).done((resp) => {
-      this.$root.find('[data-action="watchlist"] .detail__rating-value').text(resp.watching ? '\u2713' : '-');
+      this.$root.find('[data-action="watchlist"] .icon-check').toggleClass('checked', resp.watching);
     });
   };
 

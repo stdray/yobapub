@@ -311,6 +311,24 @@ html, body {
   margin-bottom: 30px;
 }
 
+.icon-check {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #888;
+  border-radius: 4px;
+  background: transparent;
+  text-align: center;
+  line-height: 20px;
+  font-size: 14px;
+  color: transparent;
+  vertical-align: middle;
+}
+
+.icon-check.checked {
+  color: #e94560;
+}
+
 /* Focusable rating-style items */
 .detail__rating.focusable {
   border: 2px solid transparent;
