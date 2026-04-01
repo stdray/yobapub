@@ -2,27 +2,23 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { loadItemWithWatching } from '../api/items';
-import { Item, BookmarkFolder, WatchingInfoItem } from '../types/api';
+import { Item, WatchingInfoItem } from '../types/api';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { renderRatings } from '../utils/templates';
 import { formatDuration } from '../utils/format';
 import { storage } from '../utils/storage';
-import { toggleWatchlist } from '../api/watching';
-import { getBookmarkFolders, getItemFolders, toggleBookmarkItem, createBookmarkFolder } from '../api/bookmarks';
+import { DetailControls } from '../utils/detail-controls';
 
 const $root = $('#page-movie');
 const keys = new PageKeys();
+const controls = new DetailControls($root);
 
-type FocusArea = 'watchlist' | 'play' | 'bookmarks';
+type FocusArea = 'bookmarks' | 'watchlist' | 'play';
 let focusArea: FocusArea = 'play';
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
-
-let allFolders: readonly BookmarkFolder[] = [];
-let itemFolderIds: ReadonlySet<number> = new Set();
-let pickerIdx = 0;
 
 const tplDetailCompiled = doT.template(`
   <div class="detail">
@@ -32,10 +28,10 @@ const tplDetailCompiled = doT.template(`
       {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
       <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
       <div class="detail__meta">{{=it.genres}}</div>
+      {{=it.bookmarksTpl}}
       {{?it.duration}}<div class="detail__meta">{{=it.duration}} &bull; {{=it.quality}}p</div>{{?}}
-      <div class="detail__ratings">{{=it.ratings}}<span class="detail__watchlist" data-action="watchlist">Я смотрю <span class="icon-check{{?it.inWatchlist}} checked{{?}}">\u2713</span></span></div>
+      <div class="detail__ratings">{{=it.ratings}}{{=it.watchlistTpl}}</div>
       <div class="detail__actions">{{=it.buttons}}</div>
-      <div class="detail__bookmarks"><span class="detail__bookmarks-label">Закладки:</span><span class="detail__bookmark-tags"></span><span class="detail__bookmark-picker"><span class="detail__bookmark-arrow">\u25C0</span> <span class="detail__picker-name">-</span> <span class="icon-check">\u2713</span> <span class="detail__bookmark-arrow">\u25B6</span></span></div>
       <div class="detail__plot">{{=it.plot}}</div>
     </div>
   </div>
@@ -53,44 +49,10 @@ const tplDetail = (data: {
   readonly ratings: string;
   readonly buttons: string;
   readonly plot: string;
-  readonly inWatchlist: boolean;
+  readonly bookmarksTpl: string;
+  readonly watchlistTpl: string;
 }): string =>
   tplDetailCompiled(data);
-
-const renderBookmarks = (): void => {
-  const tags = allFolders
-    .filter((f) => itemFolderIds.has(f.id))
-    .map((f) => '<span class="detail__bookmark-tag">' + f.title + '</span>')
-    .join('');
-  $root.find('.detail__bookmark-tags').html(tags);
-
-  const folder = allFolders[pickerIdx];
-  if (folder) {
-    $root.find('.detail__picker-name').text(folder.title);
-    $root.find('.detail__bookmark-picker .icon-check').toggleClass('checked', itemFolderIds.has(folder.id));
-  } else {
-    $root.find('.detail__picker-name').text('-');
-    $root.find('.detail__bookmark-picker .icon-check').removeClass('checked');
-  }
-};
-
-const loadBookmarks = (itemId: number): void => {
-  $.when(getBookmarkFolders(), getItemFolders(itemId)).done((foldersResp, itemFoldersResp) => {
-    if (foldersResp.items.length > 0) {
-      allFolders = foldersResp.items;
-      itemFolderIds = new Set(itemFoldersResp.folders.map((f) => f.id));
-      pickerIdx = 0;
-      renderBookmarks();
-    } else {
-      createBookmarkFolder('Favorites').done((resp) => {
-        allFolders = resp.items;
-        itemFolderIds = new Set();
-        pickerIdx = 0;
-        renderBookmarks();
-      });
-    }
-  });
-};
 
 const render = (item: Item): void => {
   const title = item.title.split(' / ');
@@ -115,13 +77,13 @@ const render = (item: Item): void => {
     ratings: renderRatings(item),
     buttons: buttons,
     plot: item.plot || '',
-    inWatchlist: item.in_watchlist
+    bookmarksTpl: controls.bookmarksTpl(),
+    watchlistTpl: controls.watchlistTpl(item.in_watchlist)
   }));
 
   focusArea = 'play';
-  pickerIdx = 0;
   updateFocus();
-  loadBookmarks(item.id);
+  controls.loadBookmarks(item.id);
 };
 
 const updateFocus = (): void => {
@@ -129,10 +91,10 @@ const updateFocus = (): void => {
   $root.find('.detail__watchlist').removeClass('focused');
   $root.find('.detail__bookmark-picker').removeClass('focused');
 
-  if (focusArea === 'watchlist') {
-    $root.find('.detail__watchlist').addClass('focused');
-  } else if (focusArea === 'bookmarks') {
+  if (focusArea === 'bookmarks') {
     $root.find('.detail__bookmark-picker').addClass('focused');
+  } else if (focusArea === 'watchlist') {
+    $root.find('.detail__watchlist').addClass('focused');
   } else {
     $root.find('.btn').eq(0).addClass('focused');
   }
@@ -151,54 +113,27 @@ const handleKey = (e: JQuery.Event): void => {
       e.preventDefault(); return;
   }
 
-  if (focusArea === 'watchlist') {
+  if (focusArea === 'bookmarks') {
     switch (e.keyCode) {
-      case TvKey.Down:
-        focusArea = 'play'; updateFocus();
-        e.preventDefault(); break;
+      case TvKey.Left: controls.prevFolder(); e.preventDefault(); break;
+      case TvKey.Right: controls.nextFolder(); e.preventDefault(); break;
+      case TvKey.Down: focusArea = 'watchlist'; updateFocus(); e.preventDefault(); break;
+      case TvKey.Enter: controls.toggleBookmark(); e.preventDefault(); break;
+    }
+  } else if (focusArea === 'watchlist') {
+    switch (e.keyCode) {
+      case TvKey.Up: focusArea = 'bookmarks'; updateFocus(); e.preventDefault(); break;
+      case TvKey.Down: focusArea = 'play'; updateFocus(); e.preventDefault(); break;
       case TvKey.Enter:
-        if (currentItem) {
-          toggleWatchlist(currentItem.id).done((resp) => {
-            $root.find('.detail__watchlist .icon-check').toggleClass('checked', resp.watching);
-          });
-        }
+        if (currentItem) { controls.toggleWatchlist(currentItem.id); }
         e.preventDefault(); break;
     }
   } else if (focusArea === 'play') {
     switch (e.keyCode) {
-      case TvKey.Up:
-        focusArea = 'watchlist'; updateFocus();
-        e.preventDefault(); break;
-      case TvKey.Down:
-        focusArea = 'bookmarks'; updateFocus();
-        e.preventDefault(); break;
+      case TvKey.Up: focusArea = 'watchlist'; updateFocus(); e.preventDefault(); break;
       case TvKey.Enter:
         if (currentItem) { router.navigateMoviePlayer(currentItem.id); }
         e.preventDefault(); break;
-    }
-  } else if (focusArea === 'bookmarks') {
-    switch (e.keyCode) {
-      case TvKey.Left:
-        if (pickerIdx > 0) { pickerIdx--; renderBookmarks(); }
-        e.preventDefault(); break;
-      case TvKey.Right:
-        if (pickerIdx < allFolders.length - 1) { pickerIdx++; renderBookmarks(); }
-        e.preventDefault(); break;
-      case TvKey.Up:
-        focusArea = 'play'; updateFocus();
-        e.preventDefault(); break;
-      case TvKey.Enter: {
-        const folder = allFolders[pickerIdx];
-        if (folder && currentItem) {
-          toggleBookmarkItem(currentItem.id, folder.id).done(() => {
-            const updated = new Set(itemFolderIds);
-            if (updated.has(folder.id)) { updated.delete(folder.id); } else { updated.add(folder.id); }
-            itemFolderIds = updated;
-            renderBookmarks();
-          });
-        }
-        e.preventDefault(); break;
-      }
     }
   }
 };
@@ -207,8 +142,7 @@ export const moviePage: Page = {
   mount(params: RouteParams) {
     currentItem = null;
     watchingInfo = null;
-    allFolders = [];
-    itemFolderIds = new Set();
+    controls.reset();
     PageUtils.showSpinnerIn($root);
 
     loadItemWithWatching(params.id!,
