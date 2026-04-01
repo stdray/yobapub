@@ -1,5 +1,4 @@
 using LiteDB;
-using Microsoft.Extensions.Options;
 
 namespace YobaPub.Proxy;
 
@@ -10,17 +9,13 @@ public class VipLoginEntry
     public DateTimeOffset AddedAt { get; set; }
 }
 
-public class VipLoginStore : IDisposable
+public class VipLoginStore
 {
-    private readonly LiteDatabase _db;
     private readonly ILiteCollection<VipLoginEntry> _col;
 
-    public VipLoginStore(IOptions<AdminOptions> options)
+    public VipLoginStore(MainDb db)
     {
-        var dbPath = options.Value.VipLoginsDbPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
-        _db = new LiteDatabase(dbPath);
-        _col = _db.GetCollection<VipLoginEntry>("vipLogins");
+        _col = db.GetCollection<VipLoginEntry>("vipLogins");
         _col.EnsureIndex(x => x.Login, true);
     }
 
@@ -44,6 +39,4 @@ public class VipLoginStore : IDisposable
 
     public bool Contains(string login) =>
         _col.Exists(x => x.Login == login.Trim().ToLowerInvariant());
-
-    public void Dispose() => _db.Dispose();
 }

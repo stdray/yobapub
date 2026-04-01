@@ -1,0 +1,38 @@
+@model SettingsViewModel
+@{
+    ViewData["Title"] = "YobaPub - Настройки";
+}
+<header>
+  <h1>Настройки</h1>
+</header>
+<div style="padding:16px">
+  <table>
+    <thead>
+      <tr>
+        <th>Параметр</th>
+        <th>Состояние</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Отладка (запись событий от фронта)</td>
+        <td>
+          @if (Model.DebugEnabled)
+          {
+            <span style="color:#2ecc71">Включена</span>
+          }
+          else
+          {
+            <span style="color:#e74c3c">Выключена</span>
+          }
+        </td>
+        <td>
+          <form asp-action="ToggleDebug" method="post" style="margin:0">
+            <button type="submit">@(Model.DebugEnabled ? "Выключить" : "Включить")</button>
+          </form>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

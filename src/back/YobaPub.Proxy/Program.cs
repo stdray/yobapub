@@ -14,7 +14,9 @@ builder.Services.AddDataProtection()
         builder.Configuration["DataProtection:KeysPath"] ?? "/keys/dataprotection"));
 builder.Services.AddSingleton<LogStore>();
 builder.Services.AddSingleton<PlaybackErrorStore>();
+builder.Services.AddSingleton<MainDb>();
 builder.Services.AddSingleton<VipLoginStore>();
+builder.Services.AddSingleton<DebugSettingsStore>();
 builder.Services.AddHostedService<LogRetentionService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
@@ -50,8 +52,9 @@ app.MapGet("/api/proxy-config", (ProxyConfig cfg) => Results.Json(new { cfg.Prox
 app.MapGet("/api/vip-check", (string login, VipLoginStore vipStore) =>
     Results.Json(new { vip = vipStore.Contains(login) }));
 
-app.MapPost("/api/log", async (HttpContext ctx, LogStore store) =>
+app.MapPost("/api/log", async (HttpContext ctx, LogStore store, DebugSettingsStore debugSettings) =>
 {
+    if (!debugSettings.IsEnabled) return Results.Ok();
     try
     {
         using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
@@ -72,8 +75,9 @@ app.MapPost("/api/log", async (HttpContext ctx, LogStore store) =>
     return Results.Ok();
 });
 
-app.MapPost("/api/playback-error", async (HttpContext ctx, PlaybackErrorStore store) =>
+app.MapPost("/api/playback-error", async (HttpContext ctx, PlaybackErrorStore store, DebugSettingsStore debugSettings) =>
 {
+    if (!debugSettings.IsEnabled) return Results.Ok();
     try
     {
         using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);

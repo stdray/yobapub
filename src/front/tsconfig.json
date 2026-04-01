@@ -3,7 +3,7 @@
     "target": "ES5",
     "module": "ESNext",
     "moduleResolution": "node",
-    "lib": ["ES2015", "DOM"],
+    "lib": ["ES5", "DOM"],
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
