@@ -58,6 +58,10 @@ class Sidebar {
     this.onUnfocus = null;
   }
 
+  refresh(): void {
+    if (!this.$el.hasClass('hidden')) this.render();
+  }
+
   isRoute(route: RouteName): boolean {
     return SIDEBAR_ROUTES.indexOf(route) >= 0;
   }

@@ -66,6 +66,7 @@ if (getAccessToken()) {
   notifyDevice();
   checkVip().then((isVip: boolean) => {
     if (!isVip) setProxyAll(false);
+    sidebar.refresh();
   });
   navigate(getStartPage());
 } else {
