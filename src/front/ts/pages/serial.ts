@@ -3,15 +3,15 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { loadItemWithWatching } from '../api/items';
 import { Item, Season, WatchingInfoItem } from '../types/api';
-import { navigate, goBack } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
-import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { renderRatings } from '../utils/templates';
 import { formatTimeShort } from '../utils/format';
-import { proxyPosterUrl } from '../utils/storage';
+import { storage } from '../utils/storage';
 
 const $root = $('#page-serial');
-const keys = pageKeys();
+const keys = new PageKeys();
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
 
@@ -148,7 +148,7 @@ function render(item: Item): void {
   }
 
   $root.html(tplDetail({
-    poster: proxyPosterUrl(item.posters.big),
+    poster: storage.proxyPosterUrl(item.posters.big),
     titleRu: title[0],
     titleEn: title.length > 1 ? title[1] : '',
     year: item.year,
@@ -186,7 +186,7 @@ function updateFocus(): void {
     if ($eps.length > 0) {
       const $ep = $eps.eq(focusedEpisode);
       $ep.addClass('focused');
-      scrollIntoView($ep[0], $root.find('.detail__info')[0], 20);
+      PageUtils.scrollIntoView($ep[0], $root.find('.detail__info')[0], 20);
     }
   }
 }
@@ -208,7 +208,7 @@ function handleKey(e: JQuery.Event): void {
     case TvKey.Return:
     case TvKey.Backspace:
     case TvKey.Escape:
-      goBack(); e.preventDefault(); return;
+      router.goBack(); e.preventDefault(); return;
   }
 
   if (focusArea === 'play') {
@@ -221,10 +221,10 @@ function handleKey(e: JQuery.Event): void {
           const resume = findResumeEpisode();
           if (resume) {
             const resumeEpObj = seasons[resume.seasonIdx] && seasons[resume.seasonIdx].episodes[resume.episodeIdx];
-            navigate('player', { id: currentItem.id, season: resume.season, episode: resume.episode });
+            router.navigate('player', { id: currentItem.id, season: resume.season, episode: resume.episode });
           } else if (seasons.length > 0 && seasons[0].episodes.length > 0) {
             const firstEp = seasons[0].episodes[0];
-            navigate('player', { id: currentItem.id, season: seasons[0].number, episode: firstEp.number });
+            router.navigate('player', { id: currentItem.id, season: seasons[0].number, episode: firstEp.number });
           }
         }
         e.preventDefault(); break;
@@ -260,7 +260,7 @@ function handleKey(e: JQuery.Event): void {
       case TvKey.Enter:
         if (currentItem && seasons[selectedSeason]) {
           const ep = seasons[selectedSeason].episodes[focusedEpisode];
-          if (ep) { navigate('player', { id: currentItem.id, season: seasons[selectedSeason].number, episode: ep.number }); }
+          if (ep) { router.navigate('player', { id: currentItem.id, season: seasons[selectedSeason].number, episode: ep.number }); }
         }
         e.preventDefault(); break;
     }
@@ -270,7 +270,7 @@ function handleKey(e: JQuery.Event): void {
 export var serialPage: Page = {
   mount: function (params: RouteParams) {
     currentItem = null; watchingInfo = null; selectedSeason = 0;
-    showSpinnerIn($root);
+    PageUtils.showSpinnerIn($root);
     let id = params.id!;
 
     const targetEpisodeId = params.episodeId;
@@ -300,7 +300,7 @@ export var serialPage: Page = {
   },
   unmount: function () {
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     currentItem = null; watchingInfo = null;
   }
 };

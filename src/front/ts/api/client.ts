@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from '../utils/storage';
+import { storage } from '../utils/storage';
 
 let CLIENT_ID = '';
 let CLIENT_SECRET = '';
@@ -18,9 +18,9 @@ export function getClientSecret(): string {
 }
 
 function refreshToken(): JQueryXHR {
-  const rt = getRefreshToken();
+  const rt = storage.getRefreshToken();
   if (!rt) {
-    clearTokens();
+    storage.clearTokens();
     let d = $.Deferred();
     d.reject(null, 'error', 'no_refresh_token');
     return d.promise() as any as JQueryXHR;
@@ -40,7 +40,7 @@ function refreshToken(): JQueryXHR {
 }
 
 export function apiGet(path: string, params?: Record<string, any>): JQueryXHR {
-  const token = getAccessToken();
+  const token = storage.getAccessToken();
   const data: Record<string, any> = params ? $.extend({}, params) : {};
   if (token) {
     data['access_token'] = token;
@@ -54,7 +54,7 @@ export function apiGet(path: string, params?: Record<string, any>): JQueryXHR {
 }
 
 export function apiPost(path: string, data?: Record<string, any>): JQueryXHR {
-  const token = getAccessToken();
+  const token = storage.getAccessToken();
   let url = path;
   if (token) {
     url += '?access_token=' + encodeURIComponent(token);
@@ -74,17 +74,17 @@ export function apiGetWithRefresh(path: string, params?: Record<string, any>): J
     apiGet(path, params).then(
       function (data: any) { d.resolve(data); },
       function (xhr: JQueryXHR) {
-        if (xhr.status === 401 && getRefreshToken()) {
+        if (xhr.status === 401 && storage.getRefreshToken()) {
           refreshToken().then(
             function (tokenData: any) {
-              saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
+              storage.saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
               apiGet(path, params).then(
                 function (data: any) { d.resolve(data); },
                 function (xhr2: JQueryXHR) { d.reject(xhr2); }
               );
             },
             function () {
-              clearTokens();
+              storage.clearTokens();
               d.reject(xhr);
             }
           );
@@ -106,17 +106,17 @@ export function apiPostWithRefresh(path: string, data?: Record<string, any>): JQ
     apiPost(path, data).then(
       function (res: any) { d.resolve(res); },
       function (xhr: JQueryXHR) {
-        if (xhr.status === 401 && getRefreshToken()) {
+        if (xhr.status === 401 && storage.getRefreshToken()) {
           refreshToken().then(
             function (tokenData: any) {
-              saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
+              storage.saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
               apiPost(path, data).then(
                 function (res: any) { d.resolve(res); },
                 function (xhr2: JQueryXHR) { d.reject(xhr2); }
               );
             },
             function () {
-              clearTokens();
+              storage.clearTokens();
               d.reject(xhr);
             }
           );

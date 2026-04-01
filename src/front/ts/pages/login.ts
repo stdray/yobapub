@@ -2,13 +2,13 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { requestDeviceCode, pollDeviceToken } from '../api/auth';
-import { navigate } from '../router';
-import { TvKey, getDeviceInfo } from '../utils/platform';
+import { router } from '../router';
+import { TvKey, platform } from '../utils/platform';
 import { apiPost } from '../api/client';
-import { pageKeys, clearPage } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 
 const $root = $('#page-login');
-const keys = pageKeys();
+const keys = new PageKeys();
 let poller: { stop: () => void } | null = null;
 let countdownTimer: number | null = null;
 
@@ -90,9 +90,9 @@ function startAuth(): void {
         data.expires_in,
         function () {
           cleanup();
-          const info = getDeviceInfo();
+          const info = platform.getDeviceInfo();
           apiPost('/v1/device/notify', { title: info.title, hardware: info.hardware, software: info.software });
-          navigate('watching');
+          router.navigate('watching');
         },
         function () { cleanup(); $root.html(tplExpired({})); },
         function (msg) { cleanup(); $root.html(tplError({ message: msg })); }
@@ -124,6 +124,6 @@ export var loginPage: Page = {
   unmount: function () {
     cleanup();
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
   }
 };

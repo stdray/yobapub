@@ -1,14 +1,15 @@
 import $ from 'jquery';
 import { Page, RouteParams } from '../types/app';
-import { goBack } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
-import { pageKeys, clearPage } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
-import { buildBaseHlsConfig, applyHlsProxy, logPlaybackStart } from '../utils/hls-proxy';
+import { buildBaseHlsConfig, logPlaybackStart } from '../utils/hls-proxy';
+import { storage } from '../utils/storage';
 import { showHlsError } from '../utils/hls-error';
 
 const $root = $('#page-tv-player');
-const keys = pageKeys();
+const keys = new PageKeys();
 const plog = new Logger('tv-player');
 let hls: any = null;
 let video: HTMLVideoElement | null = null;
@@ -101,7 +102,7 @@ function startPlayback(streamUrl: string): void {
 
     const hlsConfig: Record<string, any> = buildBaseHlsConfig();
 
-    if (applyHlsProxy()) {
+    if (storage.isProxyTv()) {
       plog.debug('Proxy enabled, will rewrite URLs');
       streamUrl = '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0&proxy=true';
     }
@@ -191,7 +192,7 @@ function startPlayback(streamUrl: string): void {
           keys.bind((e: JQuery.Event) => {
             if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace ||
                 e.keyCode === TvKey.Escape || e.keyCode === TvKey.Stop) {
-              goBack();
+              router.goBack();
               e.preventDefault();
             }
           });
@@ -247,7 +248,7 @@ const handleKey = (e: JQuery.Event): void => {
     case TvKey.Stop:
       plog.debug('stop/back pressed');
       stopPlayback();
-      goBack();
+      router.goBack();
       e.preventDefault(); break;
   }
 };
@@ -267,6 +268,6 @@ export const tvPlayerPage: Page = {
     clearOverlayTimer();
     stopPlayback();
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
   }
 };

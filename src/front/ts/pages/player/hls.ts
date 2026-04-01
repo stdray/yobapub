@@ -1,4 +1,4 @@
-import { getAccessToken, isProxyAll } from '../../utils/storage';
+import { storage } from '../../utils/storage';
 
 export function getBaseUrl(url: string): string {
   const i = url.indexOf('?');
@@ -42,9 +42,9 @@ export function rewriteHlsManifest(manifest: string, audioIndex: number): string
 }
 
 export function getRewrittenHlsUrl(url: string, audioIndex: number): string {
-  const token = getAccessToken() || '';
+  const token = storage.getAccessToken() || '';
   return '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
-    (isProxyAll() ? '&proxy=true' : '') +
+    (storage.isProxyAll() ? '&proxy=true' : '') +
     (token ? '&access_token=' + encodeURIComponent(token) : '');
 }
 

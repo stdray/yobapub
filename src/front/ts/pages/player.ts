@@ -3,12 +3,12 @@ import { Page, RouteParams } from '../types/app';
 import { getItem } from '../api/items';
 import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
-import { goBack } from '../router';
-import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getStreamingType } from '../utils/storage';
+import { router } from '../router';
+import { TvKey, platform } from '../utils/platform';
+import { storage } from '../utils/storage';
 import { buildBaseHlsConfig, logPlaybackStart } from '../utils/hls-proxy';
 import { showHlsError } from '../utils/hls-error';
-import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
 
 const plog = new Logger('player');
@@ -77,7 +77,7 @@ const defaultPanelState = (): PanelState => ({
 
 class PlayerController {
   private readonly $root = $('#page-player');
-  private readonly keys = pageKeys();
+  private readonly keys = new PageKeys();
 
   // State
   private videoEl: HTMLVideoElement | null = null;
@@ -348,8 +348,8 @@ class PlayerController {
   private getHlsUrl(f: VideoFile): string {
     const hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
     const hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
-    if (isLegacyTizen()) return hls2;
-    const sp = getStreamingType();
+    if (platform.isLegacyTizen()) return hls2;
+    const sp = storage.getStreamingType();
     if (sp === 'hls4') return hls4;
     if (sp === 'hls2') return hls2;
     return hls4 || hls2;
@@ -504,7 +504,7 @@ class PlayerController {
       this.keys.bind((e: JQuery.Event) => {
         const kc = this.getKeyCode(e);
         if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape) {
-          goBack();
+          router.goBack();
           e.preventDefault();
         }
       });
@@ -516,7 +516,7 @@ class PlayerController {
   private onSourceReady(): void {
     if (!this.videoEl) return;
     plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime });
-    if (this.state.position > 0 && isLegacyTizen()) {
+    if (this.state.position > 0 && platform.isLegacyTizen()) {
       // Tizen 2.3: startPosition is ignored by hls.js on Chromium 28.
       // Wait for playback to stabilize, then seek manually.
       const pos = this.state.position;
@@ -599,7 +599,7 @@ class PlayerController {
     this.keys.bind((e: JQuery.Event) => {
       const kc = this.getKeyCode(e);
       if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape) {
-        goBack();
+        router.goBack();
         e.preventDefault();
       }
     });
@@ -619,7 +619,7 @@ class PlayerController {
     this.videoEl.addEventListener('ended', () => {
       plog.info('video ended currentTime={currentTime}', { currentTime: this.videoEl ? this.videoEl.currentTime : -1 });
       if (!this.markedWatched) this.sendToggleWatched();
-      if (!this.navigateTrack(1)) goBack();
+      if (!this.navigateTrack(1)) router.goBack();
     });
     this.videoEl.addEventListener('waiting', () => {
       plog.debug('video waiting currentTime={currentTime}', { currentTime: this.videoEl ? this.videoEl.currentTime : -1 });
@@ -740,7 +740,7 @@ class PlayerController {
     const kc = this.getKeyCode(e);
     if (!this.videoEl) {
       if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
-        this.destroyPlayer(); goBack(); e.preventDefault();
+        this.destroyPlayer(); router.goBack(); e.preventDefault();
       }
       return;
     }
@@ -752,7 +752,7 @@ class PlayerController {
 
     switch (kc) {
       case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
-        this.destroyPlayer(); goBack(); break;
+        this.destroyPlayer(); router.goBack(); break;
 
       case TvKey.Enter: case TvKey.PlayPause:
         if (!this.playbackStarted) break;
@@ -808,7 +808,7 @@ class PlayerController {
     this.media.episode = params.episode;
     this.media.video = params.video;
 
-    showSpinnerIn(this.$root);
+    PageUtils.showSpinnerIn(this.$root);
     const id = params.id!;
 
     getItem(id).then(
@@ -829,7 +829,7 @@ class PlayerController {
   unmount(): void {
     this.destroyPlayer();
     this.keys.unbind();
-    clearPage(this.$root);
+    PageUtils.clearPage(this.$root);
   }
 }
 

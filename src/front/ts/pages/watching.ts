@@ -3,17 +3,17 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { getWatchingMovies, getWatchingSerials } from '../api/watching';
 import { WatchingSerialItem, WatchingMovieItem } from '../types/api';
-import { navigate, setParams } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
-import { proxyPosterUrl } from '../utils/storage';
-import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { storage } from '../utils/storage';
+import { PageKeys, PageUtils } from '../utils/page';
 import { gridMove, gridPos } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 import { sidebar } from '../sidebar';
 
 const $root = $('#page-watching');
-const keys = pageKeys();
+const keys = new PageKeys();
 
 let focusedSection = 0;
 let focusedIndex = 0;
@@ -50,7 +50,7 @@ const buildRows = (): string => {
     for (let j = 0; j < moviesData.length; j++) {
       mCards += tplCard({
         id: moviesData[j].id,
-        poster: proxyPosterUrl(moviesData[j].posters.medium),
+        poster: storage.proxyPosterUrl(moviesData[j].posters.medium),
         title: moviesData[j].title,
         extra: ''
       });
@@ -65,7 +65,7 @@ const buildRows = (): string => {
       const s = serialsData[i];
       cards += tplCard({
         id: s.id,
-        poster: proxyPosterUrl(s.posters.medium),
+        poster: storage.proxyPosterUrl(s.posters.medium),
         title: s.title,
         extra: s.watched + ' / ' + s.total + (s.new > 0 ? ' +' + s.new : '')
       });
@@ -95,7 +95,7 @@ const updateFocus = (): void => {
   if ($cards.length > 0 && focusedIndex < $cards.length) {
     const $card = $cards.eq(focusedIndex);
     $card.addClass('focused');
-    scrollIntoView($card[0], $root.find('.watching')[0]);
+    PageUtils.scrollIntoView($card[0], $root.find('.watching')[0]);
   }
 };
 
@@ -140,9 +140,9 @@ const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
     case TvKey.Enter: {
       const item = currentItems[focusedIndex];
       if (item) {
-        setParams({ focusedSection: focusedSection, focusedIndex: focusedIndex });
+        router.setParams({ focusedSection: focusedSection, focusedIndex: focusedIndex });
         const isSerial = item.type === 'serial' || item.type === 'docuserial';
-        navigate(isSerial ? 'serial' : 'movie', { id: item.id });
+        router.navigate(isSerial ? 'serial' : 'movie', { id: item.id });
       }
       e.preventDefault(); break;
     }
@@ -154,7 +154,7 @@ export const watchingPage: Page = {
   mount(_params: RouteParams) {
     const savedSection = _params.focusedSection;
     const savedIndex = _params.focusedIndex;
-    showSpinnerIn($root);
+    PageUtils.showSpinnerIn($root);
 
     sidebar.setUnfocusHandler(() => updateFocus());
 
@@ -192,7 +192,7 @@ export const watchingPage: Page = {
 
   unmount() {
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     sidebar.setUnfocusHandler(null);
     sections = [];
     serialsData = [];

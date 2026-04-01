@@ -1,11 +1,11 @@
 import $ from 'jquery';
 import { Subtitle } from '../../types/api';
-import { getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, proxyUrl } from '../../utils/storage';
+import { storage, Storage } from '../../utils/storage';
 
 let subStyleEl: HTMLStyleElement | null = null;
 
 export function applySubSize(): void {
-  let size = getSubSize();
+  let size = storage.getSubSize();
   if (!subStyleEl) {
     subStyleEl = document.createElement('style');
     document.head.appendChild(subStyleEl);
@@ -14,8 +14,8 @@ export function applySubSize(): void {
   // Calculate line-height: larger sizes = smaller line-height for compactness
   // Min 22px -> 1.6, Max 82px -> 1.1
   const lineHeightRange = 1.6 - 1.1; // 0.5
-  const sizeRange = SUB_SIZE_MAX - SUB_SIZE_MIN; // 60
-  const sizeProgress = (size - SUB_SIZE_MIN) / sizeRange; // 0 to 1
+  const sizeRange = Storage.SUB_SIZE_MAX - Storage.SUB_SIZE_MIN; // 60
+  const sizeProgress = (size - Storage.SUB_SIZE_MIN) / sizeRange; // 0 to 1
   const lineHeight = (1.6 - lineHeightRange * sizeProgress).toFixed(2);
 
   subStyleEl.textContent =
@@ -27,9 +27,9 @@ export function applySubSize(): void {
 }
 
 export function changeSubSize(dir: number, showToast: (text: string) => void): void {
-  let size = getSubSize();
-  size = Math.max(SUB_SIZE_MIN, Math.min(SUB_SIZE_MAX, size + dir * SUB_SIZE_STEP));
-  setSubSize(size);
+  let size = storage.getSubSize();
+  size = Math.max(Storage.SUB_SIZE_MIN, Math.min(Storage.SUB_SIZE_MAX, size + dir * Storage.SUB_SIZE_STEP));
+  storage.setSubSize(size);
   applySubSize();
   showToast('Субтитры: ' + size + 'px');
 }
@@ -66,7 +66,7 @@ export function loadSubtitleTrack(videoEl: HTMLVideoElement, $root: JQuery, subs
     }
   }
 
-  const subUrl = proxyUrl(sub.url);
+  const subUrl = storage.proxyUrl(sub.url);
 
   $.ajax({
     url: subUrl,

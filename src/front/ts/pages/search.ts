@@ -3,16 +3,16 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { Item, ItemsResponse } from '../types/api';
 import { searchItems } from '../api/items';
-import { navigate } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
-import { proxyPosterUrl } from '../utils/storage';
-import { pageKeys, clearPage, scrollIntoView } from '../utils/page';
+import { storage } from '../utils/storage';
+import { PageKeys, PageUtils } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 import { sidebar } from '../sidebar';
 
 const $root = $('#page-search');
-const keys = pageKeys();
+const keys = new PageKeys();
 
 let query = '';
 let results: Item[] = [];
@@ -132,7 +132,7 @@ const renderResults = (): void => {
   for (let i = 0; i < results.length; i++) {
     html += tplCard({
       id: results[i].id,
-      poster: proxyPosterUrl(results[i].posters.medium),
+      poster: storage.proxyPosterUrl(results[i].posters.medium),
       title: results[i].title,
       extra: ''
     });
@@ -149,7 +149,7 @@ const updateResultsFocus = (): void => {
   if (focusArea === 'results' && focusedIndex < $cards.length) {
     const $card = $cards.eq(focusedIndex);
     $card.addClass('focused');
-    scrollIntoView($card[0], $root.find('.search__results')[0]);
+    PageUtils.scrollIntoView($card[0], $root.find('.search__results')[0]);
   }
 };
 
@@ -292,7 +292,7 @@ const handleResultsKey = (e: JQuery.Event): void => {
       const item = results[focusedIndex];
       if (item) {
         const isSerial = item.type === 'serial' || item.type === 'docuserial';
-        navigate(isSerial ? 'serial' : 'movie', { id: item.id });
+        router.navigate(isSerial ? 'serial' : 'movie', { id: item.id });
       }
       e.preventDefault(); break;
     }
@@ -336,7 +336,7 @@ export const searchPage: Page = {
   unmount() {
     if (searchTimer !== null) { clearTimeout(searchTimer); searchTimer = null; }
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     sidebar.setUnfocusHandler(null);
     results = [];
   }

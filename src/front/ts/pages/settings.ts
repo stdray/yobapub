@@ -2,13 +2,13 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { getDeviceSettings, saveDeviceSettings, checkVip } from '../api/device';
-import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getSubSize, setSubSize, SUB_SIZE_STEP, SUB_SIZE_MIN, SUB_SIZE_MAX, DEFAULT_SUB_SIZE, setStreamingType, setProxyAll, getStartPage, setStartPage, START_PAGE_OPTIONS, getProxyMode, setProxyMode, PROXY_MODE_OPTIONS } from '../utils/storage';
-import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+import { TvKey, platform } from '../utils/platform';
+import { storage, Storage } from '../utils/storage';
+import { PageKeys, PageUtils } from '../utils/page';
 import { sidebar } from '../sidebar';
 
 const $root = $('#page-settings');
-const keys = pageKeys();
+const keys = new PageKeys();
 
 interface SettingOption {
   id: number;
@@ -107,7 +107,7 @@ const parseSettings = (raw: Record<string, any>): SettingItem[] => {
         for (let i = 0; i < setting.value.length; i++) {
           const optLabel = String(setting.value[i].label || setting.value[i].id || '').toLowerCase();
           if (key === 'streamingType' && optLabel === 'http') continue;
-          if (key === 'streamingType' && isLegacyTizen() && optLabel === 'hls4') continue;
+          if (key === 'streamingType' && platform.isLegacyTizen() && optLabel === 'hls4') continue;
           opts.push({
             id: setting.value[i].id,
             label: setting.value[i].label,
@@ -125,36 +125,36 @@ const parseSettings = (raw: Record<string, any>): SettingItem[] => {
 };
 
 const buildQualitySetting = (): SettingItem => {
-  let savedId = getDefaultQuality();
+  let savedId = storage.getDefaultQuality();
   if (savedId === -1) {
-    savedId = isLegacyTizen() ? 3 : 0;
-    setDefaultQuality(savedId);
+    savedId = platform.isLegacyTizen() ? 3 : 0;
+    storage.setDefaultQuality(savedId);
   }
   const opts: SettingOption[] = [];
-  for (let i = 0; i < QUALITY_OPTIONS.length; i++) {
-    const q = QUALITY_OPTIONS[i];
+  for (let i = 0; i < Storage.QUALITY_OPTIONS.length; i++) {
+    const q = Storage.QUALITY_OPTIONS[i];
     opts.push({ id: q.id, label: q.label, description: '', selected: q.id === savedId ? 1 : 0 });
   }
   return { key: '_defaultQuality', label: 'Качество по умолчанию', type: 'list', value: null, options: opts };
 };
 
 const buildSubSizeSetting = (): SettingItem => {
-  return { key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: getSubSize() };
+  return { key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: storage.getSubSize() };
 };
 
 const buildStartPageSetting = (): SettingItem => {
-  const savedId = getStartPage();
+  const savedId = storage.getStartPage();
   const opts: SettingOption[] = [];
-  for (let i = 0; i < START_PAGE_OPTIONS.length; i++) {
-    const o = START_PAGE_OPTIONS[i];
+  for (let i = 0; i < Storage.START_PAGE_OPTIONS.length; i++) {
+    const o = Storage.START_PAGE_OPTIONS[i];
     opts.push({ id: i, label: o.label, description: '', selected: o.id === savedId ? 1 : 0 });
   }
   return { key: '_startPage', label: 'Стартовая страница', type: 'list', value: null, options: opts };
 };
 
 const buildProxyModeSetting = (isVip: boolean): SettingItem => {
-  const mode = getProxyMode();
-  const available = isVip ? PROXY_MODE_OPTIONS : PROXY_MODE_OPTIONS.filter((o) => o.id !== 'all');
+  const mode = storage.getProxyMode();
+  const available = storage.getAvailableProxyModes(isVip);
   const opts: SettingOption[] = available.map((o, i) => ({
     id: i,
     label: o.label,
@@ -168,7 +168,7 @@ const getDisplayValue = (item: SettingItem): string => {
   if (item.type === 'stepper') {
     const v = item.value as number;
     let lbl = v + 'px';
-    if (v === DEFAULT_SUB_SIZE) lbl += ' (стандарт)';
+    if (v === Storage.DEFAULT_SUB_SIZE) lbl += ' (стандарт)';
     return lbl;
   }
   if (item.type === 'list' && item.options) {
@@ -235,7 +235,7 @@ const applyOption = (): void => {
       for (let j = 0; j < item.options.length; j++) {
         item.options[j].selected = (j === focusedOptionIndex) ? 1 : 0;
       }
-      setDefaultQuality(item.options[focusedOptionIndex].id);
+      storage.setDefaultQuality(item.options[focusedOptionIndex].id);
     }
     closeOptions();
     return;
@@ -246,7 +246,7 @@ const applyOption = (): void => {
       for (let k = 0; k < item.options.length; k++) {
         item.options[k].selected = (k === focusedOptionIndex) ? 1 : 0;
       }
-      setStartPage(START_PAGE_OPTIONS[focusedOptionIndex].id);
+      storage.setStartPage(Storage.START_PAGE_OPTIONS[focusedOptionIndex].id);
     }
     closeOptions();
     return;
@@ -254,11 +254,11 @@ const applyOption = (): void => {
 
   if (item.key === '_proxyMode') {
     if (item.options) {
-      const available = vipUser ? PROXY_MODE_OPTIONS : PROXY_MODE_OPTIONS.filter((o) => o.id !== 'all');
+      const available = storage.getAvailableProxyModes(vipUser);
       for (let j = 0; j < item.options.length; j++) {
         item.options[j].selected = (j === focusedOptionIndex) ? 1 : 0;
       }
-      setProxyMode(available[focusedOptionIndex].id);
+      storage.setProxyMode(available[focusedOptionIndex].id);
     }
     closeOptions();
     return;
@@ -278,7 +278,7 @@ const applyOption = (): void => {
 
   if (item.key === 'streamingType' && item.options) {
     const stOpt = item.options[focusedOptionIndex];
-    setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
+    storage.setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
   }
 
   saveDeviceSettings(saveData);
@@ -289,9 +289,9 @@ const stepSubSize = (dir: number): void => {
   const item = allSettings[focusedIndex];
   if (!item || item.key !== '_subSize') return;
   let size = item.value as number;
-  size = Math.max(SUB_SIZE_MIN, Math.min(SUB_SIZE_MAX, size + dir * SUB_SIZE_STEP));
+  size = Math.max(Storage.SUB_SIZE_MIN, Math.min(Storage.SUB_SIZE_MAX, size + dir * Storage.SUB_SIZE_STEP));
   item.value = size;
-  setSubSize(size);
+  storage.setSubSize(size);
   render();
 };
 
@@ -392,7 +392,7 @@ export const settingsPage: Page = {
     allSettings = [];
     focusedIndex = 0;
     optionsOpen = false;
-    showSpinnerIn($root);
+    PageUtils.showSpinnerIn($root);
 
     sidebar.setUnfocusHandler(() => render());
 
@@ -404,12 +404,12 @@ export const settingsPage: Page = {
           if (data.settings.streamingType && data.settings.streamingType.value) {
             const stValues = data.settings.streamingType.value;
             for (let si = 0; si < stValues.length; si++) {
-              if (stValues[si].selected) { setStreamingType(String(stValues[si].label || stValues[si].id).toLowerCase()); break; }
+              if (stValues[si].selected) { storage.setStreamingType(String(stValues[si].label || stValues[si].id).toLowerCase()); break; }
             }
           }
         }
         vipUser = isVip;
-        if (!isVip) setProxyAll(false);
+        if (!isVip) storage.downgradeProxyForNonVip();
         allSettings.unshift(buildProxyModeSetting(isVip));
         allSettings.unshift(buildSubSizeSetting());
         allSettings.unshift(buildQualitySetting());
@@ -426,7 +426,7 @@ export const settingsPage: Page = {
 
   unmount() {
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     sidebar.setUnfocusHandler(null);
     allSettings = [];
   }

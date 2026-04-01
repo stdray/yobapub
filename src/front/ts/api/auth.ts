@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import { getClientId, getClientSecret } from './client';
 import { DeviceCodeResponse, TokenResponse, AuthErrorResponse } from '../types/api';
-import { saveTokens } from '../utils/storage';
+import { storage } from '../utils/storage';
 
 export function requestDeviceCode(): JQueryXHR {
   return $.ajax({
@@ -48,7 +48,7 @@ export function pollDeviceToken(
     }).then(
       function (data: TokenResponse) {
         if (stopped) return;
-        saveTokens(data.access_token, data.refresh_token, data.expires_in);
+        storage.saveTokens(data.access_token, data.refresh_token, data.expires_in);
         onSuccess();
       },
       function (xhr: JQueryXHR) {

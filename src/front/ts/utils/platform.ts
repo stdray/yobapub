@@ -34,104 +34,108 @@ export enum TvKey {
 declare var tizen: any;
 declare var webapis: any;
 
-export function registerTizenKeys(): void {
-  try {
-    if (typeof tizen !== 'undefined' && tizen.tvinputdevice) {
-      const keysToRegister = [
-        'MediaPlay', 'MediaPause', 'MediaPlayPause', 'MediaStop',
-        'MediaFastForward', 'MediaRewind',
-        'MediaTrackNext', 'MediaTrackPrevious',
-        'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
-      ];
-      for (var i = 0; i < keysToRegister.length; i++) {
-        try {
-          tizen.tvinputdevice.registerKey(keysToRegister[i]);
-        } catch (e) {
-          // key may not be supported on this device
+export interface DeviceInfo {
+  readonly title: string;
+  readonly hardware: string;
+  readonly software: string;
+}
+
+class Platform {
+  registerTizenKeys = (): void => {
+    try {
+      if (typeof tizen !== 'undefined' && tizen.tvinputdevice) {
+        const keysToRegister = [
+          'MediaPlay', 'MediaPause', 'MediaPlayPause', 'MediaStop',
+          'MediaFastForward', 'MediaRewind',
+          'MediaTrackNext', 'MediaTrackPrevious',
+          'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue',
+          '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+        ];
+        for (var i = 0; i < keysToRegister.length; i++) {
+          try {
+            tizen.tvinputdevice.registerKey(keysToRegister[i]);
+          } catch (e) {
+            // key may not be supported on this device
+          }
         }
       }
+    } catch (e) {
+      console.log('[Platform] Not running on Tizen');
     }
-  } catch (e) {
-    console.log('[Platform] Not running on Tizen');
-  }
-}
+  };
 
-export interface DeviceInfo {
-  title: string;
-  hardware: string;
-  software: string;
-}
+  getDeviceInfo = (): DeviceInfo => {
+    let title = 'YobaPub Tizen';
+    let hardware = 'Unknown';
+    let software = 'Unknown';
 
-export function getDeviceInfo(): DeviceInfo {
-  let title = 'YobaPub Tizen';
-  let hardware = 'Unknown';
-  let software = 'Unknown';
-
-  try {
-    if (typeof webapis !== 'undefined' && webapis.productinfo) {
-      const model = webapis.productinfo.getModel ? webapis.productinfo.getModel() : '';
-      const firmware = webapis.productinfo.getFirmware ? webapis.productinfo.getFirmware() : '';
-      hardware = 'Samsung ' + (model || 'Smart TV');
-      software = 'Tizen' + (firmware ? ' ' + firmware : '');
-      title = 'YobaPub ' + hardware;
+    try {
+      if (typeof webapis !== 'undefined' && webapis.productinfo) {
+        const model = webapis.productinfo.getModel ? webapis.productinfo.getModel() : '';
+        const firmware = webapis.productinfo.getFirmware ? webapis.productinfo.getFirmware() : '';
+        hardware = 'Samsung ' + (model || 'Smart TV');
+        software = 'Tizen' + (firmware ? ' ' + firmware : '');
+        title = 'YobaPub ' + hardware;
+      }
+    } catch (e) {
+      // not on Tizen
     }
-  } catch (e) {
-    // not on Tizen
-  }
 
-  // Fallback for browser testing
-  if (hardware === 'Unknown') {
-    const ua = navigator.userAgent;
-    if (ua.indexOf('Tizen') !== -1) {
-      hardware = 'Samsung Smart TV';
-      const tizenMatch = ua.match(/Tizen\s*([\d.]+)/);
-      software = 'Tizen' + (tizenMatch ? ' ' + tizenMatch[1] : '');
-      title = 'YobaPub Samsung TV';
-    } else if (ua.indexOf('Android') !== -1) {
-      const androidMatch = ua.match(/Android\s*([\d.]+)/);
-      const deviceMatch = ua.match(/;\s*([^;)]+)\s*(?:Build|;|\))/);
-      hardware = deviceMatch ? deviceMatch[1].trim() : 'Android';
-      software = 'Android' + (androidMatch ? ' ' + androidMatch[1] : '');
-      title = 'YobaPub Android';
-    } else {
-      const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge)\/([\d.]+)/);
-      const osMatch = ua.match(/(Windows|Mac OS X|Linux|iOS)[^\s;)]*/);
-      hardware = osMatch ? osMatch[0] : 'Browser';
-      software = browserMatch ? browserMatch[1] + ' ' + browserMatch[2] : navigator.userAgent.substring(0, 50);
-      title = 'YobaPub Web';
+    if (hardware === 'Unknown') {
+      const ua = navigator.userAgent;
+      if (ua.indexOf('Tizen') !== -1) {
+        hardware = 'Samsung Smart TV';
+        const tizenMatch = ua.match(/Tizen\s*([\d.]+)/);
+        software = 'Tizen' + (tizenMatch ? ' ' + tizenMatch[1] : '');
+        title = 'YobaPub Samsung TV';
+      } else if (ua.indexOf('Android') !== -1) {
+        const androidMatch = ua.match(/Android\s*([\d.]+)/);
+        const deviceMatch = ua.match(/;\s*([^;)]+)\s*(?:Build|;|\))/);
+        hardware = deviceMatch ? deviceMatch[1].trim() : 'Android';
+        software = 'Android' + (androidMatch ? ' ' + androidMatch[1] : '');
+        title = 'YobaPub Android';
+      } else {
+        const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge)\/([\d.]+)/);
+        const osMatch = ua.match(/(Windows|Mac OS X|Linux|iOS)[^\s;)]*/);
+        hardware = osMatch ? osMatch[0] : 'Browser';
+        software = browserMatch ? browserMatch[1] + ' ' + browserMatch[2] : navigator.userAgent.substring(0, 50);
+        title = 'YobaPub Web';
+      }
     }
-  }
 
-  return { title: title, hardware: hardware, software: software };
-}
+    return { title, hardware, software };
+  };
 
-export function getTizenVersion(): number {
-  try {
-    if (typeof tizen !== 'undefined' && tizen.systeminfo) {
-      const cap = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
-      if (cap) return parseFloat(cap) || 0;
+  getTizenVersion = (): number => {
+    try {
+      if (typeof tizen !== 'undefined' && tizen.systeminfo) {
+        const cap = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
+        if (cap) return parseFloat(cap) || 0;
+      }
+    } catch (e) { /* ignore */ }
+    const m = navigator.userAgent.match(/Tizen\s*([\d.]+)/);
+    return m ? (parseFloat(m[1]) || 0) : 0;
+  };
+
+  isLegacyTizen = (): boolean => {
+    const v = this.getTizenVersion();
+    return v > 0 && v < 3;
+  };
+
+  isAndroidWebView = (): boolean => {
+    return typeof (window as any).NativeApp !== 'undefined' || /Android.*wv\b/.test(navigator.userAgent);
+  };
+
+  exitApp = (): void => {
+    try {
+      if (typeof tizen !== 'undefined' && tizen.application) {
+        tizen.application.getCurrentApplication().exit();
+      }
+    } catch (e) {
+      console.log('[Platform] Cannot exit app');
     }
-  } catch (e) { /* ignore */ }
-  const m = navigator.userAgent.match(/Tizen\s*([\d.]+)/);
-  return m ? (parseFloat(m[1]) || 0) : 0;
+  };
 }
 
-export function isLegacyTizen(): boolean {
-  const v = getTizenVersion();
-  return v > 0 && v < 3;
-}
-
-export function isAndroidWebView(): boolean {
-  return typeof (window as any).NativeApp !== 'undefined' || /Android.*wv\b/.test(navigator.userAgent);
-}
-
-export function exitApp(): void {
-  try {
-    if (typeof tizen !== 'undefined' && tizen.application) {
-      tizen.application.getCurrentApplication().exit();
-    }
-  } catch (e) {
-    console.log('[Platform] Cannot exit app');
-  }
-}
+export { Platform };
+export const platform = new Platform();

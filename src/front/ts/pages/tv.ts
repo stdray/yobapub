@@ -2,17 +2,17 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { TvChannel } from '../types/api';
-import { navigate, setParams } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
-import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { gridMove } from '../utils/grid';
-import { proxyPosterUrl } from '../utils/storage';
+import { storage } from '../utils/storage';
 import { getTvChannels } from '../api/tv';
 import { tplEmptyText } from '../utils/templates';
 import { sidebar } from '../sidebar';
 
 const $root = $('#page-tv');
-const keys = pageKeys();
+const keys = new PageKeys();
 
 let channels: TvChannel[] = [];
 let focusedIndex = 0;
@@ -45,7 +45,7 @@ const updateFocus = (): void => {
   if ($cards.length > 0 && focusedIndex < $cards.length) {
     const $card = $cards.eq(focusedIndex);
     $card.addClass('focused');
-    scrollIntoView($card[0], $root.find('.watching')[0]);
+    PageUtils.scrollIntoView($card[0], $root.find('.watching')[0]);
   }
 };
 
@@ -58,7 +58,7 @@ const render = (): void => {
   for (let i = 0; i < channels.length; i++) {
     cards += tplChannelCard({
       id: channels[i].id,
-      logo: proxyPosterUrl(channels[i].logos.s),
+      logo: storage.proxyPosterUrl(channels[i].logos.s),
       title: channels[i].title
     });
   }
@@ -92,8 +92,8 @@ const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
     case TvKey.Enter:
       if (channels.length > 0) {
         const ch = channels[focusedIndex];
-        setParams({ tvFocusedIndex: focusedIndex });
-        navigate('tv-player', {
+        router.setParams({ tvFocusedIndex: focusedIndex });
+        router.navigate('tv-player', {
           channelId: ch.id,
           channelTitle: ch.title,
           channelStream: ch.stream
@@ -107,7 +107,7 @@ const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
 export const tvPage: Page = {
   mount(params: RouteParams) {
     focusedIndex = typeof params.tvFocusedIndex === 'number' ? params.tvFocusedIndex : 0;
-    showSpinnerIn($root);
+    PageUtils.showSpinnerIn($root);
     sidebar.setUnfocusHandler(() => updateFocus());
     getTvChannels().then(
       (res: any) => {
@@ -123,7 +123,7 @@ export const tvPage: Page = {
   },
   unmount() {
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     sidebar.setUnfocusHandler(null);
     channels = [];
   }

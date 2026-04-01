@@ -2,18 +2,18 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { Item } from '../types/api';
-import { navigate, setParams } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
-import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { gridMove, gridPos } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
-import { proxyPosterUrl } from '../utils/storage';
+import { storage } from '../utils/storage';
 import { getItems } from '../api/items';
 import { sidebar } from '../sidebar';
 
 const $root = $('#page-novelties');
-const keys = pageKeys();
+const keys = new PageKeys();
 
 const SECTIONS_CONFIG = [
   { type: 'movie',      title: 'Новые фильмы' },
@@ -60,7 +60,7 @@ const buildRows = (): string => {
       const item = sections[i].items[j] as any;
       cards += tplCard({
         id: item.id,
-        poster: proxyPosterUrl(item.poster),
+        poster: storage.proxyPosterUrl(item.poster),
         title: item.title,
         extra: ''
       });
@@ -84,7 +84,7 @@ const updateFocus = (): void => {
   if ($cards.length > 0 && focusedIndex < $cards.length) {
     const $card = $cards.eq(focusedIndex);
     $card.addClass('focused');
-    scrollIntoView($card[0], $root.find('.watching')[0]);
+    PageUtils.scrollIntoView($card[0], $root.find('.watching')[0]);
   }
 };
 
@@ -129,9 +129,9 @@ const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
     case TvKey.Enter: {
       const item = currentItems[focusedIndex];
       if (item) {
-        setParams({ focusedSection: focusedSection, focusedIndex: focusedIndex });
+        router.setParams({ focusedSection: focusedSection, focusedIndex: focusedIndex });
         const isSerial = item.type === 'serial' || item.type === 'docuserial';
-        navigate(isSerial ? 'serial' : 'movie', { id: item.id });
+        router.navigate(isSerial ? 'serial' : 'movie', { id: item.id });
       }
       e.preventDefault(); break;
     }
@@ -143,7 +143,7 @@ export const noveltiesPage: Page = {
   mount(params: RouteParams) {
     const savedSection = params.focusedSection;
     const savedIndex = params.focusedIndex;
-    showSpinnerIn($root);
+    PageUtils.showSpinnerIn($root);
 
     sidebar.setUnfocusHandler(() => updateFocus());
 
@@ -184,7 +184,7 @@ export const noveltiesPage: Page = {
 
   unmount() {
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     sidebar.setUnfocusHandler(null);
     sections = [];
   }

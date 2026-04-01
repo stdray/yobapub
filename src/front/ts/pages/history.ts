@@ -2,18 +2,18 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { HistoryEntry } from '../types/api';
-import { navigate, goBack, setParams } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
-import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { gridMove, gridPos } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
-import { proxyPosterUrl } from '../utils/storage';
+import { storage } from '../utils/storage';
 import { getHistory } from '../api/history';
 import { sidebar } from '../sidebar';
 
 const $root = $('#page-history');
-const keys = pageKeys();
+const keys = new PageKeys();
 
 let entries: HistoryEntry[] = [];
 let focusedIndex = 0;
@@ -54,7 +54,7 @@ const buildCards = (): string => {
     }
     html += tplCard({
       id: e.item.id,
-      poster: proxyPosterUrl(e.item.posters.medium),
+      poster: storage.proxyPosterUrl(e.item.posters.medium),
       title: e.item.title,
       extra: extra
     });
@@ -74,13 +74,13 @@ const updateFocus = (): void => {
   const idx = Math.min(focusedIndex, entries.length - 1);
   const $card = $root.find('.card').eq(idx);
   $card.addClass('focused');
-  scrollIntoView($card[0], $root.find('.watching')[0]);
+  PageUtils.scrollIntoView($card[0], $root.find('.watching')[0]);
 };
 
 const loadPage = (page: number): void => {
   if (loading) { return; }
   loading = true;
-  showSpinnerIn($root);
+  PageUtils.showSpinnerIn($root);
   getHistory(page).then(
     (res: any) => {
       const data = Array.isArray(res) ? res[0] : res;
@@ -151,12 +151,12 @@ const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
     case TvKey.Enter: {
       const entry = entries[focusedIndex];
       if (entry) {
-        setParams({ historyPage: currentPage, historyFocusedIndex: focusedIndex });
+        router.setParams({ historyPage: currentPage, historyFocusedIndex: focusedIndex });
         const isSerial = entry.item.type === 'serial' || entry.item.type === 'docuserial';
         if (isSerial) {
-          navigate('serial', { id: entry.item.id, episodeId: entry.media.id });
+          router.navigate('serial', { id: entry.item.id, episodeId: entry.media.id });
         } else {
-          navigate('movie', { id: entry.item.id });
+          router.navigate('movie', { id: entry.item.id });
         }
       }
       e.preventDefault(); break;
@@ -178,7 +178,7 @@ export const historyPage: Page = {
 
   unmount() {
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     sidebar.setUnfocusHandler(null);
     entries = [];
     loading = false;

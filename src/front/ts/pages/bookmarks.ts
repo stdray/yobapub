@@ -3,16 +3,16 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { getBookmarkFolders, getBookmarkItems } from '../api/bookmarks';
 import { BookmarkFolder, Item } from '../types/api';
-import { navigate, setParams } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
-import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
-import { proxyPosterUrl } from '../utils/storage';
+import { storage } from '../utils/storage';
 import { sidebar } from '../sidebar';
 
 const $root = $('#page-bookmarks');
-const keys = pageKeys();
+const keys = new PageKeys();
 
 type ViewMode = 'folders' | 'items';
 let viewMode: ViewMode = 'folders';
@@ -80,7 +80,7 @@ const updateFolderFocus = (): void => {
   if (folders.length > 0) {
     const $item = $root.find('.folder-item').eq(folderFocused);
     $item.addClass('focused');
-    scrollIntoView($item[0], $root.find('.watching')[0]);
+    PageUtils.scrollIntoView($item[0], $root.find('.watching')[0]);
   }
 };
 
@@ -93,7 +93,7 @@ const renderItems = (): void => {
   for (let i = 0; i < itemsData.length; i++) {
     cards += tplCard({
       id: itemsData[i].id,
-      poster: proxyPosterUrl(itemsData[i].posters.medium),
+      poster: storage.proxyPosterUrl(itemsData[i].posters.medium),
       title: itemsData[i].title
     });
   }
@@ -106,7 +106,7 @@ const updateItemFocus = (): void => {
   if (itemsData.length > 0 && focusedIndex < itemsData.length) {
     const $card = $root.find('.card').eq(focusedIndex);
     $card.addClass('focused');
-    scrollIntoView($card[0], $root.find('.watching')[0]);
+    PageUtils.scrollIntoView($card[0], $root.find('.watching')[0]);
   }
 };
 
@@ -164,9 +164,9 @@ const handleItemKey = (e: JQuery.Event): void => {
       if (itemsData.length > 0) {
         const item = itemsData[focusedIndex];
         if (item) {
-          setParams({ folderId: currentFolderId, folderTitle: currentFolderTitle, focusedIndex: focusedIndex });
+          router.setParams({ folderId: currentFolderId, folderTitle: currentFolderTitle, focusedIndex: focusedIndex });
           const isSerial = item.type === 'serial' || item.type === 'docuserial';
-          navigate(isSerial ? 'serial' : 'movie', { id: item.id });
+          router.navigate(isSerial ? 'serial' : 'movie', { id: item.id });
         }
       }
       e.preventDefault(); break;
@@ -182,7 +182,7 @@ const handleItemKey = (e: JQuery.Event): void => {
 const openFolder = (folderId: number, keepFocus?: boolean): void => {
   viewMode = 'items';
   if (!keepFocus) { focusedIndex = 0; }
-  showSpinnerIn($root);
+  PageUtils.showSpinnerIn($root);
   getBookmarkItems(folderId).then(
     (res: any) => {
       itemsData = (res && res.items) || [];
@@ -198,7 +198,7 @@ const openFolder = (folderId: number, keepFocus?: boolean): void => {
 export const bookmarksPage: Page = {
   mount(params: RouteParams) {
     keys.bind(handleKey);
-    showSpinnerIn($root);
+    PageUtils.showSpinnerIn($root);
 
     sidebar.setUnfocusHandler(() => {
       if (viewMode === 'folders') { updateFolderFocus(); }
@@ -239,7 +239,7 @@ export const bookmarksPage: Page = {
 
   unmount() {
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     sidebar.setUnfocusHandler(null);
     folders = [];
     itemsData = [];

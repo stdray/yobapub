@@ -1,9 +1,9 @@
 import $ from 'jquery';
 import * as doT from 'dot';
 import { RouteName } from './types/app';
-import { navigate, goBack } from './router';
+import { router } from './router';
 import { TvKey } from './utils/platform';
-import { clearTokens, proxyPosterUrl } from './utils/storage';
+import { storage } from './utils/storage';
 import { unlinkDevice, getUserProfile } from './api/device';
 import { gridMove } from './utils/grid';
 
@@ -120,7 +120,7 @@ class Sidebar {
   private render(): void {
     const up = getUserProfile();
     const profile = up && up.avatar
-      ? { avatar: proxyPosterUrl(up.avatar), username: up.username, days: up.subscriptionDays }
+      ? { avatar: storage.proxyPosterUrl(up.avatar), username: up.username, days: up.subscriptionDays }
       : null;
     this.$el.html(tplCompiled({ items: this.buildItems(), profile: profile }));
   }
@@ -166,12 +166,12 @@ class Sidebar {
         const route = MENU_ROUTES[this.menuIndex];
         if (route) {
           if (route !== this.activeRoute) {
-            navigate(route);
+            router.navigate(route);
           } else {
             this.unfocus();
           }
         } else if (this.menuIndex === 7) {
-          unlinkDevice().always(() => { clearTokens(); navigate('login'); });
+          unlinkDevice().always(() => { storage.clearTokens(); router.navigate('login'); });
         }
         e.preventDefault(); break;
       }
@@ -182,12 +182,12 @@ class Sidebar {
           const now = Date.now();
           if (now - this.lastBackTime < DOUBLE_BACK_MS) {
             this.lastBackTime = 0;
-            goBack();
+            router.goBack();
           } else {
             this.lastBackTime = now;
           }
         } else {
-          goBack();
+          router.goBack();
         }
         e.preventDefault(); break;
       }

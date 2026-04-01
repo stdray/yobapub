@@ -1,19 +1,19 @@
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
-import { getDefaultQuality, setDefaultQuality, QUALITY_OPTIONS, getTitlePrefs, saveTitlePrefs, TitlePrefs } from '../../utils/storage';
-import { isLegacyTizen } from '../../utils/platform';
+import { storage, Storage, TitlePrefs } from '../../utils/storage';
+import { platform } from '../../utils/platform';
 
 export type { TitlePrefs };
 
 export function pickDefaultQualityIndex(files: VideoFile[]): number {
-  let savedId = getDefaultQuality();
+  let savedId = storage.getDefaultQuality();
   if (savedId === -1) {
-    savedId = isLegacyTizen() ? 3 : 0;
-    setDefaultQuality(savedId);
+    savedId = platform.isLegacyTizen() ? 3 : 0;
+    storage.setDefaultQuality(savedId);
   }
   if (savedId === 0 || files.length === 0) return 0;
   let maxH = 0;
-  for (var q = 0; q < QUALITY_OPTIONS.length; q++) {
-    if (QUALITY_OPTIONS[q].id === savedId) { maxH = QUALITY_OPTIONS[q].maxH; break; }
+  for (var q = 0; q < Storage.QUALITY_OPTIONS.length; q++) {
+    if (Storage.QUALITY_OPTIONS[q].id === savedId) { maxH = Storage.QUALITY_OPTIONS[q].maxH; break; }
   }
   if (maxH === 0) return 0;
   for (var i = 0; i < files.length; i++) {
@@ -73,7 +73,7 @@ export function saveCurrentPrefs(
   if (selectedSub >= 0 && selectedSub < subs.length) {
     prefs.subLang = subs[selectedSub].lang;
   }
-  saveTitlePrefs(prefs);
+  storage.saveTitlePrefs(prefs);
 }
 
-export { getTitlePrefs };
+export const getTitlePrefs = storage.getTitlePrefs;

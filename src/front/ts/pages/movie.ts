@@ -3,15 +3,15 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { loadItemWithWatching } from '../api/items';
 import { Item, WatchingInfoItem } from '../types/api';
-import { navigate, goBack } from '../router';
+import { router } from '../router';
 import { TvKey } from '../utils/platform';
-import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { renderRatings } from '../utils/templates';
 import { formatDuration } from '../utils/format';
-import { proxyPosterUrl } from '../utils/storage';
+import { storage } from '../utils/storage';
 
 const $root = $('#page-movie');
-const keys = pageKeys();
+const keys = new PageKeys();
 let focusedBtn = 0;
 let btnCount = 0;
 let currentItem: Item | null = null;
@@ -67,7 +67,7 @@ function render(item: Item): void {
   const ratings = renderRatings(item);
 
   $root.html(tplDetail({
-    poster: proxyPosterUrl(item.posters.big),
+    poster: storage.proxyPosterUrl(item.posters.big),
     titleRu: title[0],
     titleEn: title.length > 1 ? title[1] : '',
     year: item.year,
@@ -101,13 +101,13 @@ function handleKey(e: JQuery.Event): void {
       const action = $root.find('.btn').eq(focusedBtn).data('action');
       if (action === 'play' && currentItem) {
         const firstVideo = currentItem.videos && currentItem.videos[0];
-        navigate('player', { id: currentItem.id, video: 1 });
+        router.navigate('player', { id: currentItem.id, video: 1 });
       }
       e.preventDefault(); break;
     case TvKey.Return:
     case TvKey.Backspace:
     case TvKey.Escape:
-      goBack(); e.preventDefault(); break;
+      router.goBack(); e.preventDefault(); break;
   }
 }
 
@@ -115,7 +115,7 @@ export var moviePage: Page = {
   mount: function (params: RouteParams) {
     currentItem = null;
     watchingInfo = null;
-    showSpinnerIn($root);
+    PageUtils.showSpinnerIn($root);
     let id = params.id!;
 
     loadItemWithWatching(id,
@@ -132,7 +132,7 @@ export var moviePage: Page = {
   },
   unmount: function () {
     keys.unbind();
-    clearPage($root);
+    PageUtils.clearPage($root);
     currentItem = null;
     watchingInfo = null;
   }

@@ -1,6 +1,6 @@
 // Structured logger. Logs to console and to the backend /api/log endpoint.
 
-import { getDeviceId } from './storage';
+import { storage } from './storage';
 
 type Level = 'Verbose' | 'Debug' | 'Information' | 'Warning' | 'Error';
 
@@ -27,7 +27,7 @@ function sendToBackend(level: Level, message: string, props: Record<string, unkn
       category: typeof props['category'] === 'string' ? props['category'] : '',
       message,
       props,
-      deviceId: getDeviceId(),
+      deviceId: storage.getDeviceId(),
       clientTs: Date.now()
     }));
   } catch (_) { /* fire-and-forget */ }

@@ -1,10 +1,10 @@
 import objectFitImages from 'object-fit-images';
 import '../css/app.css';
 import { configure } from './api/client';
-import { registerPage, navigate, setExitHandler, onAfterNavigate } from './router';
-import { registerTizenKeys, getDeviceInfo, exitApp } from './utils/platform';
+import { router } from './router';
+import { platform } from './utils/platform';
 import { showExitDialog } from './utils/exit-dialog';
-import { getAccessToken, getStartPage, setProxyAll } from './utils/storage';
+import { storage } from './utils/storage';
 import { apiPostWithRefresh } from './api/client';
 import { loginPage } from './pages/login';
 import { watchingPage } from './pages/watching';
@@ -26,22 +26,22 @@ objectFitImages();
 
 configure(CLIENT_ID, CLIENT_SECRET);
 
-registerTizenKeys();
+platform.registerTizenKeys();
 
-registerPage('login', loginPage);
-registerPage('watching', watchingPage);
-registerPage('bookmarks', bookmarksPage);
-registerPage('movie', moviePage);
-registerPage('serial', serialPage);
-registerPage('player', playerPage);
-registerPage('settings', settingsPage);
-registerPage('novelties', noveltiesPage);
-registerPage('search', searchPage);
-registerPage('tv', tvPage);
-registerPage('tv-player', tvPlayerPage);
-registerPage('history', historyPage);
+router.registerPage('login', loginPage);
+router.registerPage('watching', watchingPage);
+router.registerPage('bookmarks', bookmarksPage);
+router.registerPage('movie', moviePage);
+router.registerPage('serial', serialPage);
+router.registerPage('player', playerPage);
+router.registerPage('settings', settingsPage);
+router.registerPage('novelties', noveltiesPage);
+router.registerPage('search', searchPage);
+router.registerPage('tv', tvPage);
+router.registerPage('tv-player', tvPlayerPage);
+router.registerPage('history', historyPage);
 
-onAfterNavigate((route) => {
+router.onAfterNavigate((route) => {
   if (sidebar.isRoute(route)) {
     sidebar.show(route);
   } else {
@@ -50,7 +50,7 @@ onAfterNavigate((route) => {
 });
 
 function notifyDevice(): void {
-  const info = getDeviceInfo();
+  const info = platform.getDeviceInfo();
   console.log('[notify] title:', info.title, 'hw:', info.hardware, 'sw:', info.software);
   apiPostWithRefresh('/v1/device/notify', {
     title: info.title,
@@ -62,23 +62,23 @@ function notifyDevice(): void {
   );
 }
 
-if (getAccessToken()) {
+if (storage.getAccessToken()) {
   notifyDevice();
   checkVip().then((isVip: boolean) => {
-    if (!isVip) setProxyAll(false);
+    if (!isVip) storage.downgradeProxyForNonVip();
     sidebar.refresh();
   });
-  navigate(getStartPage());
+  router.navigate(storage.getStartPage());
 } else {
-  navigate('login');
+  router.navigate('login');
 }
 
 const closeApp = (): void => {
   if ((window as any).NativeApp) {
     (window as any).NativeApp.exit();
   } else {
-    exitApp();
+    platform.exitApp();
   }
 };
 
-setExitHandler(() => showExitDialog(closeApp));
+router.setExitHandler(() => showExitDialog(closeApp));

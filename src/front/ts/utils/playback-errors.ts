@@ -1,4 +1,4 @@
-import { getDeviceId } from './storage';
+import { storage } from './storage';
 
 const DAY_MS = 86400000;
 const reported = new Map<string, number>();
@@ -27,7 +27,7 @@ export const reportPlaybackError = (url: string, errorDetails: string): void => 
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.send(JSON.stringify({
       url: url.substring(0, 500),
-      deviceId: getDeviceId(),
+      deviceId: storage.getDeviceId(),
       userAgent: navigator.userAgent,
       errorDetails: errorDetails
     }));
