@@ -97,7 +97,7 @@ html, body {
   width: 280px;
   flex-shrink: 0;
   background: #16162a;
-  padding: 40px 0 40px 16px;
+  padding: 40px 0 40px 24px;
   display: flex;
   flex-direction: column;
   height: 100%;

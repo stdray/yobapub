@@ -116,8 +116,16 @@ export const loginPage: Page = {
   mount(_params: RouteParams) {
     startAuth();
     keys.bind((e: JQuery.Event) => {
-      if (e.keyCode === TvKey.Enter) {
-        if ($root.find('.login__expired, .login__error').length > 0) { startAuth(); }
+      switch (e.keyCode) {
+        case TvKey.Enter:
+          if ($root.find('.login__expired, .login__error').length > 0) { startAuth(); }
+          break;
+        case TvKey.Return:
+        case TvKey.Backspace:
+        case TvKey.Escape:
+          router.goBack();
+          e.preventDefault();
+          break;
       }
     });
   },
