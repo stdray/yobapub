@@ -189,7 +189,6 @@ html, body {
 .card.focused .card__poster,
 .card:focus .card__poster {
   border-color: #e94560;
-  border-width: 5px;
   box-shadow:
     0 0 16px rgba(233, 69, 96, 0.7),
     0 0 50px rgba(233, 69, 96, 0.3);
@@ -200,7 +199,7 @@ html, body {
   padding-bottom: 140%;
   position: relative;
   background: #2a2a4a;
-  border: 3px solid transparent;
+  border: 5px solid transparent;
   border-radius: 8px;
   overflow: hidden;
   transition: border-color 0.15s, box-shadow 0.15s;
