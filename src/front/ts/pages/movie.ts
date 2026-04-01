@@ -9,11 +9,14 @@ import { PageKeys, PageUtils } from '../utils/page';
 import { renderRatings } from '../utils/templates';
 import { formatDuration } from '../utils/format';
 import { storage } from '../utils/storage';
+import { toggleWatchlist } from '../api/watching';
+import { showBookmarkPicker } from '../utils/bookmark-picker';
 
 const $root = $('#page-movie');
 const keys = new PageKeys();
-let focusedBtn = 0;
-let btnCount = 0;
+type FocusArea = 'actions' | 'play';
+let focusArea: FocusArea = 'play';
+let focusedAction = 0;
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
 
@@ -27,6 +30,10 @@ const tplDetailCompiled = doT.template(`
       <div class="detail__meta">{{=it.genres}}</div>
       {{?it.duration}}<div class="detail__meta">{{=it.duration}} &bull; {{=it.quality}}p</div>{{?}}
       {{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}
+      <div class="detail__quick-actions">
+        <div class="detail__quick-btn" data-action="bookmark"><span class="icon-bookmark"></span> Закладки</div>
+        <div class="detail__quick-btn{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-eye"></span> Я смотрю</div>
+      </div>
       <div class="detail__actions">{{=it.buttons}}</div>
       <div class="detail__plot">{{=it.plot}}</div>
     </div>
@@ -45,6 +52,7 @@ export const tplDetail = (data: {
   readonly ratings: string;
   readonly buttons: string;
   readonly plot: string;
+  readonly inWatchlist: boolean;
 }): string =>
   tplDetailCompiled(data);
 
@@ -56,13 +64,8 @@ const render = (item: Item): void => {
     if (v.status === 0 && v.time > 0 && v.time < v.duration - 10) { resumeTime = v.time; }
   }
 
-  let buttons = '<div class="btn" data-action="play">' +
+  const buttons = '<div class="btn" data-action="play">' +
     (resumeTime > 0 ? 'Продолжить с ' + formatDuration(resumeTime) : 'Смотреть') + '</div>';
-  btnCount = 1;
-  if (item.trailer) {
-    buttons += '<div class="btn" data-action="trailer">Трейлер</div>';
-    btnCount++;
-  }
 
   const ratings = renderRatings(item);
 
@@ -77,37 +80,73 @@ const render = (item: Item): void => {
     quality: item.quality,
     ratings: ratings,
     buttons: buttons,
-    plot: item.plot || ''
+    plot: item.plot || '',
+    inWatchlist: item.in_watchlist
   }));
 
-  focusedBtn = 0;
+  focusArea = 'play';
+  focusedAction = 0;
   updateFocus();
 };
 
 const updateFocus = (): void => {
   $root.find('.btn').removeClass('focused');
-  $root.find('.btn').eq(focusedBtn).addClass('focused');
+  $root.find('.detail__quick-btn').removeClass('focused');
+
+  if (focusArea === 'actions') {
+    $root.find('.detail__quick-btn').eq(focusedAction).addClass('focused');
+  } else {
+    $root.find('.btn').eq(0).addClass('focused');
+  }
+};
+
+const handleWatchlistToggle = (): void => {
+  if (!currentItem) return;
+  toggleWatchlist(currentItem.id).done((resp) => {
+    $root.find('.detail__quick-btn[data-action="watchlist"]').toggleClass('active', resp.watching);
+  });
 };
 
 const handleKey = (e: JQuery.Event): void => {
   switch (e.keyCode) {
-    case TvKey.Left:
-      if (focusedBtn > 0) { focusedBtn--; updateFocus(); }
-      e.preventDefault(); break;
-    case TvKey.Right:
-      if (focusedBtn < btnCount - 1) { focusedBtn++; updateFocus(); }
-      e.preventDefault(); break;
-    case TvKey.Enter: {
-      const action = $root.find('.btn').eq(focusedBtn).data('action');
-      if (action === 'play' && currentItem) {
-        router.navigateMoviePlayer(currentItem.id);
-      }
-      e.preventDefault(); break;
-    }
     case TvKey.Return:
     case TvKey.Backspace:
     case TvKey.Escape:
-      router.goBack(); e.preventDefault(); break;
+      router.goBack(); e.preventDefault(); return;
+  }
+
+  if (focusArea === 'actions') {
+    switch (e.keyCode) {
+      case TvKey.Left:
+        if (focusedAction > 0) { focusedAction--; updateFocus(); }
+        e.preventDefault(); break;
+      case TvKey.Right:
+        if (focusedAction < 1) { focusedAction++; updateFocus(); }
+        e.preventDefault(); break;
+      case TvKey.Down:
+        focusArea = 'play'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter: {
+        const action = $root.find('.detail__quick-btn').eq(focusedAction).data('action');
+        if (action === 'bookmark' && currentItem) {
+          showBookmarkPicker(currentItem.id);
+        } else if (action === 'watchlist') {
+          handleWatchlistToggle();
+        }
+        e.preventDefault(); break;
+      }
+    }
+  } else {
+    switch (e.keyCode) {
+      case TvKey.Up:
+        focusArea = 'actions'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter:
+        if (currentItem) {
+          router.navigateMoviePlayer(currentItem.id);
+        }
+        e.preventDefault(); break;
+    }
   }
 };
 

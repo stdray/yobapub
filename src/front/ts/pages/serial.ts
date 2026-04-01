@@ -9,14 +9,17 @@ import { PageKeys, PageUtils } from '../utils/page';
 import { renderRatings } from '../utils/templates';
 import { formatTimeShort } from '../utils/format';
 import { storage } from '../utils/storage';
+import { toggleWatchlist } from '../api/watching';
+import { showBookmarkPicker } from '../utils/bookmark-picker';
 
 const $root = $('#page-serial');
 const keys = new PageKeys();
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
 
-type FocusArea = 'seasons' | 'episodes' | 'play';
+type FocusArea = 'actions' | 'seasons' | 'episodes' | 'play';
 let focusArea: FocusArea = 'play';
+let focusedAction = 0;
 let selectedSeason = 0;
 let focusedEpisode = 0;
 let focusedSeasonTab = 0;
@@ -30,6 +33,10 @@ const tplDetailCompiled = doT.template(`
       <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
       <div class="detail__meta">{{=it.genres}}</div>
       {{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}
+      <div class="detail__quick-actions">
+        <div class="detail__quick-btn" data-action="bookmark"><span class="icon-bookmark"></span> Закладки</div>
+        <div class="detail__quick-btn{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-eye"></span> Я смотрю</div>
+      </div>
       <div class="detail__plot">{{=it.plot}}</div>
       <div class="detail__actions"><div class="btn" data-action="play">{{=it.playLabel}}</div></div>
       <div class="episodes">
@@ -52,6 +59,7 @@ export const tplDetail = (data: {
   readonly playLabel: string;
   readonly seasonTabs: string;
   readonly episodes: string;
+  readonly inWatchlist: boolean;
 }): string =>
   tplDetailCompiled(data);
 
@@ -158,11 +166,13 @@ const render = (item: Item): void => {
     plot: item.plot || '',
     playLabel: playLabel,
     seasonTabs: seasonTabs,
-    episodes: buildEpisodes(seasons[selectedSeason])
+    episodes: buildEpisodes(seasons[selectedSeason]),
+    inWatchlist: item.in_watchlist
   }));
 
   focusedSeasonTab = selectedSeason;
   focusArea = 'play';
+  focusedAction = 0;
   focusedEpisode = resumeEp ? resumeEp.episodeIdx : 0;
 
   updateFocus();
@@ -174,10 +184,13 @@ const render = (item: Item): void => {
 
 const updateFocus = (): void => {
   $root.find('.btn').removeClass('focused');
+  $root.find('.detail__quick-btn').removeClass('focused');
   $root.find('.episodes__season-tab').removeClass('focused');
   $root.find('.episode').removeClass('focused');
 
-  if (focusArea === 'play') {
+  if (focusArea === 'actions') {
+    $root.find('.detail__quick-btn').eq(focusedAction).addClass('focused');
+  } else if (focusArea === 'play') {
     $root.find('.btn').eq(0).addClass('focused');
   } else if (focusArea === 'seasons') {
     $root.find('.episodes__season-tab').eq(focusedSeasonTab).addClass('focused');
@@ -211,8 +224,34 @@ const handleKey = (e: JQuery.Event): void => {
       router.goBack(); e.preventDefault(); return;
   }
 
-  if (focusArea === 'play') {
+  if (focusArea === 'actions') {
     switch (e.keyCode) {
+      case TvKey.Left:
+        if (focusedAction > 0) { focusedAction--; updateFocus(); }
+        e.preventDefault(); break;
+      case TvKey.Right:
+        if (focusedAction < 1) { focusedAction++; updateFocus(); }
+        e.preventDefault(); break;
+      case TvKey.Down:
+        focusArea = 'play'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter: {
+        const action = $root.find('.detail__quick-btn').eq(focusedAction).data('action');
+        if (action === 'bookmark' && currentItem) {
+          showBookmarkPicker(currentItem.id);
+        } else if (action === 'watchlist' && currentItem) {
+          toggleWatchlist(currentItem.id).done((resp) => {
+            $root.find('.detail__quick-btn[data-action="watchlist"]').toggleClass('active', resp.watching);
+          });
+        }
+        e.preventDefault(); break;
+      }
+    }
+  } else if (focusArea === 'play') {
+    switch (e.keyCode) {
+      case TvKey.Up:
+        focusArea = 'actions'; updateFocus();
+        e.preventDefault(); break;
       case TvKey.Down:
         if (seasons.length > 0) { focusArea = 'seasons'; updateFocus(); }
         e.preventDefault(); break;

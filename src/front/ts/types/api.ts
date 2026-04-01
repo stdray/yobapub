@@ -245,6 +245,20 @@ export interface BookmarkItemsResponse {
   pagination: Pagination;
 }
 
+export interface BookmarkItemFoldersResponse {
+  status: number;
+  folders: BookmarkFolder[];
+}
+
+export interface BookmarkToggleResponse {
+  status: number;
+}
+
+export interface WatchlistToggleResponse {
+  status: number;
+  watching: boolean;
+}
+
 export interface TvChannel {
   readonly id: number;
   readonly title: string;

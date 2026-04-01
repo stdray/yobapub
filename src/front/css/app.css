@@ -154,7 +154,7 @@ html, body {
 
 /* --- Watching --- */
 .watching {
-  padding: 30px 50px;
+  padding: 40px 50px;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
@@ -306,6 +306,88 @@ html, body {
   line-height: 1.4;
   color: #ccc;
   margin-bottom: 30px;
+}
+
+.detail__quick-actions {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.detail__quick-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 28px;
+  font-size: 24px;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  outline: none;
+}
+
+.detail__quick-btn.focused {
+  border-color: #e94560;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.detail__quick-btn.active {
+  color: #e94560;
+}
+
+/* CSS eye icon for watchlist */
+.icon-eye {
+  display: inline-block;
+  position: relative;
+  width: 22px;
+  height: 14px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+}
+
+.icon-eye:after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+/* CSS bookmark icon */
+.icon-bookmark {
+  display: inline-block;
+  position: relative;
+  width: 14px;
+  height: 20px;
+  border: 3px solid currentColor;
+  border-bottom: none;
+}
+
+.icon-bookmark:after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -3px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 8px solid #1a1a2e;
+}
+
+.detail__quick-btn.focused .icon-bookmark:after {
+  border-bottom-color: #262640;
+}
+
+.detail__quick-btn.active .icon-bookmark {
+  background: currentColor;
 }
 
 .detail__actions {
@@ -1033,6 +1115,70 @@ video::cue {
   border-color: #e94560;
   color: #fff;
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* --- Bookmark picker --- */
+.bpicker {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.bpicker.hidden { display: none; }
+
+.bpicker__box {
+  background: #1e1e3a;
+  border-radius: 16px;
+  padding: 40px 48px;
+  min-width: 500px;
+  max-width: 700px;
+}
+
+.bpicker__header {
+  font-size: 36px;
+  color: #eee;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.bpicker__loading {
+  text-align: center;
+  font-size: 28px;
+  color: #888;
+  padding: 20px;
+}
+
+.bpicker__item {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px;
+  font-size: 28px;
+  color: #ccc;
+  border: 3px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.bpicker__item.focused {
+  border-color: #e94560;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.bpicker__check {
+  width: 40px;
+  font-size: 28px;
+  color: #e94560;
+  flex-shrink: 0;
+}
+
+.bpicker__title {
+  flex: 1;
 }
 
 /* --- History --- */
