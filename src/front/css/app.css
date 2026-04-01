@@ -308,10 +308,9 @@ html, body {
   margin-bottom: 30px;
 }
 
-.detail__quick-actions {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
+.detail__actions-sep {
+  flex: 1;
+  min-width: 40px;
 }
 
 .detail__quick-btn {
@@ -334,69 +333,33 @@ html, body {
   background: rgba(255, 255, 255, 0.15);
 }
 
-.detail__quick-btn.active {
-  color: #e94560;
-}
-
-/* CSS eye icon for watchlist */
-.icon-eye {
+.detail__quick-btn .icon-check {
   display: inline-block;
-  position: relative;
   width: 22px;
-  height: 14px;
-  border: 3px solid currentColor;
-  border-radius: 50%;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  text-align: center;
+  line-height: 22px;
+  font-size: 16px;
+  color: transparent;
+  flex-shrink: 0;
 }
 
-.icon-eye:after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  margin: -4px 0 0 -4px;
-  background: currentColor;
-  border-radius: 50%;
-}
-
-/* CSS bookmark icon */
-.icon-bookmark {
-  display: inline-block;
-  position: relative;
-  width: 14px;
-  height: 20px;
-  border: 3px solid currentColor;
-  border-bottom: none;
-}
-
-.icon-bookmark:after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: -3px;
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-bottom: 8px solid #1a1a2e;
-}
-
-.detail__quick-btn.focused .icon-bookmark:after {
-  border-bottom-color: #262640;
-}
-
-.detail__quick-btn.active .icon-bookmark {
-  background: currentColor;
+.detail__quick-btn.active .icon-check {
+  background: #e94560;
+  color: #fff;
 }
 
 .detail__actions {
   display: flex;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 30px;
 }
 
 .detail__actions > .btn {
-  margin-right: 20px;
+  flex-shrink: 0;
 }
 
 .btn {

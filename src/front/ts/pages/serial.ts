@@ -17,9 +17,10 @@ const keys = new PageKeys();
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
 
-type FocusArea = 'actions' | 'seasons' | 'episodes' | 'play';
+const PLAY_BTN_COUNT = 3; // play, bookmark, watchlist
+type FocusArea = 'play' | 'seasons' | 'episodes';
 let focusArea: FocusArea = 'play';
-let focusedAction = 0;
+let focusedPlayBtn = 0;
 let selectedSeason = 0;
 let focusedEpisode = 0;
 let focusedSeasonTab = 0;
@@ -33,12 +34,8 @@ const tplDetailCompiled = doT.template(`
       <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
       <div class="detail__meta">{{=it.genres}}</div>
       {{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}
-      <div class="detail__quick-actions">
-        <div class="detail__quick-btn" data-action="bookmark"><span class="icon-bookmark"></span> Закладки</div>
-        <div class="detail__quick-btn{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-eye"></span> Я смотрю</div>
-      </div>
       <div class="detail__plot">{{=it.plot}}</div>
-      <div class="detail__actions"><div class="btn" data-action="play">{{=it.playLabel}}</div></div>
+      <div class="detail__actions"><div class="btn" data-action="play">{{=it.playLabel}}</div><div class="detail__actions-sep"></div><div class="detail__quick-btn" data-action="bookmark"><span class="icon-check">\u2713</span> Закладки</div><div class="detail__quick-btn{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-check">\u2713</span> Я смотрю</div></div>
       <div class="episodes">
         <div class="episodes__seasons">{{=it.seasonTabs}}</div>
         <div class="episodes__list">{{=it.episodes}}</div>
@@ -172,7 +169,7 @@ const render = (item: Item): void => {
 
   focusedSeasonTab = selectedSeason;
   focusArea = 'play';
-  focusedAction = 0;
+  focusedPlayBtn = 0;
   focusedEpisode = resumeEp ? resumeEp.episodeIdx : 0;
 
   updateFocus();
@@ -182,16 +179,15 @@ const render = (item: Item): void => {
   }
 };
 
+const playButtons = (): JQuery => $root.find('.btn, .detail__quick-btn');
+
 const updateFocus = (): void => {
-  $root.find('.btn').removeClass('focused');
-  $root.find('.detail__quick-btn').removeClass('focused');
+  playButtons().removeClass('focused');
   $root.find('.episodes__season-tab').removeClass('focused');
   $root.find('.episode').removeClass('focused');
 
-  if (focusArea === 'actions') {
-    $root.find('.detail__quick-btn').eq(focusedAction).addClass('focused');
-  } else if (focusArea === 'play') {
-    $root.find('.btn').eq(0).addClass('focused');
+  if (focusArea === 'play') {
+    playButtons().eq(focusedPlayBtn).addClass('focused');
   } else if (focusArea === 'seasons') {
     $root.find('.episodes__season-tab').eq(focusedSeasonTab).addClass('focused');
   } else if (focusArea === 'episodes') {
@@ -224,20 +220,29 @@ const handleKey = (e: JQuery.Event): void => {
       router.goBack(); e.preventDefault(); return;
   }
 
-  if (focusArea === 'actions') {
+  if (focusArea === 'play') {
     switch (e.keyCode) {
       case TvKey.Left:
-        if (focusedAction > 0) { focusedAction--; updateFocus(); }
+        if (focusedPlayBtn > 0) { focusedPlayBtn--; updateFocus(); }
         e.preventDefault(); break;
       case TvKey.Right:
-        if (focusedAction < 1) { focusedAction++; updateFocus(); }
+        if (focusedPlayBtn < PLAY_BTN_COUNT - 1) { focusedPlayBtn++; updateFocus(); }
         e.preventDefault(); break;
       case TvKey.Down:
-        focusArea = 'play'; updateFocus();
+        if (seasons.length > 0) { focusArea = 'seasons'; updateFocus(); }
         e.preventDefault(); break;
       case TvKey.Enter: {
-        const action = $root.find('.detail__quick-btn').eq(focusedAction).data('action');
-        if (action === 'bookmark' && currentItem) {
+        const $btn = playButtons().eq(focusedPlayBtn);
+        const action = $btn.data('action');
+        if (action === 'play' && currentItem) {
+          const resume = findResumeEpisode();
+          if (resume) {
+            router.navigateSerialPlayer(currentItem.id, resume.season, resume.episode);
+          } else if (seasons.length > 0 && seasons[0].episodes.length > 0) {
+            const firstEp = seasons[0].episodes[0];
+            router.navigateSerialPlayer(currentItem.id, seasons[0].number, firstEp.number);
+          }
+        } else if (action === 'bookmark' && currentItem) {
           showBookmarkPicker(currentItem.id);
         } else if (action === 'watchlist' && currentItem) {
           toggleWatchlist(currentItem.id).done((resp) => {
@@ -246,26 +251,6 @@ const handleKey = (e: JQuery.Event): void => {
         }
         e.preventDefault(); break;
       }
-    }
-  } else if (focusArea === 'play') {
-    switch (e.keyCode) {
-      case TvKey.Up:
-        focusArea = 'actions'; updateFocus();
-        e.preventDefault(); break;
-      case TvKey.Down:
-        if (seasons.length > 0) { focusArea = 'seasons'; updateFocus(); }
-        e.preventDefault(); break;
-      case TvKey.Enter:
-        if (currentItem) {
-          const resume = findResumeEpisode();
-          if (resume) {
-            router.navigateSerialPlayer(currentItem.id, resume.season, resume.episode);
-          } else if (seasons.length > 0 && seasons[0].episodes.length > 0) {
-            const firstEp = seasons[0].episodes[0];
-            router.navigateSerialPlayer(currentItem.id, seasons[0].number, firstEp.number);
-          }
-        }
-        e.preventDefault(); break;
     }
   } else if (focusArea === 'seasons') {
     switch (e.keyCode) {

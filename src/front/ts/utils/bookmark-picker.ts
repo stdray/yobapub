@@ -89,18 +89,18 @@ export const showBookmarkPicker = (itemId: number, done?: () => void): void => {
     switch (e.keyCode) {
       case TvKey.Up:
         if (focusedIndex > 0) { focusedIndex--; updateFocus(); }
-        e.preventDefault(); e.stopPropagation(); break;
+        e.preventDefault(); e.stopImmediatePropagation(); break;
       case TvKey.Down:
         if (focusedIndex < folders.length - 1) { focusedIndex++; updateFocus(); }
-        e.preventDefault(); e.stopPropagation(); break;
+        e.preventDefault(); e.stopImmediatePropagation(); break;
       case TvKey.Enter:
         toggleFolder();
-        e.preventDefault(); e.stopPropagation(); break;
+        e.preventDefault(); e.stopImmediatePropagation(); break;
       case TvKey.Return:
       case TvKey.Backspace:
       case TvKey.Escape:
         close();
-        e.preventDefault(); e.stopPropagation(); break;
+        e.preventDefault(); e.stopImmediatePropagation(); break;
     }
   };
   $(window).on('keydown', keyHandler);
