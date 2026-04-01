@@ -4,6 +4,7 @@ namespace YobaPub.Proxy;
 
 public class LogRetentionService(
     LogStore store,
+    PlaybackErrorStore errorStore,
     IOptions<AdminOptions> options,
     ILogger<LogRetentionService> logger) : BackgroundService
 {
@@ -15,6 +16,10 @@ public class LogRetentionService(
             var deleted = store.DeleteOlderThan(cutoff);
             if (deleted > 0)
                 logger.LogInformation("Log retention: deleted {count} entries older than {cutoff:O}", deleted, cutoff);
+
+            var deletedErrors = errorStore.DeleteOlderThan(cutoff);
+            if (deletedErrors > 0)
+                logger.LogInformation("Playback error retention: deleted {count} entries older than {cutoff:O}", deletedErrors, cutoff);
 
             await Task.Delay(TimeSpan.FromDays(1), ct).ConfigureAwait(false);
         }

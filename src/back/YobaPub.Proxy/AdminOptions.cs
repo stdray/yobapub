@@ -6,4 +6,5 @@ public class AdminOptions
     public string Password { get; init; } = "secret";
     public string LogsDbPath { get; init; } = "/logs/logs.litedb";
     public int RetentionDays { get; init; } = 60;
+    public string PlaybackErrorsDbPath { get; init; } = "/logs/playback-errors.litedb";
 }

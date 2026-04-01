@@ -6,7 +6,7 @@ namespace YobaPub.Proxy.Controllers;
 
 [Route("admin")]
 [Authorize]
-public class AdminController(LogStore store) : Controller
+public class AdminController(LogStore store, PlaybackErrorStore errorStore) : Controller
 {
     [HttpGet("")]
     public IActionResult Index() => RedirectToAction(nameof(Logs));
@@ -43,5 +43,23 @@ public class AdminController(LogStore store) : Controller
     {
         store.DeleteAll();
         return RedirectToAction(nameof(Logs), query);
+    }
+
+    [HttpGet("playback-errors")]
+    public IActionResult PlaybackErrors()
+    {
+        var groups = errorStore.GetGroupedByDomain();
+        return View(new PlaybackErrorsViewModel
+        {
+            Domains = groups,
+            TotalEntries = groups.Sum(g => g.TotalErrors)
+        });
+    }
+
+    [HttpPost("playback-errors/clear")]
+    public IActionResult ClearPlaybackErrors()
+    {
+        errorStore.DeleteAll();
+        return RedirectToAction(nameof(PlaybackErrors));
     }
 }

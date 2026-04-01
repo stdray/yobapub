@@ -47,11 +47,24 @@ body.login {
 
 .error { margin-top: 14px; color: #f66; font-size: 12px; text-align: center; }
 
+/* ── Admin nav ────────────────────────────────────── */
+.admin-nav {
+  display: flex; align-items: center; gap: 0;
+  background: #111; border-bottom: 1px solid #333;
+  padding: 0 14px; position: sticky; top: 0; z-index: 20;
+}
+.admin-nav a {
+  color: #888; text-decoration: none;
+  padding: 8px 14px; border-bottom: 2px solid transparent;
+}
+.admin-nav a:hover { color: #ccc; }
+.admin-nav a.active { color: #6af; border-bottom-color: #6af; }
+
 /* ── Logs page ────────────────────────────────────── */
 header {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 14px; background: #111; border-bottom: 1px solid #333;
-  position: sticky; top: 0; z-index: 10;
+  position: sticky; top: 33px; z-index: 10;
 }
 header h1 { font-size: 15px; }
 #status { color: #666; font-size: 11px; margin-left: auto; }
@@ -59,7 +72,7 @@ header h1 { font-size: 15px; }
 table { width: 100%; border-collapse: collapse; }
 th {
   background: #222; color: #aaa; padding: 6px 8px; text-align: left;
-  position: sticky; top: 41px; font-weight: normal; border-bottom: 1px solid #333;
+  position: sticky; top: 74px; font-weight: normal; border-bottom: 1px solid #333;
 }
 td { padding: 3px 8px; border-bottom: 1px solid #222; vertical-align: top; }
 
@@ -81,3 +94,22 @@ tr.V td { color: #555; }
 }
 .pager a { color: #6af; text-decoration: none; }
 .pager a:hover { text-decoration: underline; }
+
+/* ── Playback errors page ────────────────────────── */
+.error-domains { padding: 8px 14px; }
+
+.domain-group { margin-bottom: 4px; }
+.domain-group summary {
+  cursor: pointer; padding: 8px 10px;
+  background: #222; border: 1px solid #333;
+  display: flex; gap: 16px; align-items: center;
+}
+.domain-group summary:hover { background: #2a2a2a; }
+.domain-name { color: #6af; min-width: 200px; }
+.domain-count { color: #f88; min-width: 70px; }
+.domain-devices { color: #888; min-width: 70px; }
+.domain-ts { color: #777; }
+
+.domain-group table { margin: 0 0 8px 20px; width: calc(100% - 20px); }
+.domain-group th { background: #1a1a1a; }
+.ua { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

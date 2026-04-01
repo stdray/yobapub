@@ -13,6 +13,7 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(
         builder.Configuration["DataProtection:KeysPath"] ?? "/keys/dataprotection"));
 builder.Services.AddSingleton<LogStore>();
+builder.Services.AddSingleton<PlaybackErrorStore>();
 builder.Services.AddHostedService<LogRetentionService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
@@ -60,6 +61,34 @@ app.MapPost("/api/log", async (HttpContext ctx, LogStore store) =>
             Message = root.TryGetProperty("message", out var msg) ? msg.GetString() ?? "" : "",
             DeviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
             Props = root.TryGetProperty("props", out var props) ? props.GetRawText() : "{}"
+        };
+        store.Add(entry);
+    }
+    catch { /* ignore malformed requests */ }
+    return Results.Ok();
+});
+
+app.MapPost("/api/playback-error", async (HttpContext ctx, PlaybackErrorStore store) =>
+{
+    try
+    {
+        using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
+        var root = doc.RootElement;
+        var url = root.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
+        var domain = "";
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            domain = uri.Host;
+
+        if (string.IsNullOrEmpty(domain)) return Results.Ok();
+
+        var entry = new PlaybackErrorEntry
+        {
+            ServerTs = DateTimeOffset.UtcNow,
+            Domain = domain,
+            DeviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
+            UserAgent = root.TryGetProperty("userAgent", out var ua) ? ua.GetString() ?? "" : "",
+            ErrorDetails = root.TryGetProperty("errorDetails", out var details) ? details.GetString() ?? "" : "",
+            Url = url.Length > 500 ? url[..500] : url
         };
         store.Add(entry);
     }

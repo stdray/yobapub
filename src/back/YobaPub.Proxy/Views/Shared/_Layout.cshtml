@@ -7,6 +7,16 @@
     <link rel="stylesheet" href="~/css/admin.css">
 </head>
 <body class="@ViewData["BodyClass"]">
+@if (User.Identity?.IsAuthenticated == true && ViewData["BodyClass"] as string != "login")
+{
+<nav class="admin-nav">
+    <a href="/admin/logs" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Logs" ? "active" : "")">Логи</a>
+    <a href="/admin/playback-errors" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "PlaybackErrors" ? "active" : "")">Ошибки CDN</a>
+    <form asp-controller="Auth" asp-action="Logout" method="post" style="margin:0;margin-left:auto">
+        <button type="submit" class="danger">Выйти</button>
+    </form>
+</nav>
+}
 @RenderBody()
 </body>
 </html>
