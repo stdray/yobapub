@@ -88,9 +88,15 @@ export function getDeviceInfo(): DeviceInfo {
       const tizenMatch = ua.match(/Tizen\s*([\d.]+)/);
       software = 'Tizen' + (tizenMatch ? ' ' + tizenMatch[1] : '');
       title = 'YobaPub Samsung TV';
+    } else if (ua.indexOf('Android') !== -1) {
+      const androidMatch = ua.match(/Android\s*([\d.]+)/);
+      const deviceMatch = ua.match(/;\s*([^;)]+)\s*(?:Build|;|\))/);
+      hardware = deviceMatch ? deviceMatch[1].trim() : 'Android';
+      software = 'Android' + (androidMatch ? ' ' + androidMatch[1] : '');
+      title = 'YobaPub Android';
     } else {
       const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge)\/([\d.]+)/);
-      const osMatch = ua.match(/(Windows|Mac OS X|Linux|Android|iOS)[^\s;)]*/);
+      const osMatch = ua.match(/(Windows|Mac OS X|Linux|iOS)[^\s;)]*/);
       hardware = osMatch ? osMatch[0] : 'Browser';
       software = browserMatch ? browserMatch[1] + ' ' + browserMatch[2] : navigator.userAgent.substring(0, 50);
       title = 'YobaPub Web';
