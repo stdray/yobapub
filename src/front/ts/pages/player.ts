@@ -483,15 +483,16 @@ function onSourceReady(): void {
     const v = videoEl;
     plog.info('onSourceReady starting playback then seeking to {pos}', { pos });
     safePlay(v);
-    const onPlaying = () => {
-      v.removeEventListener('playing', onPlaying);
-      window.setTimeout(function () {
+    if (hlsInstance) {
+      const hls = hlsInstance;
+      const onFragBuffered = () => {
+        hls.off(Hls.Events.FRAG_BUFFERED, onFragBuffered);
         if (v !== videoEl) return;
-        plog.info('resume seek to {pos} via continuePlaying', { pos });
+        plog.info('first frag buffered, resume seek to {pos}', { pos });
         continuePlaying({ quality: state.quality, audio: state.audio, sub: state.sub, position: pos, paused: false });
-      }, 1500);
-    };
-    v.addEventListener('playing', onPlaying);
+      };
+      hls.on(Hls.Events.FRAG_BUFFERED, onFragBuffered);
+    }
   } else {
     plog.info('onSourceReady pos=0, playing paused={paused}', { paused: state.paused });
     if (!state.paused) safePlay(videoEl);
