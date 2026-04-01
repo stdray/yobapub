@@ -181,8 +181,11 @@ export function setProxyAll(on: boolean): void {
 }
 
 export var START_PAGE_OPTIONS: Array<{ id: RouteName; label: string }> = [
-  { id: 'watching',  label: 'Я смотрю' },
-  { id: 'novelties', label: 'Новинки' }
+  { id: 'watching',   label: 'Я смотрю' },
+  { id: 'novelties',  label: 'Новинки' },
+  { id: 'bookmarks',  label: 'Закладки' },
+  { id: 'history',    label: 'История' },
+  { id: 'tv',         label: 'ТВ' }
 ];
 
 export function getStartPage(): RouteName {

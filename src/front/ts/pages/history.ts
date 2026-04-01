@@ -10,6 +10,7 @@ import { gridMove, gridPos } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 import { proxyPosterUrl } from '../utils/storage';
 import { getHistory } from '../api/history';
+import { sidebar } from '../sidebar';
 
 const $root = $('#page-history');
 const keys = pageKeys();
@@ -23,10 +24,10 @@ let pendingFocusCol = -1;
 
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
-function formatDate(unix: number): string {
-  let d = new Date(unix * 1000);
+const formatDate = (unix: number): string => {
+  const d = new Date(unix * 1000);
   return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
-}
+};
 
 const tplLayoutCompiled = doT.template(`
   <div class="content"><div class="watching">
@@ -36,15 +37,15 @@ const tplLayoutCompiled = doT.template(`
   </div></div>
 `);
 
-export const tplLayout = (data: { readonly cards: string; readonly pager: string }): string =>
+const tplLayout = (data: { readonly cards: string; readonly pager: string }): string =>
   tplLayoutCompiled(data);
 
-function buildCards(): string {
+const buildCards = (): string => {
   if (entries.length === 0) {
     return tplEmptyText({ text: 'История пуста' });
   }
   let html = '';
-  for (var i = 0; i < entries.length; i++) {
+  for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
     const isSerial = e.item.type === 'serial' || e.item.type === 'docuserial';
     let extra = formatDate(e.last_seen);
@@ -59,29 +60,29 @@ function buildCards(): string {
     });
   }
   return html;
-}
+};
 
-function render(): void {
+const render = (): void => {
   const pager = totalPages > 1 ? 'Страница ' + currentPage + ' из ' + totalPages : '';
   $root.html(tplLayout({ cards: buildCards(), pager: pager }));
   updateFocus();
-}
+};
 
-function updateFocus(): void {
+const updateFocus = (): void => {
   $root.find('.card').removeClass('focused');
   if (entries.length === 0) { return; }
-  let idx = Math.min(focusedIndex, entries.length - 1);
+  const idx = Math.min(focusedIndex, entries.length - 1);
   const $card = $root.find('.card').eq(idx);
   $card.addClass('focused');
   scrollIntoView($card[0], $root.find('.watching')[0]);
-}
+};
 
-function loadPage(page: number): void {
+const loadPage = (page: number): void => {
   if (loading) { return; }
   loading = true;
   showSpinnerIn($root);
   getHistory(page).then(
-    function (res: any) {
+    (res: any) => {
       const data = Array.isArray(res) ? res[0] : res;
       entries = (data && data.history) || [];
       const pagination = (data && data.pagination) || {};
@@ -99,7 +100,7 @@ function loadPage(page: number): void {
 
       render();
     },
-    function () {
+    () => {
       loading = false;
       $root.html(
         '<div class="content"><div class="watching">' +
@@ -108,18 +109,10 @@ function loadPage(page: number): void {
       );
     }
   );
-}
+};
 
-function handleKey(e: JQuery.Event): void {
-  if (loading || entries.length === 0) {
-    switch (e.keyCode) {
-      case TvKey.Return:
-      case TvKey.Backspace:
-      case TvKey.Escape:
-        goBack(); e.preventDefault(); break;
-    }
-    return;
-  }
+const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
+  if (loading || entries.length === 0) { sidebar.handleEmptyState(e); return; }
 
   switch (e.keyCode) {
     case TvKey.Right: {
@@ -128,7 +121,7 @@ function handleKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     }
     case TvKey.Left: {
-      const nl = gridMove(focusedIndex, entries.length, 'left');
+      const nl = sidebar.gridLeftOrFocus(focusedIndex, entries.length);
       if (nl >= 0) { focusedIndex = nl; updateFocus(); }
       e.preventDefault(); break;
     }
@@ -168,27 +161,25 @@ function handleKey(e: JQuery.Event): void {
       }
       e.preventDefault(); break;
     }
-    case TvKey.Return:
-    case TvKey.Backspace:
-    case TvKey.Escape:
-      goBack();
-      e.preventDefault(); break;
+    default: sidebar.backOrFocus(e);
   }
-}
+});
 
-export var historyPage: Page = {
-  mount: function (params: RouteParams) {
+export const historyPage: Page = {
+  mount(params: RouteParams) {
     const page = params.historyPage || 1;
     focusedIndex = params.historyFocusedIndex || 0;
     loading = false;
     pendingFocusCol = -1;
+    sidebar.setUnfocusHandler(() => updateFocus());
     loadPage(page);
     keys.bind(handleKey);
   },
 
-  unmount: function () {
+  unmount() {
     keys.unbind();
     clearPage($root);
+    sidebar.setUnfocusHandler(null);
     entries = [];
     loading = false;
   }

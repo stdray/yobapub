@@ -1,7 +1,7 @@
 import objectFitImages from 'object-fit-images';
 import '../css/app.css';
 import { configure } from './api/client';
-import { registerPage, navigate, setExitHandler } from './router';
+import { registerPage, navigate, setExitHandler, onAfterNavigate } from './router';
 import { registerTizenKeys, getDeviceInfo, exitApp } from './utils/platform';
 import { showExitDialog } from './utils/exit-dialog';
 import { getAccessToken, getStartPage, setProxyAll } from './utils/storage';
@@ -20,6 +20,7 @@ import { tvPlayerPage } from './pages/tv-player';
 import { historyPage } from './pages/history';
 import { checkVip } from './api/device';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
+import { sidebar } from './sidebar';
 
 objectFitImages();
 
@@ -39,6 +40,14 @@ registerPage('search', searchPage);
 registerPage('tv', tvPage);
 registerPage('tv-player', tvPlayerPage);
 registerPage('history', historyPage);
+
+onAfterNavigate((route) => {
+  if (sidebar.isRoute(route)) {
+    sidebar.show(route);
+  } else {
+    sidebar.hide();
+  }
+});
 
 function notifyDevice(): void {
   const info = getDeviceInfo();

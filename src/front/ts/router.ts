@@ -6,6 +6,19 @@ let currentRoute: RouteName | null = null;
 let currentParams: RouteParams = {};
 const history: Array<{ route: RouteName; params: RouteParams }> = [];
 
+type AfterNavigateCallback = (route: RouteName) => void;
+const afterCallbacks: AfterNavigateCallback[] = [];
+
+export const onAfterNavigate = (cb: AfterNavigateCallback): void => {
+  afterCallbacks.push(cb);
+};
+
+const fireAfterNavigate = (route: RouteName): void => {
+  for (let i = 0; i < afterCallbacks.length; i++) {
+    afterCallbacks[i](route);
+  }
+};
+
 export function registerPage(name: RouteName, page: Page): void {
   pages[name] = page;
 }
@@ -19,6 +32,7 @@ export function navigate(route: RouteName, params?: RouteParams): void {
 
   currentRoute = route;
   currentParams = params || {};
+  fireAfterNavigate(route);
   $('#page-' + route).removeClass('hidden');
   pages[route].mount(currentParams);
 }
@@ -42,6 +56,7 @@ export function goBack(): boolean {
 
   const prev = history.pop()!;
   currentRoute = prev.route;
+  fireAfterNavigate(prev.route);
   $('#page-' + prev.route).removeClass('hidden');
   pages[prev.route].mount(prev.params);
   return true;

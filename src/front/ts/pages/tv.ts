@@ -2,13 +2,14 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { TvChannel } from '../types/api';
-import { navigate, goBack, setParams } from '../router';
+import { navigate, setParams } from '../router';
 import { TvKey } from '../utils/platform';
 import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { proxyPosterUrl } from '../utils/storage';
 import { getTvChannels } from '../api/tv';
 import { tplEmptyText } from '../utils/templates';
+import { sidebar } from '../sidebar';
 
 const $root = $('#page-tv');
 const keys = pageKeys();
@@ -25,7 +26,7 @@ const tplChannelCardCompiled = doT.template(`
   </div>
 `);
 
-export const tplChannelCard = (data: { readonly id: number; readonly logo: string; readonly title: string }): string =>
+const tplChannelCard = (data: { readonly id: number; readonly logo: string; readonly title: string }): string =>
   tplChannelCardCompiled(data);
 
 const tplPageCompiled = doT.template(`
@@ -35,10 +36,10 @@ const tplPageCompiled = doT.template(`
   </div></div>
 `);
 
-export const tplPage = (data: { readonly cards: string }): string =>
+const tplPage = (data: { readonly cards: string }): string =>
   tplPageCompiled(data);
 
-function updateFocus(): void {
+const updateFocus = (): void => {
   $root.find('.card').removeClass('focused');
   const $cards = $root.find('.card');
   if ($cards.length > 0 && focusedIndex < $cards.length) {
@@ -46,9 +47,9 @@ function updateFocus(): void {
     $card.addClass('focused');
     scrollIntoView($card[0], $root.find('.watching')[0]);
   }
-}
+};
 
-function render(): void {
+const render = (): void => {
   if (channels.length === 0) {
     $root.html('<div class="content"><div class="watching">' + tplEmptyText({ text: 'Нет каналов' }) + '</div></div>');
     return;
@@ -63,9 +64,11 @@ function render(): void {
   }
   $root.html(tplPage({ cards: cards }));
   updateFocus();
-}
+};
 
-const handleKey = (e: JQuery.Event): void => {
+const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
+  if (channels.length === 0) { sidebar.handleEmptyState(e); return; }
+
   const dir =
     e.keyCode === TvKey.Right ? 'right' as const :
     e.keyCode === TvKey.Left  ? 'left'  as const :
@@ -74,8 +77,13 @@ const handleKey = (e: JQuery.Event): void => {
     null;
 
   if (dir !== null) {
-    const next = gridMove(focusedIndex, channels.length, dir);
-    if (next >= 0) { focusedIndex = next; updateFocus(); }
+    if (dir === 'left') {
+      const nl = sidebar.gridLeftOrFocus(focusedIndex, channels.length);
+      if (nl >= 0) { focusedIndex = nl; updateFocus(); }
+    } else {
+      const next = gridMove(focusedIndex, channels.length, dir);
+      if (next >= 0) { focusedIndex = next; updateFocus(); }
+    }
     e.preventDefault();
     return;
   }
@@ -92,17 +100,15 @@ const handleKey = (e: JQuery.Event): void => {
         });
       }
       e.preventDefault(); break;
-    case TvKey.Return:
-    case TvKey.Backspace:
-    case TvKey.Escape:
-      goBack(); e.preventDefault(); break;
+    default: sidebar.backOrFocus(e);
   }
-};
+});
 
 export const tvPage: Page = {
-  mount(params: RouteParams): void {
+  mount(params: RouteParams) {
     focusedIndex = typeof params.tvFocusedIndex === 'number' ? params.tvFocusedIndex : 0;
     showSpinnerIn($root);
+    sidebar.setUnfocusHandler(() => updateFocus());
     getTvChannels().then(
       (res: any) => {
         channels = (res && res.channels) || [];
@@ -115,9 +121,10 @@ export const tvPage: Page = {
     );
     keys.bind(handleKey);
   },
-  unmount(): void {
+  unmount() {
     keys.unbind();
     clearPage($root);
+    sidebar.setUnfocusHandler(null);
     channels = [];
   }
 };

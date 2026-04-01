@@ -3,12 +3,13 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { getBookmarkFolders, getBookmarkItems } from '../api/bookmarks';
 import { BookmarkFolder, Item } from '../types/api';
-import { navigate, goBack, setParams } from '../router';
+import { navigate, setParams } from '../router';
 import { TvKey } from '../utils/platform';
 import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 import { proxyPosterUrl } from '../utils/storage';
+import { sidebar } from '../sidebar';
 
 const $root = $('#page-bookmarks');
 const keys = pageKeys();
@@ -34,7 +35,7 @@ const tplFolderItemCompiled = doT.template(`
   </div>
 `);
 
-export const tplFolderItem = (data: { readonly id: number; readonly title: string; readonly count: string }): string =>
+const tplFolderItem = (data: { readonly id: number; readonly title: string; readonly count: string }): string =>
   tplFolderItemCompiled(data);
 
 const tplFoldersPageCompiled = doT.template(`
@@ -44,7 +45,7 @@ const tplFoldersPageCompiled = doT.template(`
   </div>
 `);
 
-export const tplFoldersPage = (data: { readonly title: string; readonly items: string }): string =>
+const tplFoldersPage = (data: { readonly title: string; readonly items: string }): string =>
   tplFoldersPageCompiled(data);
 
 const tplItemsPageCompiled = doT.template(`
@@ -54,16 +55,16 @@ const tplItemsPageCompiled = doT.template(`
   </div>
 `);
 
-export const tplItemsPage = (data: { readonly title: string; readonly cards: string }): string =>
+const tplItemsPage = (data: { readonly title: string; readonly cards: string }): string =>
   tplItemsPageCompiled(data);
 
-function renderFolders(): void {
+const renderFolders = (): void => {
   if (folders.length === 0) {
     $root.html('<div class="watching">' + tplEmptyText({ text: 'Нет папок' }) + '</div>');
     return;
   }
   let html = '';
-  for (var i = 0; i < folders.length; i++) {
+  for (let i = 0; i < folders.length; i++) {
     html += tplFolderItem({
       id: folders[i].id,
       title: folders[i].title,
@@ -72,24 +73,24 @@ function renderFolders(): void {
   }
   $root.html(tplFoldersPage({ title: 'Закладки', items: html }));
   updateFolderFocus();
-}
+};
 
-function updateFolderFocus(): void {
+const updateFolderFocus = (): void => {
   $root.find('.folder-item').removeClass('focused');
   if (folders.length > 0) {
     const $item = $root.find('.folder-item').eq(folderFocused);
     $item.addClass('focused');
     scrollIntoView($item[0], $root.find('.watching')[0]);
   }
-}
+};
 
-function renderItems(): void {
+const renderItems = (): void => {
   if (itemsData.length === 0) {
     $root.html('<div class="watching">' + tplEmptyText({ text: 'Папка пуста' }) + '</div>');
     return;
   }
   let cards = '';
-  for (var i = 0; i < itemsData.length; i++) {
+  for (let i = 0; i < itemsData.length; i++) {
     cards += tplCard({
       id: itemsData[i].id,
       poster: proxyPosterUrl(itemsData[i].posters.medium),
@@ -98,32 +99,35 @@ function renderItems(): void {
   }
   $root.html(tplItemsPage({ title: currentFolderTitle, cards: cards }));
   updateItemFocus();
-}
+};
 
-function updateItemFocus(): void {
+const updateItemFocus = (): void => {
   $root.find('.card').removeClass('focused');
   if (itemsData.length > 0 && focusedIndex < itemsData.length) {
     const $card = $root.find('.card').eq(focusedIndex);
     $card.addClass('focused');
     scrollIntoView($card[0], $root.find('.watching')[0]);
   }
-}
+};
 
-function handleKey(e: JQuery.Event): void {
+const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
   if (viewMode === 'folders') {
     handleFolderKey(e);
   } else {
     handleItemKey(e);
   }
-}
+});
 
-function handleFolderKey(e: JQuery.Event): void {
+const handleFolderKey = (e: JQuery.Event): void => {
   switch (e.keyCode) {
     case TvKey.Up:
       if (folderFocused > 0) { folderFocused--; updateFolderFocus(); }
       e.preventDefault(); break;
     case TvKey.Down:
       if (folderFocused < folders.length - 1) { folderFocused++; updateFolderFocus(); }
+      e.preventDefault(); break;
+    case TvKey.Left:
+      sidebar.focus();
       e.preventDefault(); break;
     case TvKey.Enter:
       if (folders.length > 0) {
@@ -133,22 +137,24 @@ function handleFolderKey(e: JQuery.Event): void {
         openFolder(folder.id);
       }
       e.preventDefault(); break;
-    case TvKey.Return:
-    case TvKey.Backspace:
-    case TvKey.Escape:
-      goBack(); e.preventDefault(); break;
+    default: sidebar.backOrFocus(e);
   }
-}
+};
 
-function handleItemKey(e: JQuery.Event): void {
+const handleItemKey = (e: JQuery.Event): void => {
   const dir = e.keyCode === TvKey.Right ? 'right' as const
     : e.keyCode === TvKey.Left ? 'left' as const
     : e.keyCode === TvKey.Down ? 'down' as const
     : e.keyCode === TvKey.Up ? 'up' as const
     : null;
   if (dir) {
-    const next = gridMove(focusedIndex, itemsData.length, dir);
-    if (next >= 0) { focusedIndex = next; updateItemFocus(); }
+    if (dir === 'left') {
+      const nl = sidebar.gridLeftOrFocus(focusedIndex, itemsData.length);
+      if (nl >= 0) { focusedIndex = nl; updateItemFocus(); }
+    } else {
+      const next = gridMove(focusedIndex, itemsData.length, dir);
+      if (next >= 0) { focusedIndex = next; updateItemFocus(); }
+    }
     e.preventDefault();
     return;
   }
@@ -171,28 +177,33 @@ function handleItemKey(e: JQuery.Event): void {
       renderFolders();
       e.preventDefault(); break;
   }
-}
+};
 
-function openFolder(folderId: number, keepFocus?: boolean): void {
+const openFolder = (folderId: number, keepFocus?: boolean): void => {
   viewMode = 'items';
   if (!keepFocus) { focusedIndex = 0; }
   showSpinnerIn($root);
   getBookmarkItems(folderId).then(
-    function (res: any) {
+    (res: any) => {
       itemsData = (res && res.items) || [];
       if (focusedIndex >= itemsData.length) { focusedIndex = Math.max(0, itemsData.length - 1); }
       renderItems();
     },
-    function () {
+    () => {
       $root.html('<div class="watching">' + tplEmptyText({ text: 'Ошибка загрузки' }) + '</div>');
     }
   );
-}
+};
 
-export var bookmarksPage: Page = {
-  mount: function (params: RouteParams) {
+export const bookmarksPage: Page = {
+  mount(params: RouteParams) {
     keys.bind(handleKey);
     showSpinnerIn($root);
+
+    sidebar.setUnfocusHandler(() => {
+      if (viewMode === 'folders') { updateFolderFocus(); }
+      else { updateItemFocus(); }
+    });
 
     if (params.folderId) {
       currentFolderId = params.folderId;
@@ -200,9 +211,9 @@ export var bookmarksPage: Page = {
       focusedIndex = (typeof params.focusedIndex === 'number') ? params.focusedIndex : 0;
 
       getBookmarkFolders().then(
-        function (res: any) {
+        (res: any) => {
           folders = (res && res.items) || [];
-          for (var i = 0; i < folders.length; i++) {
+          for (let i = 0; i < folders.length; i++) {
             if (folders[i].id === currentFolderId) { folderFocused = i; break; }
           }
         }
@@ -216,19 +227,20 @@ export var bookmarksPage: Page = {
     viewMode = 'folders';
 
     getBookmarkFolders().then(
-      function (res: any) {
+      (res: any) => {
         folders = (res && res.items) || [];
         renderFolders();
       },
-      function () {
+      () => {
         $root.html('<div class="watching">' + tplEmptyText({ text: 'Ошибка загрузки' }) + '</div>');
       }
     );
   },
 
-  unmount: function () {
+  unmount() {
     keys.unbind();
     clearPage($root);
+    sidebar.setUnfocusHandler(null);
     folders = [];
     itemsData = [];
   }

@@ -2,7 +2,7 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { Item } from '../types/api';
-import { navigate, setParams, goBack } from '../router';
+import { navigate, setParams } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
 import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
@@ -10,6 +10,7 @@ import { gridMove, gridPos } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 import { proxyPosterUrl } from '../utils/storage';
 import { getItems } from '../api/items';
+import { sidebar } from '../sidebar';
 
 const $root = $('#page-novelties');
 const keys = pageKeys();
@@ -38,24 +39,24 @@ const tplSectionCompiled = doT.template(`
   <div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>
 `);
 
-export const tplSection = (data: { readonly title: string; readonly idx: number; readonly cards: string }): string =>
+const tplSection = (data: { readonly title: string; readonly idx: number; readonly cards: string }): string =>
   tplSectionCompiled(data);
 
 const tplLayoutCompiled = doT.template(`
   <div class="content"><div class="watching">{{=it.rows}}</div></div>
 `);
 
-export const tplLayout = (data: { readonly rows: string }): string =>
+const tplLayout = (data: { readonly rows: string }): string =>
   tplLayoutCompiled(data);
 
-function buildRows(): string {
+const buildRows = (): string => {
   if (sections.length === 0) {
     return tplEmptyText({ text: 'Нет данных' });
   }
   let html = '';
-  for (var i = 0; i < sections.length; i++) {
+  for (let i = 0; i < sections.length; i++) {
     let cards = '';
-    for (var j = 0; j < sections[i].items.length; j++) {
+    for (let j = 0; j < sections[i].items.length; j++) {
       const item = sections[i].items[j] as any;
       cards += tplCard({
         id: item.id,
@@ -67,14 +68,14 @@ function buildRows(): string {
     html += tplSection({ title: sections[i].title, idx: i, cards: cards });
   }
   return html;
-}
+};
 
-function render(): void {
+const render = (): void => {
   $root.html(tplLayout({ rows: buildRows() }));
   updateFocus();
-}
+};
 
-function updateFocus(): void {
+const updateFocus = (): void => {
   $root.find('.card').removeClass('focused');
   if (sections.length === 0) return;
 
@@ -85,10 +86,10 @@ function updateFocus(): void {
     $card.addClass('focused');
     scrollIntoView($card[0], $root.find('.watching')[0]);
   }
-}
+};
 
-function handleKey(e: JQuery.Event): void {
-  if (sections.length === 0) return;
+const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
+  if (sections.length === 0) { sidebar.handleEmptyState(e); return; }
 
   const currentItems = sections[focusedSection].items;
   const g = gridPos(focusedIndex, currentItems.length);
@@ -100,7 +101,7 @@ function handleKey(e: JQuery.Event): void {
       e.preventDefault(); break;
     }
     case TvKey.Left: {
-      const nl = gridMove(focusedIndex, currentItems.length, 'left');
+      const nl = sidebar.gridLeftOrFocus(focusedIndex, currentItems.length);
       if (nl >= 0) { focusedIndex = nl; updateFocus(); }
       e.preventDefault(); break;
     }
@@ -134,22 +135,20 @@ function handleKey(e: JQuery.Event): void {
       }
       e.preventDefault(); break;
     }
-    case TvKey.Return:
-    case TvKey.Backspace:
-    case TvKey.Escape:
-      goBack();
-      e.preventDefault(); break;
+    default: sidebar.backOrFocus(e);
   }
-}
+});
 
-export var noveltiesPage: Page = {
-  mount: function (params: RouteParams) {
+export const noveltiesPage: Page = {
+  mount(params: RouteParams) {
     const savedSection = params.focusedSection;
     const savedIndex = params.focusedIndex;
     showSpinnerIn($root);
 
+    sidebar.setUnfocusHandler(() => updateFocus());
+
     const requests = [];
-    for (var i = 0; i < SECTIONS_CONFIG.length; i++) {
+    for (let i = 0; i < SECTIONS_CONFIG.length; i++) {
       requests.push(getItems(SECTIONS_CONFIG[i].type, 'created-'));
     }
 
@@ -157,14 +156,14 @@ export var noveltiesPage: Page = {
       sections = [];
       const args = arguments;
       const n = SECTIONS_CONFIG.length;
-      for (var i = 0; i < n; i++) {
+      for (let i = 0; i < n; i++) {
         const raw = n === 1 ? args[0] : args[i];
         const res = Array.isArray(raw) ? raw[0] : raw;
         const items: Item[] = (res && res.items) || [];
         if (items.length > 0) {
-          const sectionItems = items.map(function (it: Item) {
-            return { id: it.id, type: it.type, title: it.title, poster: it.posters.medium };
-          });
+          const sectionItems = items.map((it: Item) => ({
+            id: it.id, type: it.type, title: it.title, poster: it.posters.medium
+          }));
           sections.push({ title: SECTIONS_CONFIG[i].title, items: sectionItems });
         }
       }
@@ -183,9 +182,10 @@ export var noveltiesPage: Page = {
     keys.bind(handleKey);
   },
 
-  unmount: function () {
+  unmount() {
     keys.unbind();
     clearPage($root);
+    sidebar.setUnfocusHandler(null);
     sections = [];
   }
 };

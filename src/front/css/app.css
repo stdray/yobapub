@@ -18,6 +18,14 @@ html, body {
   width: 1920px;
   height: 1080px;
   position: relative;
+  display: flex;
+}
+
+#pages {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
 }
 
 .page {
@@ -84,13 +92,7 @@ html, body {
   margin-top: 20px;
 }
 
-/* --- Layout (sidebar + content) --- */
-.layout {
-  display: flex;
-  width: 100%;
-  height: 100%;
-}
-
+/* --- Sidebar (persistent) --- */
 .sidebar {
   width: 280px;
   flex-shrink: 0;
@@ -98,6 +100,7 @@ html, body {
   padding: 40px 0 40px 16px;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .sidebar__profile {

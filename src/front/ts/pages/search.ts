@@ -3,12 +3,13 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { Item, ItemsResponse } from '../types/api';
 import { searchItems } from '../api/items';
-import { navigate, goBack } from '../router';
+import { navigate } from '../router';
 import { TvKey } from '../utils/platform';
 import { proxyPosterUrl } from '../utils/storage';
 import { pageKeys, clearPage, scrollIntoView } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
+import { sidebar } from '../sidebar';
 
 const $root = $('#page-search');
 const keys = pageKeys();
@@ -62,7 +63,7 @@ const tplKeyboardCompiled = doT.template(`
   </div>
 `);
 
-export const tplKeyboard = (data: { readonly rows: Array<{ readonly label: string; readonly wide: boolean }[]> }): string =>
+const tplKeyboard = (data: { readonly rows: Array<{ readonly label: string; readonly wide: boolean }[]> }): string =>
   tplKeyboardCompiled(data);
 
 const tplLayoutCompiled = doT.template(`
@@ -75,16 +76,16 @@ const tplLayoutCompiled = doT.template(`
   </div>
 `);
 
-export const tplLayout = (data: Record<string, never>): string =>
+const tplLayout = (data: Record<string, never>): string =>
   tplLayoutCompiled(data);
 
-function buildKeyboardRows(): KbKeyData[][] {
+const buildKeyboardRows = (): KbKeyData[][] => {
   const layout = KB_LAYOUTS[currentLayout];
   const rows: KbKeyData[][] = [];
-  for (var ri = 0; ri < layout.length; ri++) {
+  for (let ri = 0; ri < layout.length; ri++) {
     const rowChars = layout[ri];
     const rowKeys: KbKeyData[] = [];
-    for (var ci = 0; ci < rowChars.length; ci++) {
+    for (let ci = 0; ci < rowChars.length; ci++) {
       const char = rowChars[ci];
       rowKeys.push({
         char: char,
@@ -95,25 +96,25 @@ function buildKeyboardRows(): KbKeyData[][] {
     rows.push(rowKeys);
   }
   return rows;
-}
+};
 
-function renderKeyboard(): void {
+const renderKeyboard = (): void => {
   $root.find('.search__keyboard').html(tplKeyboard({ rows: buildKeyboardRows() }));
   updateKeyboardFocus();
-}
+};
 
-function updateKeyboardFocus(): void {
+const updateKeyboardFocus = (): void => {
   $root.find('.kb__key').removeClass('focused');
   if (focusArea === 'keyboard') {
     $root.find('.kb__key[data-row="' + kbRow + '"][data-col="' + kbCol + '"]').addClass('focused');
   }
-}
+};
 
-function renderInput(): void {
+const renderInput = (): void => {
   $root.find('.search-input__text').text(query);
-}
+};
 
-function renderResults(): void {
+const renderResults = (): void => {
   const $el = $root.find('.search__results');
   if (loading) {
     $el.html('<div class="spinner"><div class="spinner__circle"></div></div>');
@@ -128,7 +129,7 @@ function renderResults(): void {
     return;
   }
   let html = '';
-  for (var i = 0; i < results.length; i++) {
+  for (let i = 0; i < results.length; i++) {
     html += tplCard({
       id: results[i].id,
       poster: proxyPosterUrl(results[i].posters.medium),
@@ -140,9 +141,9 @@ function renderResults(): void {
   if (focusArea === 'results') {
     updateResultsFocus();
   }
-}
+};
 
-function updateResultsFocus(): void {
+const updateResultsFocus = (): void => {
   const $cards = $root.find('.search-grid .card');
   $cards.removeClass('focused');
   if (focusArea === 'results' && focusedIndex < $cards.length) {
@@ -150,16 +151,16 @@ function updateResultsFocus(): void {
     $card.addClass('focused');
     scrollIntoView($card[0], $root.find('.search__results')[0]);
   }
-}
+};
 
-function render(): void {
+const render = (): void => {
   $root.html(tplLayout({}));
   renderInput();
   renderKeyboard();
   renderResults();
-}
+};
 
-function scheduleSearch(): void {
+const scheduleSearch = (): void => {
   if (searchTimer !== null) clearTimeout(searchTimer);
   if (query.length < 3) {
     results = [];
@@ -167,32 +168,32 @@ function scheduleSearch(): void {
     renderResults();
     return;
   }
-  searchTimer = setTimeout(function () {
+  searchTimer = setTimeout(() => {
     doSearch();
   }, 1000) as unknown as number;
-}
+};
 
-function doSearch(): void {
+const doSearch = (): void => {
   loading = true;
   renderResults();
   searchItems(query).then(
-    function (res: ItemsResponse) {
+    (res: ItemsResponse) => {
       loading = false;
       results = (res && res.items) || [];
       noResults = results.length === 0;
       focusedIndex = 0;
       renderResults();
     },
-    function () {
+    () => {
       loading = false;
       results = [];
       noResults = true;
       renderResults();
     }
   );
-}
+};
 
-function pressKey(char: string): void {
+const pressKey = (char: string): void => {
   if (char === '⌫') {
     query = query.slice(0, -1);
   } else if (char === '⎵' || char === '_') {
@@ -218,9 +219,9 @@ function pressKey(char: string): void {
   }
   renderInput();
   scheduleSearch();
-}
+};
 
-function handleKeyboardKey(e: JQuery.Event): void {
+const handleKeyboardKey = (e: JQuery.Event): void => {
   const layout = KB_LAYOUTS[currentLayout];
   const row = layout[kbRow];
 
@@ -253,15 +254,11 @@ function handleKeyboardKey(e: JQuery.Event): void {
     case TvKey.Enter:
       pressKey(row[kbCol]);
       e.preventDefault(); break;
-    case TvKey.Return:
-    case TvKey.Backspace:
-    case TvKey.Escape:
-      goBack();
-      e.preventDefault(); break;
+    default: sidebar.backOrFocus(e);
   }
-}
+};
 
-function handleResultsKey(e: JQuery.Event): void {
+const handleResultsKey = (e: JQuery.Event): void => {
   const $cards = $root.find('.search-grid .card');
   const total = $cards.length;
 
@@ -307,18 +304,18 @@ function handleResultsKey(e: JQuery.Event): void {
       updateResultsFocus();
       e.preventDefault(); break;
   }
-}
+};
 
-function handleKey(e: JQuery.Event): void {
+const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
   if (focusArea === 'keyboard') {
     handleKeyboardKey(e);
   } else {
     handleResultsKey(e);
   }
-}
+});
 
-export var searchPage: Page = {
-  mount: function (params: RouteParams) {
+export const searchPage: Page = {
+  mount(params: RouteParams) {
     query = params.searchQuery || '';
     results = [];
     focusedIndex = 0;
@@ -328,14 +325,19 @@ export var searchPage: Page = {
     currentLayout = 'ru';
     noResults = false;
     loading = false;
+    sidebar.setUnfocusHandler(() => {
+      if (focusArea === 'keyboard') { updateKeyboardFocus(); }
+      else { updateResultsFocus(); }
+    });
     render();
     keys.bind(handleKey);
     if (query.length >= 3) doSearch();
   },
-  unmount: function () {
+  unmount() {
     if (searchTimer !== null) { clearTimeout(searchTimer); searchTimer = null; }
     keys.unbind();
     clearPage($root);
+    sidebar.setUnfocusHandler(null);
     results = [];
   }
 };
