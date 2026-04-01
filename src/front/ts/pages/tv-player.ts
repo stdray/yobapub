@@ -112,13 +112,34 @@ function startPlayback(streamUrl: string): void {
     plog.debug('HLS attached to video element');
 
     hls.on(HlsCtor.Events.ERROR, (event: unknown, data: any) => {
-      // Avoid serializing cyclic objects - just log key properties
       const errorInfo: Record<string, unknown> = {
         fatal: data?.fatal,
         type: data?.type
       };
       if (data?.details) errorInfo.details = String(data.details).substring(0, 100);
-      if (data?.error) errorInfo.error = String(data.error).substring(0, 100);
+      if (data?.error) errorInfo.error = String(data.error).substring(0, 200);
+      if (data?.reason) errorInfo.reason = String(data.reason).substring(0, 200);
+      if (data?.response) {
+        errorInfo.responseCode = data.response.code;
+        if (data.response.text) errorInfo.responseText = String(data.response.text).substring(0, 200);
+      }
+      if (data?.url) errorInfo.url = String(data.url).substring(0, 200);
+      if (data?.frag) {
+        errorInfo.fragSn = data.frag.sn;
+        errorInfo.fragUrl = data.frag.url ? String(data.frag.url).substring(0, 200) : undefined;
+        errorInfo.fragLevel = data.frag.level;
+      }
+      if (data?.context) {
+        errorInfo.ctxUrl = data.context.url ? String(data.context.url).substring(0, 200) : undefined;
+        errorInfo.ctxType = data.context.type;
+      }
+      if (data?.networkDetails) {
+        const nd = data.networkDetails as XMLHttpRequest;
+        errorInfo.httpStatus = nd.status;
+        errorInfo.httpStatusText = nd.statusText;
+      }
+      if (data?.level !== undefined) errorInfo.level = data.level;
+      if (data?.buffer !== undefined) errorInfo.buffer = data.buffer;
 
       plog.error('HLS error', errorInfo);
 
