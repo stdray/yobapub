@@ -79,7 +79,7 @@ function buildMenu(): string {
     });
   }
   const up = getUserProfile();
-  const profile = up && up.avatar ? { avatar: proxyPosterUrl(up.avatar), username: up.username, days: up.subscriptionDays } : null;
+  const profile = up && up.avatar ? { avatar: up.avatar, username: up.username, days: up.subscriptionDays } : null;
   return tplMenu({ items, profile });
 }
 
