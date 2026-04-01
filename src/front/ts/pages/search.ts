@@ -291,8 +291,7 @@ const handleResultsKey = (e: JQuery.Event): void => {
     case TvKey.Enter: {
       const item = results[focusedIndex];
       if (item) {
-        const isSerial = item.type === 'serial' || item.type === 'docuserial';
-        router.navigate(isSerial ? 'serial' : 'movie', { id: item.id });
+        router.navigateItem(item);
       }
       e.preventDefault(); break;
     }

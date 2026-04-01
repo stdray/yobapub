@@ -130,8 +130,7 @@ const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
       const item = currentItems[focusedIndex];
       if (item) {
         router.setParams({ focusedSection: focusedSection, focusedIndex: focusedIndex });
-        const isSerial = item.type === 'serial' || item.type === 'docuserial';
-        router.navigate(isSerial ? 'serial' : 'movie', { id: item.id });
+        router.navigateItem(item);
       }
       e.preventDefault(); break;
     }

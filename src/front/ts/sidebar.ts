@@ -20,8 +20,14 @@ const enum MenuIndex {
 
 const MENU_ITEMS = ['Новинки', 'Я смотрю', 'История', 'Закладки', 'ТВ', 'Поиск', 'Настройки', 'Выход'];
 
-const MENU_ROUTES: ReadonlyArray<RouteName | null> = [
-  'novelties', 'watching', 'history', 'bookmarks', 'tv', 'search', 'settings', null
+const MENU_NAVIGATE: ReadonlyArray<() => void> = [
+  () => router.navigateNovelties(),
+  () => router.navigateWatching(),
+  () => router.navigateHistory(),
+  () => router.navigateBookmarks(),
+  () => router.navigateTv(),
+  () => router.navigateSearch(),
+  () => router.navigateSettings(),
 ];
 
 const ROUTE_TO_MENU: Readonly<Record<string, MenuIndex>> = {
@@ -33,6 +39,10 @@ const ROUTE_TO_MENU: Readonly<Record<string, MenuIndex>> = {
   search: MenuIndex.Search,
   settings: MenuIndex.Settings
 };
+
+const MENU_TO_ROUTE: ReadonlyArray<RouteName> = [
+  'novelties', 'watching', 'history', 'bookmarks', 'tv', 'search', 'settings'
+];
 
 const SIDEBAR_ROUTES: ReadonlyArray<RouteName> = [
   'watching', 'novelties', 'history', 'bookmarks', 'tv', 'search', 'settings'
@@ -180,15 +190,16 @@ class Sidebar {
         this.unfocus();
         e.preventDefault(); break;
       case TvKey.Enter: {
-        const route = MENU_ROUTES[this.menuIndex];
-        if (route) {
-          if (route !== this.activeRoute) {
-            router.navigate(route);
+        const nav = MENU_NAVIGATE[this.menuIndex];
+        if (nav) {
+          const menuRoute = MENU_TO_ROUTE[this.menuIndex];
+          if (menuRoute !== this.activeRoute) {
+            nav();
           } else {
             this.unfocus();
           }
         } else if (this.menuIndex === MenuIndex.Exit) {
-          deviceApi.unlinkDevice().always(() => { storage.clearTokens(); router.navigate('login'); });
+          deviceApi.unlinkDevice().always(() => { storage.clearTokens(); router.navigateLogin(); });
         }
         e.preventDefault(); break;
       }

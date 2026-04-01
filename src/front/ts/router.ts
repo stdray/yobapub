@@ -3,6 +3,11 @@ import { RouteName, RouteParams, Page } from './types/app';
 
 type AfterNavigateCallback = (route: RouteName) => void;
 
+interface ItemLike {
+  readonly id: number;
+  readonly type: string;
+}
+
 class Router {
   private readonly pages: Record<string, Page> = {};
   private currentRoute: RouteName | null = null;
@@ -25,7 +30,7 @@ class Router {
     this.pages[name] = page;
   };
 
-  readonly navigate = (route: RouteName, params?: RouteParams): void => {
+  private readonly navigate = (route: RouteName, params?: RouteParams): void => {
     if (this.currentRoute) {
       this.pages[this.currentRoute].unmount();
       $('#page-' + this.currentRoute).addClass('hidden');
@@ -66,8 +71,46 @@ class Router {
     this.currentParams = params;
   };
 
-  readonly getCurrentRoute = (): RouteName | null => {
-    return this.currentRoute;
+  readonly getCurrentRoute = (): RouteName | null => this.currentRoute;
+
+  // --- Simple page navigation ---
+
+  readonly navigateLogin = (): void => { this.navigate('login'); };
+  readonly navigateWatching = (): void => { this.navigate('watching'); };
+  readonly navigateNovelties = (): void => { this.navigate('novelties'); };
+  readonly navigateBookmarks = (): void => { this.navigate('bookmarks'); };
+  readonly navigateHistory = (): void => { this.navigate('history'); };
+  readonly navigateTv = (): void => { this.navigate('tv'); };
+  readonly navigateSearch = (): void => { this.navigate('search'); };
+  readonly navigateSettings = (): void => { this.navigate('settings'); };
+
+  readonly navigateStartPage = (route: RouteName): void => { this.navigate(route); };
+
+  // --- Parameterized navigation ---
+
+  readonly navigateItem = (item: ItemLike, episodeId?: number): void => {
+    const isSerial = item.type === 'serial' || item.type === 'docuserial';
+    this.navigate(isSerial ? 'serial' : 'movie', { id: item.id, episodeId });
+  };
+
+  readonly navigateSerial = (id: number, episodeId?: number): void => {
+    this.navigate('serial', { id, episodeId });
+  };
+
+  readonly navigateMovie = (id: number): void => {
+    this.navigate('movie', { id });
+  };
+
+  readonly navigateMoviePlayer = (id: number): void => {
+    this.navigate('player', { id, video: 1 });
+  };
+
+  readonly navigateSerialPlayer = (id: number, season: number, episode: number): void => {
+    this.navigate('player', { id, season, episode });
+  };
+
+  readonly navigateTvPlayer = (channelId: number, channelTitle: string, channelStream: string): void => {
+    this.navigate('tv-player', { channelId, channelTitle, channelStream });
   };
 }
 

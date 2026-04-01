@@ -92,7 +92,7 @@ function startAuth(): void {
           cleanup();
           const info = platform.getDeviceInfo();
           apiClient.apiPost('/v1/device/notify', { title: info.title, hardware: info.hardware, software: info.software });
-          router.navigate('watching');
+          router.navigateWatching();
         },
         function () { cleanup(); $root.html(tplExpired({})); },
         function (msg) { cleanup(); $root.html(tplError({ message: msg })); }

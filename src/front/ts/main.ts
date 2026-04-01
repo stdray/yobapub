@@ -67,9 +67,9 @@ if (storage.getAccessToken()) {
     if (!isVip) storage.downgradeProxyForNonVip();
     sidebar.refresh();
   });
-  router.navigate(storage.getStartPage());
+  router.navigateStartPage(storage.getStartPage());
 } else {
-  router.navigate('login');
+  router.navigateLogin();
 }
 
 const closeApp = (): void => {

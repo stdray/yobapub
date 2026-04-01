@@ -93,11 +93,7 @@ const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
       if (channels.length > 0) {
         const ch = channels[focusedIndex];
         router.setParams({ tvFocusedIndex: focusedIndex });
-        router.navigate('tv-player', {
-          channelId: ch.id,
-          channelTitle: ch.title,
-          channelStream: ch.stream
-        });
+        router.navigateTvPlayer(ch.id, ch.title, ch.stream);
       }
       e.preventDefault(); break;
     default: sidebar.backOrFocus(e);

@@ -165,8 +165,7 @@ const handleItemKey = (e: JQuery.Event): void => {
         const item = itemsData[focusedIndex];
         if (item) {
           router.setParams({ folderId: currentFolderId, folderTitle: currentFolderTitle, focusedIndex: focusedIndex });
-          const isSerial = item.type === 'serial' || item.type === 'docuserial';
-          router.navigate(isSerial ? 'serial' : 'movie', { id: item.id });
+          router.navigateItem(item);
         }
       }
       e.preventDefault(); break;

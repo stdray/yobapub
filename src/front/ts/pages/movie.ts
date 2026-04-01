@@ -101,7 +101,7 @@ function handleKey(e: JQuery.Event): void {
       const action = $root.find('.btn').eq(focusedBtn).data('action');
       if (action === 'play' && currentItem) {
         const firstVideo = currentItem.videos && currentItem.videos[0];
-        router.navigate('player', { id: currentItem.id, video: 1 });
+        router.navigateMoviePlayer(currentItem.id);
       }
       e.preventDefault(); break;
     case TvKey.Return:

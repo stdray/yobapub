@@ -152,12 +152,7 @@ const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
       const entry = entries[focusedIndex];
       if (entry) {
         router.setParams({ historyPage: currentPage, historyFocusedIndex: focusedIndex });
-        const isSerial = entry.item.type === 'serial' || entry.item.type === 'docuserial';
-        if (isSerial) {
-          router.navigate('serial', { id: entry.item.id, episodeId: entry.media.id });
-        } else {
-          router.navigate('movie', { id: entry.item.id });
-        }
+        router.navigateItem(entry.item, entry.media.id);
       }
       e.preventDefault(); break;
     }
