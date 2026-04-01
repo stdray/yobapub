@@ -395,6 +395,7 @@ function doSavePrefs(): void {
 
 function buildHlsConfig(): Record<string, any> {
   const cfg: Record<string, any> = {};
+  if (state.position > 0) cfg.startPosition = state.position;
   cfg.maxBufferLength = 10;
   cfg.maxMaxBufferLength = 30;
   cfg.maxBufferHole = 1.0;
