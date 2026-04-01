@@ -478,30 +478,45 @@ function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
   if (state.position > 0) {
-    // Play first (from pos 0 where data is), then seek.
-    // hls.js only reacts to currentTime changes during active playback.
+    // Seek first (while paused), then play once position is confirmed.
+    // On Tizen 2.3 (Chromium 28) currentTime assignment may be silently ignored
+    // if the fragment at that position isn't buffered yet — retry until it lands.
     const pos = state.position;
     const v = videoEl;
-    plog.info('onSourceReady starting playback then seeking to {pos}', { pos });
-    safePlay(v);
-    if (hlsInstance) {
-      const hls = hlsInstance;
-      const onFragBuffered = () => {
-        hls.off(Hls.Events.FRAG_BUFFERED, onFragBuffered);
-        if (v !== videoEl) return;
-        plog.info('first frag buffered, resume seek to {pos}', { pos });
-        continuePlaying({ quality: state.quality, audio: state.audio, sub: state.sub, position: pos, paused: false });
-      };
-      hls.on(Hls.Events.FRAG_BUFFERED, onFragBuffered);
-    }
+    let retries = 0;
+    const trySeekThenPlay = () => {
+      const diff = Math.abs(v.currentTime - pos);
+      plog.debug('trySeekThenPlay retry={retries} currentTime={currentTime} target={target} diff={diff}', {
+        retries, currentTime: v.currentTime, target: pos, diff,
+      });
+      if (diff <= 2) {
+        plog.info('resume seek done retries={retries} currentTime={currentTime}', { retries, currentTime: v.currentTime });
+        if (!state.paused) safePlay(v);
+        return;
+      }
+      if (retries >= 3) {
+        plog.warn('resume seek failed after {retries} retries, playing from currentTime={currentTime}', {
+          retries, currentTime: v.currentTime,
+        });
+        if (!state.paused) safePlay(v);
+        return;
+      }
+      retries++;
+      v.currentTime = pos;
+      window.setTimeout(trySeekThenPlay, 500);
+    };
+    plog.info('onSourceReady seeking to pos={pos} paused={paused}', { pos, paused: state.paused });
+    v.currentTime = pos;
+    window.setTimeout(trySeekThenPlay, 500);
   } else {
-    plog.info('onSourceReady pos=0, playing paused={paused}', { paused: state.paused });
+    plog.info('onSourceReady no resume pos, calling play paused={paused}', { paused: state.paused });
     if (!state.paused) safePlay(videoEl);
   }
   playbackStarted = true;
   if (state.sub >= 0 && videoEl) {
     loadSubtitleTrack(videoEl, $root, currentSubs, state.sub);
   }
+  hideSpinner();
   startMarkTimer();
   showBar();
   updateInfoBadge($root, getInfoState());
@@ -686,7 +701,6 @@ function markWatched(): void {
 
 function destroyPlayer(): void {
   videoStalled = false;
-  pendingSeekPos = -1;
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
