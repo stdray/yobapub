@@ -140,6 +140,14 @@ app.MapGet("/hls/rewrite", async (string url, int audio, bool? proxy, IHttpClien
     }
 
     var manifest = await response.Content.ReadAsStringAsync();
+
+    if (string.IsNullOrWhiteSpace(manifest) || !manifest.StartsWith("#EXTM3U"))
+    {
+        var preview = manifest.Length > 200 ? manifest[..200] : manifest;
+        app.Logger.LogWarning("HLS rewrite: CDN returned invalid manifest url={url} preview={preview}", url, preview);
+        return Results.StatusCode(502);
+    }
+
     manifest = HlsRewriter.Rewrite(manifest, url, audio, proxy == true);
 
     return Results.Content(manifest, "application/x-mpegurl");
