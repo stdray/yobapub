@@ -9,6 +9,7 @@ export class DetailControls {
   private itemFolderIds: ReadonlySet<number> = new Set();
   private pickerIdx = 0;
   private itemId = 0;
+  private emptyState = false;
 
   constructor($root: JQuery) {
     this.$root = $root;
@@ -37,19 +38,25 @@ export class DetailControls {
         this.itemFolderIds = new Set(itemFoldersResp.folders.map((f) => f.id));
         const firstBookmarked = this.allFolders.findIndex((f) => this.itemFolderIds.has(f.id));
         this.pickerIdx = firstBookmarked >= 0 ? firstBookmarked : 0;
+        this.emptyState = false;
         this.renderBookmarks();
       } else {
-        createBookmarkFolder('Favorites').done((resp) => {
-          this.allFolders = resp.items;
-          this.itemFolderIds = new Set();
-          this.pickerIdx = 0;
-          this.renderBookmarks();
-        });
+        this.allFolders = [];
+        this.itemFolderIds = new Set();
+        this.pickerIdx = 0;
+        this.emptyState = true;
+        this.renderBookmarks();
       }
     });
   };
 
   readonly renderBookmarks = (): void => {
+    if (this.emptyState) {
+      this.$root.find('.detail__bookmark-tags').html('');
+      this.$root.find('.detail__picker-name').text('Добавить в Favorites');
+      return;
+    }
+
     const tags = this.allFolders
       .filter((f) => this.itemFolderIds.has(f.id))
       .map((f) => '<span class="detail__bookmark-tag">' + f.title + '</span>')
@@ -74,6 +81,21 @@ export class DetailControls {
   };
 
   readonly toggleBookmark = (): void => {
+    if (this.emptyState) {
+      createBookmarkFolder('Favorites').done((resp) => {
+        if (resp.items.length > 0) {
+          const folder = resp.items[0];
+          toggleBookmarkItem(this.itemId, folder.id).done(() => {
+            this.allFolders = resp.items;
+            this.itemFolderIds = new Set([folder.id]);
+            this.pickerIdx = 0;
+            this.emptyState = false;
+            this.renderBookmarks();
+          });
+        }
+      });
+      return;
+    }
     const folder = this.allFolders[this.pickerIdx];
     if (!folder) return;
     toggleBookmarkItem(this.itemId, folder.id).done(() => {
@@ -117,5 +139,6 @@ export class DetailControls {
     this.allFolders = [];
     this.itemFolderIds = new Set();
     this.pickerIdx = 0;
+    this.emptyState = false;
   };
 }
