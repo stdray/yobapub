@@ -6,7 +6,7 @@ import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getStreamingType } from '../utils/storage';
-import { applyHlsProxy, logPlaybackStart } from '../utils/hls-proxy';
+import { buildBaseHlsConfig, applyHlsProxy, logPlaybackStart } from '../utils/hls-proxy';
 import { showHlsError } from '../utils/hls-error';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 import { Logger } from '../utils/log';
@@ -444,10 +444,8 @@ class PlayerController {
   // --- Playback ---
 
   private buildHlsConfig(): Record<string, number> {
-    const cfg: Record<string, number> = {};
+    const cfg = buildBaseHlsConfig();
     if (this.state.position > 0) cfg.startPosition = this.state.position;
-    cfg.maxBufferLength = 10;
-    cfg.maxMaxBufferLength = 30;
     cfg.maxBufferHole = 1.0;
     cfg.highBufferWatchdogPeriod = 10;
     cfg.nudgeMaxRetry = 3;
@@ -455,9 +453,6 @@ class PlayerController {
     cfg.abrEwmaSlowLive = 10.0;
     cfg.abrEwmaFastVoD = 5.0;
     cfg.abrEwmaSlowVoD = 10.0;
-    cfg.fragLoadingMaxRetry = 6;
-    cfg.manifestLoadingMaxRetry = 3;
-    cfg.levelLoadingMaxRetry = 4;
     return cfg;
   }
 

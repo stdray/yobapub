@@ -1,4 +1,5 @@
 import { isProxyAll, getStreamingType } from './storage';
+import { isLegacyTizen } from './platform';
 import { Logger } from './log';
 
 const proxyXhrSetup = (xhr: XMLHttpRequest, url: string): void => {
@@ -9,6 +10,19 @@ const proxyXhrSetup = (xhr: XMLHttpRequest, url: string): void => {
       : '/hls/proxy?url=' + encodeURIComponent(url);
     xhr.open('GET', newUrl, true);
   }
+};
+
+export const buildBaseHlsConfig = (): Record<string, number> => {
+  const cfg: Record<string, number> = {
+    fragLoadingMaxRetry: 3,
+    manifestLoadingMaxRetry: 2,
+    levelLoadingMaxRetry: 2
+  };
+  if (isLegacyTizen()) {
+    cfg.maxBufferLength = 10;
+    cfg.maxMaxBufferLength = 30;
+  }
+  return cfg;
 };
 
 export const applyHlsProxy = (config: Record<string, unknown>): boolean => {

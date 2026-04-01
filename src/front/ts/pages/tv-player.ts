@@ -4,7 +4,7 @@ import { goBack } from '../router';
 import { TvKey } from '../utils/platform';
 import { pageKeys, clearPage } from '../utils/page';
 import { Logger } from '../utils/log';
-import { applyHlsProxy, logPlaybackStart } from '../utils/hls-proxy';
+import { buildBaseHlsConfig, applyHlsProxy, logPlaybackStart } from '../utils/hls-proxy';
 import { showHlsError } from '../utils/hls-error';
 
 const $root = $('#page-tv-player');
@@ -74,10 +74,7 @@ function startPlayback(streamUrl: string): void {
   if (HlsCtor && HlsCtor.isSupported()) {
     plog.info('Using HLS.js');
 
-    const hlsConfig: Record<string, any> = {
-      maxBufferLength: 30,
-      maxMaxBufferLength: 60
-    };
+    const hlsConfig: Record<string, any> = buildBaseHlsConfig();
 
     if (applyHlsProxy(hlsConfig)) {
       plog.debug('Proxy enabled, will rewrite URLs');
