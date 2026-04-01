@@ -73,12 +73,12 @@ const tplEpisodeCompiled = doT.template(`
 export const tplEpisode = (data: { readonly idx: number; readonly number: number; readonly title: string; readonly status: string }): string =>
   tplEpisodeCompiled(data);
 
-function getEpisodeStatus(seasonNum: number, epNum: number): { time: number; status: number } {
+const getEpisodeStatus = (seasonNum: number, epNum: number): { time: number; status: number } => {
   if (!watchingInfo || !watchingInfo.seasons) return { time: 0, status: -1 };
-  for (var i = 0; i < watchingInfo.seasons.length; i++) {
+  for (let i = 0; i < watchingInfo.seasons.length; i++) {
     const ws = watchingInfo.seasons[i];
     if (ws.number === seasonNum) {
-      for (var j = 0; j < ws.episodes.length; j++) {
+      for (let j = 0; j < ws.episodes.length; j++) {
         if (ws.episodes[j].number === epNum) {
           return { time: ws.episodes[j].time, status: ws.episodes[j].status };
         }
@@ -86,26 +86,26 @@ function getEpisodeStatus(seasonNum: number, epNum: number): { time: number; sta
     }
   }
   return { time: 0, status: -1 };
-}
+};
 
-function findEpisodeById(episodeId: number): { seasonIdx: number; episodeIdx: number } | null {
+const findEpisodeById = (episodeId: number): { seasonIdx: number; episodeIdx: number } | null => {
   if (!currentItem || !currentItem.seasons) return null;
-  for (var i = 0; i < currentItem.seasons.length; i++) {
+  for (let i = 0; i < currentItem.seasons.length; i++) {
     const s = currentItem.seasons[i];
-    for (var j = 0; j < s.episodes.length; j++) {
+    for (let j = 0; j < s.episodes.length; j++) {
       if (s.episodes[j].id === episodeId) {
         return { seasonIdx: i, episodeIdx: j };
       }
     }
   }
   return null;
-}
+};
 
-function findResumeEpisode(): { season: number; episode: number; seasonIdx: number; episodeIdx: number } | null {
+const findResumeEpisode = (): { season: number; episode: number; seasonIdx: number; episodeIdx: number } | null => {
   if (!currentItem || !currentItem.seasons) return null;
-  for (var i = 0; i < currentItem.seasons.length; i++) {
+  for (let i = 0; i < currentItem.seasons.length; i++) {
     const s = currentItem.seasons[i];
-    for (var j = 0; j < s.episodes.length; j++) {
+    for (let j = 0; j < s.episodes.length; j++) {
       const st = getEpisodeStatus(s.number, s.episodes[j].number);
       if (st.status === 0 || st.status === -1) {
         return { season: s.number, episode: s.episodes[j].number, seasonIdx: i, episodeIdx: j };
@@ -113,12 +113,12 @@ function findResumeEpisode(): { season: number; episode: number; seasonIdx: numb
     }
   }
   return null;
-}
+};
 
-function buildEpisodes(season: Season | undefined): string {
+const buildEpisodes = (season: Season | undefined): string => {
   if (!season) return '';
   let html = '';
-  for (var j = 0; j < season.episodes.length; j++) {
+  for (let j = 0; j < season.episodes.length; j++) {
     const ep = season.episodes[j];
     const st = getEpisodeStatus(season.number, ep.number);
     let statusText = '';
@@ -127,10 +127,10 @@ function buildEpisodes(season: Season | undefined): string {
     html += tplEpisode({ idx: j, number: ep.number, title: ep.title || 'Эпизод ' + ep.number, status: statusText });
   }
   return html;
-}
+};
 
-function render(item: Item): void {
-  let title = item.title.split(' / ');
+const render = (item: Item): void => {
+  const title = item.title.split(' / ');
   const seasons = item.seasons || [];
 
   const resumeEp = findResumeEpisode();
@@ -143,7 +143,7 @@ function render(item: Item): void {
   const ratings = renderRatings(item);
 
   let seasonTabs = '';
-  for (var i = 0; i < seasons.length; i++) {
+  for (let i = 0; i < seasons.length; i++) {
     seasonTabs += tplSeasonTab({ idx: i, num: seasons[i].number, active: i === selectedSeason });
   }
 
@@ -152,8 +152,8 @@ function render(item: Item): void {
     titleRu: title[0],
     titleEn: title.length > 1 ? title[1] : '',
     year: item.year,
-    countries: item.countries.map(function (c) { return c.title; }).join(', '),
-    genres: item.genres.map(function (g) { return g.title; }).join(', '),
+    countries: item.countries.map((c) => c.title).join(', '),
+    genres: item.genres.map((g) => g.title).join(', '),
     ratings: ratings,
     plot: item.plot || '',
     playLabel: playLabel,
@@ -170,9 +170,9 @@ function render(item: Item): void {
   if (resumeEp) {
     $root.find('.episode').eq(resumeEp.episodeIdx).addClass('current');
   }
-}
+};
 
-function updateFocus(): void {
+const updateFocus = (): void => {
   $root.find('.btn').removeClass('focused');
   $root.find('.episodes__season-tab').removeClass('focused');
   $root.find('.episode').removeClass('focused');
@@ -189,9 +189,9 @@ function updateFocus(): void {
       PageUtils.scrollIntoView($ep[0], $root.find('.detail__info')[0], 20);
     }
   }
-}
+};
 
-function switchSeason(idx: number): void {
+const switchSeason = (idx: number): void => {
   if (!currentItem || !currentItem.seasons) return;
   selectedSeason = idx;
   focusedSeasonTab = idx;
@@ -199,9 +199,9 @@ function switchSeason(idx: number): void {
   $root.find('.episodes__list').html(buildEpisodes(currentItem.seasons[idx]));
   focusedEpisode = 0;
   updateFocus();
-}
+};
 
-function handleKey(e: JQuery.Event): void {
+const handleKey = (e: JQuery.Event): void => {
   const seasons = (currentItem && currentItem.seasons) || [];
 
   switch (e.keyCode) {
@@ -220,7 +220,6 @@ function handleKey(e: JQuery.Event): void {
         if (currentItem) {
           const resume = findResumeEpisode();
           if (resume) {
-            const resumeEpObj = seasons[resume.seasonIdx] && seasons[resume.seasonIdx].episodes[resume.episodeIdx];
             router.navigateSerialPlayer(currentItem.id, resume.season, resume.episode);
           } else if (seasons.length > 0 && seasons[0].episodes.length > 0) {
             const firstEp = seasons[0].episodes[0];
@@ -265,18 +264,18 @@ function handleKey(e: JQuery.Event): void {
         e.preventDefault(); break;
     }
   }
-}
+};
 
-export var serialPage: Page = {
-  mount: function (params: RouteParams) {
+export const serialPage: Page = {
+  mount(params: RouteParams) {
     currentItem = null; watchingInfo = null; selectedSeason = 0;
     PageUtils.showSpinnerIn($root);
-    let id = params.id!;
+    const id = params.id!;
 
     const targetEpisodeId = params.episodeId;
 
     loadItemWithWatching(id,
-      function (item, watching) {
+      (item, watching) => {
         currentItem = item;
         watchingInfo = watching;
         render(currentItem);
@@ -292,13 +291,13 @@ export var serialPage: Page = {
           }
         }
       },
-      function () {
+      () => {
         $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');
       }
     );
     keys.bind(handleKey);
   },
-  unmount: function () {
+  unmount() {
     keys.unbind();
     PageUtils.clearPage($root);
     currentItem = null; watchingInfo = null;

@@ -12,7 +12,7 @@ export interface ProgressState {
   barSeekEl: HTMLElement | null;
 }
 
-export function getVideoDuration(state: ProgressState): number {
+export const getVideoDuration = (state: ProgressState): number => {
   let api = state.currentDuration || 0;
   if (state.videoEl) {
     let d = state.videoEl.duration;
@@ -24,16 +24,16 @@ export function getVideoDuration(state: ProgressState): number {
   }
   if (api > 86400) api = api / 1000;
   return api;
-}
+};
 
-export function cacheBarElements($root: JQuery, state: ProgressState): void {
+export const cacheBarElements = ($root: JQuery, state: ProgressState): void => {
   if (!state.barValueEl) state.barValueEl = $root.find('.player__bar-value')[0] || null;
   if (!state.barPctEl) state.barPctEl = $root.find('.player__bar-pct')[0] || null;
   if (!state.barDurationEl) state.barDurationEl = $root.find('.player__bar-duration')[0] || null;
   if (!state.barSeekEl) state.barSeekEl = $root.find('.player__bar-seek')[0] || null;
-}
+};
 
-export function updateProgress($root: JQuery, state: ProgressState): void {
+export const updateProgress = ($root: JQuery, state: ProgressState): void => {
   if (!state.videoEl) return;
   cacheBarElements($root, state);
   let cur = state.seeking ? state.seekPos : state.videoEl.currentTime;
@@ -53,4 +53,4 @@ export function updateProgress($root: JQuery, state: ProgressState): void {
   if (state.barSeekEl) {
     state.barSeekEl.innerHTML = state.seeking ? formatTimecode(state.seekPos) : '';
   }
-}
+};

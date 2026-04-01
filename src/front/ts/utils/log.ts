@@ -6,18 +6,16 @@ type Level = 'Verbose' | 'Debug' | 'Information' | 'Warning' | 'Error';
 
 const PAGE_T0 = Date.now();
 
-function relTs(): string {
-  return '+' + ((Date.now() - PAGE_T0) / 1000).toFixed(3) + 's';
-}
+const relTs = (): string =>
+  '+' + ((Date.now() - PAGE_T0) / 1000).toFixed(3) + 's';
 
-function renderTemplate(template: string, props: Record<string, unknown>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key) => {
+const renderTemplate = (template: string, props: Record<string, unknown>): string =>
+  template.replace(/\{(\w+)\}/g, (_, key) => {
     const v = props[key];
     return v === undefined ? '{' + key + '}' : String(v);
   });
-}
 
-function sendToBackend(level: Level, message: string, props: Record<string, unknown>): void {
+const sendToBackend = (level: Level, message: string, props: Record<string, unknown>): void => {
   try {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/log', true);
@@ -31,9 +29,9 @@ function sendToBackend(level: Level, message: string, props: Record<string, unkn
       clientTs: Date.now()
     }));
   } catch (_) { /* fire-and-forget */ }
-}
+};
 
-function emit(level: Level, template: string, props: Record<string, unknown>): void {
+const emit = (level: Level, template: string, props: Record<string, unknown>): void => {
   const message = renderTemplate(template, props);
   sendToBackend(level, message, props);
   const console_msg = '[' + relTs() + '][' + level[0] + '] ' + message;
@@ -42,7 +40,7 @@ function emit(level: Level, template: string, props: Record<string, unknown>): v
     case 'Error':   console.error(console_msg, props); break;
     default:        console.log(console_msg, props); break;
   }
-}
+};
 
 export class Logger {
   constructor(private readonly category: string) {}

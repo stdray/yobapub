@@ -48,7 +48,7 @@ router.onAfterNavigate((route) => {
   }
 });
 
-function notifyDevice(): void {
+const notifyDevice = (): void => {
   const info = platform.getDeviceInfo();
   console.log('[notify] title:', info.title, 'hw:', info.hardware, 'sw:', info.software);
   apiClient.apiPostWithRefresh('/v1/device/notify', {
@@ -56,10 +56,10 @@ function notifyDevice(): void {
     hardware: info.hardware,
     software: info.software
   }).then(
-    function (res: any) { console.log('[notify] response:', JSON.stringify(res)); },
-    function (err: any) { console.log('[notify] error:', err && err.status, err && err.responseText); }
+    (res: unknown) => { console.log('[notify] response:', JSON.stringify(res)); },
+    (err: JQueryXHR) => { console.log('[notify] error:', err && err.status, err && err.responseText); }
   );
-}
+};
 
 if (storage.getAccessToken()) {
   notifyDevice();

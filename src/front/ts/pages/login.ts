@@ -57,7 +57,7 @@ const tplErrorCompiled = doT.template(`
 export const tplError = (data: { readonly message: string }): string =>
   tplErrorCompiled(data);
 
-function cleanup(): void {
+const cleanup = (): void => {
   if (poller) {
     poller.stop();
     poller = null;
@@ -66,18 +66,18 @@ function cleanup(): void {
     clearInterval(countdownTimer);
     countdownTimer = null;
   }
-}
+};
 
-function startAuth(): void {
+const startAuth = (): void => {
   cleanup();
   $root.html(tplLoading({}));
 
   requestDeviceCode().then(
-    function (data) {
+    (data) => {
       $root.html(tplCode({ code: data.user_code, uri: data.verification_uri, expires: data.expires_in }));
 
       let remaining = data.expires_in;
-      countdownTimer = window.setInterval(function () {
+      countdownTimer = window.setInterval(() => {
         remaining--;
         const $el = $('#login-countdown');
         if ($el.length) { $el.text(String(remaining)); }
@@ -88,17 +88,17 @@ function startAuth(): void {
         data.code,
         data.interval,
         data.expires_in,
-        function () {
+        () => {
           cleanup();
           const info = platform.getDeviceInfo();
           apiClient.apiPost('/v1/device/notify', { title: info.title, hardware: info.hardware, software: info.software });
           router.navigateWatching();
         },
-        function () { cleanup(); $root.html(tplExpired({})); },
-        function (msg) { cleanup(); $root.html(tplError({ message: msg })); }
+        () => { cleanup(); $root.html(tplExpired({})); },
+        (msg) => { cleanup(); $root.html(tplError({ message: msg })); }
       );
     },
-    function (xhr: JQueryXHR) {
+    (xhr: JQueryXHR) => {
       let msg = 'Ошибка подключения к серверу';
       try {
         if (xhr && xhr.responseText) {
@@ -110,18 +110,18 @@ function startAuth(): void {
       $root.html(tplError({ message: msg }));
     }
   );
-}
+};
 
-export var loginPage: Page = {
-  mount: function (_params: RouteParams) {
+export const loginPage: Page = {
+  mount(_params: RouteParams) {
     startAuth();
-    keys.bind(function (e: JQuery.Event) {
+    keys.bind((e: JQuery.Event) => {
       if (e.keyCode === TvKey.Enter) {
         if ($root.find('.login__expired, .login__error').length > 0) { startAuth(); }
       }
     });
   },
-  unmount: function () {
+  unmount() {
     cleanup();
     keys.unbind();
     PageUtils.clearPage($root);

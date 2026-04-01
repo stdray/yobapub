@@ -1,5 +1,6 @@
 import $ from 'jquery';
 import { storage } from '../utils/storage';
+import { TokenResponse } from '../types/api';
 
 export class ApiClient {
   private clientId = '';
@@ -36,9 +37,9 @@ export class ApiClient {
     });
   };
 
-  readonly apiGet = (path: string, params?: Record<string, any>): JQueryXHR => {
+  readonly apiGet = (path: string, params?: Record<string, string | number | boolean>): JQueryXHR => {
     const token = storage.getAccessToken();
-    const data: Record<string, any> = params ? $.extend({}, params) : {};
+    const data: Record<string, string | number | boolean> = params ? $.extend({}, params) : {};
     if (token) {
       data['access_token'] = token;
     }
@@ -50,7 +51,7 @@ export class ApiClient {
     });
   };
 
-  readonly apiPost = (path: string, data?: Record<string, any>): JQueryXHR => {
+  readonly apiPost = (path: string, data?: Record<string, unknown>): JQueryXHR => {
     const token = storage.getAccessToken();
     let url = path;
     if (token) {
@@ -64,19 +65,19 @@ export class ApiClient {
     });
   };
 
-  readonly apiGetWithRefresh = (path: string, params?: Record<string, any>): JQueryDeferred<any> => {
-    const d = $.Deferred();
+  readonly apiGetWithRefresh = <T = unknown>(path: string, params?: Record<string, string | number | boolean>): JQueryDeferred<T> => {
+    const d = $.Deferred<T>();
 
     const doRequest = (): void => {
       this.apiGet(path, params).then(
-        (data: any) => { d.resolve(data); },
+        (data: T) => { d.resolve(data); },
         (xhr: JQueryXHR) => {
           if (xhr.status === 401 && storage.getRefreshToken()) {
             this.refreshToken().then(
-              (tokenData: any) => {
+              (tokenData: TokenResponse) => {
                 storage.saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
                 this.apiGet(path, params).then(
-                  (data: any) => { d.resolve(data); },
+                  (data: T) => { d.resolve(data); },
                   (xhr2: JQueryXHR) => { d.reject(xhr2); }
                 );
               },
@@ -96,19 +97,19 @@ export class ApiClient {
     return d;
   };
 
-  readonly apiPostWithRefresh = (path: string, data?: Record<string, any>): JQueryDeferred<any> => {
-    const d = $.Deferred();
+  readonly apiPostWithRefresh = <T = unknown>(path: string, data?: Record<string, unknown>): JQueryDeferred<T> => {
+    const d = $.Deferred<T>();
 
     const doRequest = (): void => {
       this.apiPost(path, data).then(
-        (res: any) => { d.resolve(res); },
+        (res: T) => { d.resolve(res); },
         (xhr: JQueryXHR) => {
           if (xhr.status === 401 && storage.getRefreshToken()) {
             this.refreshToken().then(
-              (tokenData: any) => {
+              (tokenData: TokenResponse) => {
                 storage.saveTokens(tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
                 this.apiPost(path, data).then(
-                  (res: any) => { d.resolve(res); },
+                  (res: T) => { d.resolve(res); },
                   (xhr2: JQueryXHR) => { d.reject(xhr2); }
                 );
               },

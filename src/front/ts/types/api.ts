@@ -280,3 +280,33 @@ export interface HistoryResponse {
   readonly history: HistoryEntry[];
   readonly pagination: Pagination;
 }
+
+export interface DeviceInfoResponse {
+  readonly device: {
+    readonly id: number;
+    readonly title: string;
+    readonly hardware: string;
+    readonly software: string;
+  };
+}
+
+export interface DeviceSettingsResponse {
+  readonly settings: Record<string, any>;
+}
+
+export interface UserResponse {
+  readonly user: {
+    readonly username: string;
+    readonly profile?: { readonly avatar?: string };
+    readonly subscription?: { readonly days?: number };
+  };
+}
+
+export interface VipCheckResponse {
+  readonly vip: boolean;
+}
+
+export interface MediaLinksResponse {
+  readonly files: VideoFile[];
+  readonly subtitles: Subtitle[];
+}

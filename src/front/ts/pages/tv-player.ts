@@ -29,7 +29,7 @@ const showOverlay = (autoHide = true): void => {
   }
 };
 
-function render(title: string): void {
+const render = (title: string): void => {
   plog.debug('render called', { title });
   $root.html(
     '<div class="tv-player">' +
@@ -89,7 +89,7 @@ function render(title: string): void {
   }
 }
 
-function startPlayback(streamUrl: string): void {
+const startPlayback = (streamUrl: string): void => {
   plog.debug('startPlayback called', { streamUrl: streamUrl.substring(0, 80), videoExists: !!video });
   if (!video) {
     plog.error('video element not found');
@@ -211,7 +211,7 @@ function startPlayback(streamUrl: string): void {
   }
 }
 
-function stopPlayback(): void {
+const stopPlayback = (): void => {
   plog.debug('stopPlayback called');
   if (hls) {
     plog.debug('destroying HLS instance');

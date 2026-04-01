@@ -6,15 +6,13 @@ export interface GridPos {
   totalRows: number;
 }
 
-export function gridPos(index: number, totalItems: number): GridPos {
-  return {
-    col: index % CARDS_PER_ROW,
-    row: Math.floor(index / CARDS_PER_ROW),
-    totalRows: Math.ceil(totalItems / CARDS_PER_ROW)
-  };
-}
+export const gridPos = (index: number, totalItems: number): GridPos => ({
+  col: index % CARDS_PER_ROW,
+  row: Math.floor(index / CARDS_PER_ROW),
+  totalRows: Math.ceil(totalItems / CARDS_PER_ROW)
+});
 
-export function gridMove(index: number, totalItems: number, dir: 'up' | 'down' | 'left' | 'right'): number {
+export const gridMove = (index: number, totalItems: number, dir: 'up' | 'down' | 'left' | 'right'): number => {
   const g = gridPos(index, totalItems);
   switch (dir) {
     case 'right':
@@ -30,4 +28,4 @@ export function gridMove(index: number, totalItems: number, dir: 'up' | 'down' |
       if (g.row > 0) return (g.row - 1) * CARDS_PER_ROW + g.col;
       return -1;
   }
-}
+};

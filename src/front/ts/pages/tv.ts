@@ -1,21 +1,16 @@
 import $ from 'jquery';
 import * as doT from 'dot';
-import { Page, RouteParams } from '../types/app';
-import { TvChannel } from '../types/api';
+import { RouteParams } from '../types/app';
+import { TvChannel, TvChannelsResponse } from '../types/api';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
-import { PageKeys, PageUtils } from '../utils/page';
+import { PageUtils } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { storage } from '../utils/storage';
 import { getTvChannels } from '../api/tv';
 import { tplEmptyText } from '../utils/templates';
 import { sidebar } from '../sidebar';
-
-const $root = $('#page-tv');
-const keys = new PageKeys();
-
-let channels: TvChannel[] = [];
-let focusedIndex = 0;
+import { SidebarPage } from './sidebar-page';
 
 const tplChannelCardCompiled = doT.template(`
   <div class="card card--channel" data-id="{{=it.id}}">
@@ -39,88 +34,93 @@ const tplPageCompiled = doT.template(`
 const tplPage = (data: { readonly cards: string }): string =>
   tplPageCompiled(data);
 
-const updateFocus = (): void => {
-  $root.find('.card').removeClass('focused');
-  const $cards = $root.find('.card');
-  if ($cards.length > 0 && focusedIndex < $cards.length) {
-    const $card = $cards.eq(focusedIndex);
-    $card.addClass('focused');
-    PageUtils.scrollIntoView($card[0], $root.find('.watching')[0]);
-  }
-};
+class TvPage extends SidebarPage {
+  private channels: TvChannel[] = [];
+  private focusedIndex = 0;
 
-const render = (): void => {
-  if (channels.length === 0) {
-    $root.html('<div class="content"><div class="watching">' + tplEmptyText({ text: 'Нет каналов' }) + '</div></div>');
-    return;
-  }
-  let cards = '';
-  for (let i = 0; i < channels.length; i++) {
-    cards += tplChannelCard({
-      id: channels[i].id,
-      logo: storage.proxyPosterUrl(channels[i].logos.s),
-      title: channels[i].title
-    });
-  }
-  $root.html(tplPage({ cards: cards }));
-  updateFocus();
-};
+  constructor() { super('tv'); }
 
-const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
-  if (channels.length === 0) { sidebar.handleEmptyState(e); return; }
+  protected onUnfocus(): void { this.updateFocus(); }
 
-  const dir =
-    e.keyCode === TvKey.Right ? 'right' as const :
-    e.keyCode === TvKey.Left  ? 'left'  as const :
-    e.keyCode === TvKey.Down  ? 'down'  as const :
-    e.keyCode === TvKey.Up    ? 'up'    as const :
-    null;
-
-  if (dir !== null) {
-    if (dir === 'left') {
-      const nl = sidebar.gridLeftOrFocus(focusedIndex, channels.length);
-      if (nl >= 0) { focusedIndex = nl; updateFocus(); }
-    } else {
-      const next = gridMove(focusedIndex, channels.length, dir);
-      if (next >= 0) { focusedIndex = next; updateFocus(); }
-    }
-    e.preventDefault();
-    return;
-  }
-
-  switch (e.keyCode) {
-    case TvKey.Enter:
-      if (channels.length > 0) {
-        const ch = channels[focusedIndex];
-        router.setParams({ tvFocusedIndex: focusedIndex });
-        router.navigateTvPlayer(ch.id, ch.title, ch.stream);
-      }
-      e.preventDefault(); break;
-    default: sidebar.backOrFocus(e);
-  }
-});
-
-export const tvPage: Page = {
-  mount(params: RouteParams) {
-    focusedIndex = typeof params.tvFocusedIndex === 'number' ? params.tvFocusedIndex : 0;
-    PageUtils.showSpinnerIn($root);
-    sidebar.setUnfocusHandler(() => updateFocus());
+  protected onMount(params: RouteParams): void {
+    this.focusedIndex = typeof params.tvFocusedIndex === 'number' ? params.tvFocusedIndex : 0;
+    PageUtils.showSpinnerIn(this.$root);
     getTvChannels().then(
-      (res: any) => {
-        channels = (res && res.channels) || [];
-        if (focusedIndex >= channels.length) focusedIndex = 0;
-        render();
+      (res: TvChannelsResponse) => {
+        this.channels = (res && res.channels) || [];
+        if (this.focusedIndex >= this.channels.length) this.focusedIndex = 0;
+        this.render();
       },
       () => {
-        $root.html('<div class="content"><div class="watching">' + tplEmptyText({ text: 'Ошибка загрузки' }) + '</div></div>');
+        this.$root.html('<div class="content"><div class="watching">' + tplEmptyText({ text: 'Ошибка загрузки' }) + '</div></div>');
       }
     );
-    keys.bind(handleKey);
-  },
-  unmount() {
-    keys.unbind();
-    PageUtils.clearPage($root);
-    sidebar.setUnfocusHandler(null);
-    channels = [];
   }
-};
+
+  protected onUnmount(): void {
+    this.channels = [];
+  }
+
+  protected handleKey(e: JQuery.Event): void {
+    if (this.channels.length === 0) { sidebar.handleEmptyState(e); return; }
+
+    const dir =
+      e.keyCode === TvKey.Right ? 'right' as const :
+      e.keyCode === TvKey.Left  ? 'left'  as const :
+      e.keyCode === TvKey.Down  ? 'down'  as const :
+      e.keyCode === TvKey.Up    ? 'up'    as const :
+      null;
+
+    if (dir !== null) {
+      if (dir === 'left') {
+        const nl = sidebar.gridLeftOrFocus(this.focusedIndex, this.channels.length);
+        if (nl >= 0) { this.focusedIndex = nl; this.updateFocus(); }
+      } else {
+        const next = gridMove(this.focusedIndex, this.channels.length, dir);
+        if (next >= 0) { this.focusedIndex = next; this.updateFocus(); }
+      }
+      e.preventDefault();
+      return;
+    }
+
+    switch (e.keyCode) {
+      case TvKey.Enter:
+        if (this.channels.length > 0) {
+          const ch = this.channels[this.focusedIndex];
+          router.setParams({ tvFocusedIndex: this.focusedIndex });
+          router.navigateTvPlayer(ch.id, ch.title, ch.stream);
+        }
+        e.preventDefault(); break;
+      default: sidebar.backOrFocus(e);
+    }
+  }
+
+  private render(): void {
+    if (this.channels.length === 0) {
+      this.$root.html('<div class="content"><div class="watching">' + tplEmptyText({ text: 'Нет каналов' }) + '</div></div>');
+      return;
+    }
+    let cards = '';
+    for (let i = 0; i < this.channels.length; i++) {
+      cards += tplChannelCard({
+        id: this.channels[i].id,
+        logo: storage.proxyPosterUrl(this.channels[i].logos.s),
+        title: this.channels[i].title
+      });
+    }
+    this.$root.html(tplPage({ cards: cards }));
+    this.updateFocus();
+  }
+
+  private updateFocus(): void {
+    this.$root.find('.card').removeClass('focused');
+    const $cards = this.$root.find('.card');
+    if ($cards.length > 0 && this.focusedIndex < $cards.length) {
+      const $card = $cards.eq(this.focusedIndex);
+      $card.addClass('focused');
+      PageUtils.scrollIntoView($card[0], this.$root.find('.watching')[0]);
+    }
+  }
+}
+
+export const tvPage = new TvPage();

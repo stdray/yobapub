@@ -48,8 +48,8 @@ export const tplDetail = (data: {
 }): string =>
   tplDetailCompiled(data);
 
-function render(item: Item): void {
-  let title = item.title.split(' / ');
+const render = (item: Item): void => {
+  const title = item.title.split(' / ');
   let resumeTime = 0;
   if (watchingInfo && watchingInfo.videos && watchingInfo.videos.length > 0) {
     const v = watchingInfo.videos[0];
@@ -71,8 +71,8 @@ function render(item: Item): void {
     titleRu: title[0],
     titleEn: title.length > 1 ? title[1] : '',
     year: item.year,
-    countries: item.countries.map(function (c) { return c.title; }).join(', '),
-    genres: item.genres.map(function (g) { return g.title; }).join(', '),
+    countries: item.countries.map((c) => c.title).join(', '),
+    genres: item.genres.map((g) => g.title).join(', '),
     duration: item.duration ? formatDuration(item.duration.average) : '',
     quality: item.quality,
     ratings: ratings,
@@ -82,14 +82,14 @@ function render(item: Item): void {
 
   focusedBtn = 0;
   updateFocus();
-}
+};
 
-function updateFocus(): void {
+const updateFocus = (): void => {
   $root.find('.btn').removeClass('focused');
   $root.find('.btn').eq(focusedBtn).addClass('focused');
-}
+};
 
-function handleKey(e: JQuery.Event): void {
+const handleKey = (e: JQuery.Event): void => {
   switch (e.keyCode) {
     case TvKey.Left:
       if (focusedBtn > 0) { focusedBtn--; updateFocus(); }
@@ -97,40 +97,40 @@ function handleKey(e: JQuery.Event): void {
     case TvKey.Right:
       if (focusedBtn < btnCount - 1) { focusedBtn++; updateFocus(); }
       e.preventDefault(); break;
-    case TvKey.Enter:
+    case TvKey.Enter: {
       const action = $root.find('.btn').eq(focusedBtn).data('action');
       if (action === 'play' && currentItem) {
-        const firstVideo = currentItem.videos && currentItem.videos[0];
         router.navigateMoviePlayer(currentItem.id);
       }
       e.preventDefault(); break;
+    }
     case TvKey.Return:
     case TvKey.Backspace:
     case TvKey.Escape:
       router.goBack(); e.preventDefault(); break;
   }
-}
+};
 
-export var moviePage: Page = {
-  mount: function (params: RouteParams) {
+export const moviePage: Page = {
+  mount(params: RouteParams) {
     currentItem = null;
     watchingInfo = null;
     PageUtils.showSpinnerIn($root);
-    let id = params.id!;
+    const id = params.id!;
 
     loadItemWithWatching(id,
-      function (item, watching) {
+      (item, watching) => {
         currentItem = item;
         watchingInfo = watching;
         render(currentItem);
       },
-      function () {
+      () => {
         $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');
       }
     );
     keys.bind(handleKey);
   },
-  unmount: function () {
+  unmount() {
     keys.unbind();
     PageUtils.clearPage($root);
     currentItem = null;

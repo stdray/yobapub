@@ -1,5 +1,5 @@
 import { apiClient } from './client';
+import { TvChannelsResponse } from '../types/api';
 
-export function getTvChannels(): JQueryDeferred<any> {
-  return apiClient.apiGetWithRefresh('/v1/tv');
-}
+export const getTvChannels = (): JQueryDeferred<TvChannelsResponse> =>
+  apiClient.apiGetWithRefresh('/v1/tv');

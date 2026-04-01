@@ -3,8 +3,8 @@ import { apiClient } from './client';
 import { DeviceCodeResponse, TokenResponse, AuthErrorResponse } from '../types/api';
 import { storage } from '../utils/storage';
 
-export function requestDeviceCode(): JQueryXHR {
-  return $.ajax({
+export const requestDeviceCode = (): JQueryXHR =>
+  $.ajax({
     url: '/oauth2/device',
     method: 'POST',
     data: {
@@ -14,21 +14,20 @@ export function requestDeviceCode(): JQueryXHR {
     },
     dataType: 'json'
   });
-}
 
-export function pollDeviceToken(
+export const pollDeviceToken = (
   code: string,
   interval: number,
   expiresIn: number,
   onSuccess: () => void,
   onExpired: () => void,
   onError: (msg: string) => void
-): { stop: () => void } {
+): { stop: () => void } => {
   let stopped = false;
   let elapsed = 0;
   let timerId: number | null = null;
 
-  function poll(): void {
+  const poll = (): void => {
     if (stopped) return;
     if (elapsed >= expiresIn) {
       onExpired();
@@ -46,12 +45,12 @@ export function pollDeviceToken(
       },
       dataType: 'json'
     }).then(
-      function (data: TokenResponse) {
+      (data: TokenResponse) => {
         if (stopped) return;
         storage.saveTokens(data.access_token, data.refresh_token, data.expires_in);
         onSuccess();
       },
-      function (xhr: JQueryXHR) {
+      (xhr: JQueryXHR) => {
         if (stopped) return;
         try {
           const body: AuthErrorResponse = JSON.parse(xhr.responseText);
@@ -68,16 +67,16 @@ export function pollDeviceToken(
         }
       }
     );
-  }
+  };
 
   poll();
 
   return {
-    stop: function () {
+    stop: () => {
       stopped = true;
       if (timerId !== null) {
         clearTimeout(timerId);
       }
     }
   };
-}
+};

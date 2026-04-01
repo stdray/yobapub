@@ -1,1 +1,1 @@
-export var CARDS_PER_ROW = 4;
+export const CARDS_PER_ROW = 4;

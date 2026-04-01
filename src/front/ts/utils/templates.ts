@@ -15,10 +15,10 @@ const tplEmptyTextCompiled = doT.template(`<div class="watching__section-title" 
 export const tplEmptyText = (data: { readonly text: string }): string =>
   tplEmptyTextCompiled(data);
 
-export function renderRatings(item: { rating?: number; kinopoisk_rating?: number; imdb_rating?: number }): string {
+export const renderRatings = (item: { rating?: number; kinopoisk_rating?: number; imdb_rating?: number }): string => {
   let html = '';
   if (item.rating) html += tplRating({ label: 'KP', value: item.rating });
   if (item.kinopoisk_rating) html += tplRating({ label: 'КиноПоиск', value: item.kinopoisk_rating });
   if (item.imdb_rating) html += tplRating({ label: 'IMDb', value: item.imdb_rating });
   return html;
-}
+};

@@ -11,7 +11,7 @@ export interface InfoState {
   selectedSub: number;
 }
 
-export function getStreamInfo(state: InfoState): string {
+export const getStreamInfo = (state: InfoState): string => {
   const parts: string[] = [];
 
   parts.push('HLS');
@@ -36,17 +36,17 @@ export function getStreamInfo(state: InfoState): string {
   }
 
   return parts.join(' &bull; ');
-}
+};
 
-export function updateInfoBadge($root: JQuery, state: InfoState): void {
+export const updateInfoBadge = ($root: JQuery, state: InfoState): void => {
   $root.find('.player__info').html(getStreamInfo(state));
-}
+};
 
-export function showInfo($root: JQuery, state: InfoState): void {
+export const showInfo = ($root: JQuery, state: InfoState): void => {
   updateInfoBadge($root, state);
   $root.find('.player__info').removeClass('hidden');
-}
+};
 
-export function hideInfo($root: JQuery): void {
+export const hideInfo = ($root: JQuery): void => {
   $root.find('.player__info').addClass('hidden');
-}
+};

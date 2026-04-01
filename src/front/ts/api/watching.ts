@@ -1,29 +1,27 @@
 import { apiClient } from './client';
+import { WatchingMoviesResponse, WatchingSerialsResponse, WatchingInfoResponse } from '../types/api';
 
-export function getWatchingMovies(): JQueryDeferred<any> {
-  return apiClient.apiGetWithRefresh('/v1/watching/movies');
-}
+export const getWatchingMovies = (): JQueryDeferred<WatchingMoviesResponse> =>
+  apiClient.apiGetWithRefresh('/v1/watching/movies');
 
-export function getWatchingSerials(): JQueryDeferred<any> {
-  return apiClient.apiGetWithRefresh('/v1/watching/serials', { subscribed: 1 });
-}
+export const getWatchingSerials = (): JQueryDeferred<WatchingSerialsResponse> =>
+  apiClient.apiGetWithRefresh('/v1/watching/serials', { subscribed: 1 });
 
-export function getWatchingInfo(id: number): JQueryDeferred<any> {
-  return apiClient.apiGetWithRefresh('/v1/watching', { id: id });
-}
+export const getWatchingInfo = (id: number): JQueryDeferred<WatchingInfoResponse> =>
+  apiClient.apiGetWithRefresh('/v1/watching', { id: id });
 
-export function markTime(id: number, video: number, time: number, season?: number): JQueryDeferred<any> {
-  const params: Record<string, any> = { id: id, video: video, time: time };
+export const markTime = (id: number, video: number, time: number, season?: number): JQueryDeferred<unknown> => {
+  const params: Record<string, number> = { id: id, video: video, time: time };
   if (season !== undefined) {
     params.season = season;
   }
   return apiClient.apiGetWithRefresh('/v1/watching/marktime', params);
-}
+};
 
-export function toggleWatched(id: number, video: number, season?: number): JQueryDeferred<any> {
-  const params: Record<string, any> = { id: id, video: video };
+export const toggleWatched = (id: number, video: number, season?: number): JQueryDeferred<unknown> => {
+  const params: Record<string, number> = { id: id, video: video };
   if (season !== undefined) {
     params.season = season;
   }
   return apiClient.apiGetWithRefresh('/v1/watching/toggle', params);
-}
+};

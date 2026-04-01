@@ -1,5 +1,6 @@
 import $ from 'jquery';
 import { apiClient } from './client';
+import { DeviceInfoResponse, DeviceSettingsResponse, VipCheckResponse } from '../types/api';
 
 export interface UserProfile {
   readonly username: string;
@@ -23,7 +24,7 @@ export class DeviceApi {
   private cachedVip: boolean | null = null;
   private cachedProfile: UserProfile | null = null;
 
-  readonly getCurrentDeviceInfo = (): JQueryDeferred<any> =>
+  readonly getCurrentDeviceInfo = (): JQueryDeferred<DeviceInfoResponse> =>
     apiClient.apiGetWithRefresh('/v1/device/info');
 
   readonly getDeviceId = (): JQueryDeferred<number> => {
@@ -33,10 +34,9 @@ export class DeviceApi {
       return d;
     }
     this.getCurrentDeviceInfo().then(
-      (res: any) => {
-        const data = Array.isArray(res) ? res[0] : res;
-        if (data && data.device && data.device.id) {
-          this.cachedDeviceId = data.device.id;
+      (res) => {
+        if (res && res.device && res.device.id) {
+          this.cachedDeviceId = res.device.id;
           d.resolve(this.cachedDeviceId!);
         } else {
           d.reject();
@@ -47,13 +47,13 @@ export class DeviceApi {
     return d;
   };
 
-  readonly getDeviceSettings = (): JQueryDeferred<any> => {
-    const d = $.Deferred();
+  readonly getDeviceSettings = (): JQueryDeferred<DeviceSettingsResponse> => {
+    const d = $.Deferred<DeviceSettingsResponse>();
     this.getDeviceId().then(
       (id: number) => {
-        apiClient.apiGetWithRefresh('/v1/device/' + id + '/settings').then(
-          (res: any) => { d.resolve(res); },
-          (err: any) => { d.reject(err); }
+        apiClient.apiGetWithRefresh<DeviceSettingsResponse>('/v1/device/' + id + '/settings').then(
+          (res) => { d.resolve(res); },
+          (err) => { d.reject(err); }
         );
       },
       () => { d.reject(); }
@@ -61,7 +61,7 @@ export class DeviceApi {
     return d;
   };
 
-  readonly unlinkDevice = (): JQueryDeferred<any> =>
+  readonly unlinkDevice = (): JQueryDeferred<unknown> =>
     apiClient.apiPostWithRefresh('/v1/device/unlink');
 
   readonly checkVip = (forceRefresh = false): JQueryDeferred<boolean> => {
@@ -80,7 +80,7 @@ export class DeviceApi {
           return;
         }
         $.ajax({ url: '/api/vip-check', method: 'GET', data: { login: parsed.username }, dataType: 'json' }).then(
-          (r: any) => { this.cachedVip = !!(r && r.vip); d.resolve(this.cachedVip!); },
+          (r: VipCheckResponse) => { this.cachedVip = !!(r && r.vip); d.resolve(this.cachedVip!); },
           () => { this.cachedVip = false; d.resolve(false); }
         );
       },
@@ -91,13 +91,13 @@ export class DeviceApi {
 
   readonly getUserProfile = (): UserProfile | null => this.cachedProfile;
 
-  readonly saveDeviceSettings = (settings: Record<string, any>): JQueryDeferred<any> => {
+  readonly saveDeviceSettings = (settings: Record<string, unknown>): JQueryDeferred<unknown> => {
     const d = $.Deferred();
     this.getDeviceId().then(
       (id: number) => {
         apiClient.apiPost('/v1/device/' + id + '/settings', settings).then(
-          (res: any) => { d.resolve(res); },
-          (err: any) => { d.reject(err); }
+          (res: unknown) => { d.resolve(res); },
+          (err: JQueryXHR) => { d.reject(err); }
         );
       },
       () => { d.reject(); }

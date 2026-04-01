@@ -1,14 +1,13 @@
 import $ from 'jquery';
 import * as doT from 'dot';
-import { Page, RouteParams } from '../types/app';
+import { RouteParams } from '../types/app';
 import { deviceApi } from '../api/device';
+import { DeviceSettingsResponse } from '../types/api';
 import { TvKey, platform } from '../utils/platform';
 import { storage, Storage } from '../utils/storage';
-import { PageKeys, PageUtils } from '../utils/page';
+import { PageUtils } from '../utils/page';
 import { sidebar } from '../sidebar';
-
-const $root = $('#page-settings');
-const keys = new PageKeys();
+import { SidebarPage } from './sidebar-page';
 
 interface SettingOption {
   id: number;
@@ -20,16 +19,10 @@ interface SettingOption {
 interface SettingItem {
   key: string;
   label: string;
-  type: string; // 'checkbox' | 'list'
+  type: string;
   value: any;
   options?: SettingOption[];
 }
-
-let allSettings: SettingItem[] = [];
-let focusedIndex = 0;
-let focusedOptionIndex = 0;
-let optionsOpen = false;
-let vipUser = false;
 
 const DISPLAY_KEYS: Record<string, boolean> = {
   serverLocation: true,
@@ -138,9 +131,9 @@ const buildQualitySetting = (): SettingItem => {
   return { key: '_defaultQuality', label: 'Качество по умолчанию', type: 'list', value: null, options: opts };
 };
 
-const buildSubSizeSetting = (): SettingItem => {
-  return { key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: storage.getSubSize() };
-};
+const buildSubSizeSetting = (): SettingItem => ({
+  key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: storage.getSubSize()
+});
 
 const buildStartPageSetting = (): SettingItem => {
   const savedId = storage.getStartPage();
@@ -180,227 +173,29 @@ const getDisplayValue = (item: SettingItem): string => {
   return item.value ? 'Вкл' : 'Выкл';
 };
 
-const render = (): void => {
-  let html = '';
-  for (let i = 0; i < allSettings.length; i++) {
-    html += tplSettingItem({
-      idx: i,
-      label: allSettings[i].label,
-      value: getDisplayValue(allSettings[i]),
-      focused: !optionsOpen && i === focusedIndex,
-      stepper: allSettings[i].type === 'stepper'
-    });
-  }
-  $root.html(tplPage({ items: html, version: __APP_VERSION__ }));
-};
+class SettingsPage extends SidebarPage {
+  private allSettings: SettingItem[] = [];
+  private focusedIndex = 0;
+  private focusedOptionIndex = 0;
+  private optionsOpen = false;
+  private vipUser = false;
 
-const renderOptions = (): void => {
-  const item = allSettings[focusedIndex];
-  if (!item) return;
+  constructor() { super('settings'); }
 
-  if (item.type === 'list' && item.options) {
-    const opts = item.options.map((o) => ({
-      label: o.label, selected: o.selected === 1
-    }));
-    $root.find('.settings-page__list').append(
-      '<div class="soptions-overlay">' +
-      tplOptions({ title: item.label, options: opts, focused: focusedOptionIndex }) +
-      '</div>'
-    );
-  } else {
-    const checkOpts = [
-      { label: 'Выкл', selected: !item.value },
-      { label: 'Вкл', selected: !!item.value }
-    ];
-    $root.find('.settings-page__list').append(
-      '<div class="soptions-overlay">' +
-      tplOptions({ title: item.label, options: checkOpts, focused: focusedOptionIndex }) +
-      '</div>'
-    );
-  }
-};
+  protected onUnfocus(): void { this.render(); }
 
-const closeOptions = (): void => {
-  optionsOpen = false;
-  $root.find('.soptions-overlay').remove();
-  render();
-};
-
-const applyOption = (): void => {
-  const item = allSettings[focusedIndex];
-  if (!item) return;
-
-  if (item.key === '_defaultQuality') {
-    if (item.options) {
-      for (let j = 0; j < item.options.length; j++) {
-        item.options[j].selected = (j === focusedOptionIndex) ? 1 : 0;
-      }
-      storage.setDefaultQuality(item.options[focusedOptionIndex].id);
-    }
-    closeOptions();
-    return;
-  }
-
-  if (item.key === '_startPage') {
-    if (item.options) {
-      for (let k = 0; k < item.options.length; k++) {
-        item.options[k].selected = (k === focusedOptionIndex) ? 1 : 0;
-      }
-      storage.setStartPage(Storage.START_PAGE_OPTIONS[focusedOptionIndex].id);
-    }
-    closeOptions();
-    return;
-  }
-
-  if (item.key === '_proxyMode') {
-    if (item.options) {
-      const available = storage.getAvailableProxyModes(vipUser);
-      for (let j = 0; j < item.options.length; j++) {
-        item.options[j].selected = (j === focusedOptionIndex) ? 1 : 0;
-      }
-      storage.setProxyMode(available[focusedOptionIndex].id);
-    }
-    closeOptions();
-    return;
-  }
-
-  const saveData: Record<string, any> = {};
-
-  if (item.type === 'list' && item.options) {
-    for (let i = 0; i < item.options.length; i++) {
-      item.options[i].selected = (i === focusedOptionIndex) ? 1 : 0;
-    }
-    saveData[item.key] = item.options[focusedOptionIndex].id;
-  } else {
-    item.value = focusedOptionIndex === 1 ? 1 : 0;
-    saveData[item.key] = item.value;
-  }
-
-  if (item.key === 'streamingType' && item.options) {
-    const stOpt = item.options[focusedOptionIndex];
-    storage.setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
-  }
-
-  deviceApi.saveDeviceSettings(saveData);
-  closeOptions();
-};
-
-const stepSubSize = (dir: number): void => {
-  const item = allSettings[focusedIndex];
-  if (!item || item.key !== '_subSize') return;
-  let size = item.value as number;
-  size = Math.max(Storage.SUB_SIZE_MIN, Math.min(Storage.SUB_SIZE_MAX, size + dir * Storage.SUB_SIZE_STEP));
-  item.value = size;
-  storage.setSubSize(size);
-  render();
-};
-
-const cycleListOption = (dir: number): void => {
-  const item = allSettings[focusedIndex];
-  if (!item || item.type !== 'list' || !item.options || item.options.length === 0) return;
-
-  let currentIdx = 0;
-  for (let i = 0; i < item.options.length; i++) {
-    if (item.options[i].selected) { currentIdx = i; break; }
-  }
-
-  const newIdx = currentIdx + dir;
-  if (newIdx < 0 || newIdx >= item.options.length) return;
-
-  focusedOptionIndex = newIdx;
-  applyOption();
-};
-
-const handleKey = sidebar.wrapKeys((e: JQuery.Event): void => {
-  if (optionsOpen) {
-    handleOptionsKey(e);
-    return;
-  }
-
-  const item = allSettings[focusedIndex];
-
-  switch (e.keyCode) {
-    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
-      sidebar.backOrFocus(e); break;
-    case TvKey.Up:
-      if (focusedIndex > 0) { focusedIndex--; render(); }
-      e.preventDefault(); break;
-    case TvKey.Down:
-      if (focusedIndex < allSettings.length - 1) { focusedIndex++; render(); }
-      e.preventDefault(); break;
-    case TvKey.Left:
-      if (item && item.type === 'stepper') { stepSubSize(-1); e.preventDefault(); }
-      else if (item && item.type === 'list') { cycleListOption(-1); e.preventDefault(); }
-      else { sidebar.focus(); e.preventDefault(); }
-      break;
-    case TvKey.Right:
-      if (item && item.type === 'stepper') { stepSubSize(1); e.preventDefault(); }
-      else if (item && item.type === 'list') { cycleListOption(1); e.preventDefault(); }
-      break;
-    case TvKey.Enter:
-      if (item && item.type === 'stepper') { e.preventDefault(); break; }
-      openOptions(); e.preventDefault(); break;
-  }
-});
-
-const openOptions = (): void => {
-  const item = allSettings[focusedIndex];
-  if (!item) return;
-
-  optionsOpen = true;
-
-  if (item.type === 'list' && item.options) {
-    focusedOptionIndex = 0;
-    for (let i = 0; i < item.options.length; i++) {
-      if (item.options[i].selected) { focusedOptionIndex = i; break; }
-    }
-  } else {
-    focusedOptionIndex = item.value ? 1 : 0;
-  }
-
-  renderOptions();
-};
-
-const handleOptionsKey = (e: JQuery.Event): void => {
-  const item = allSettings[focusedIndex];
-  const count = (item.type === 'list' && item.options) ? item.options.length : 2;
-
-  switch (e.keyCode) {
-    case TvKey.Up:
-      if (focusedOptionIndex > 0) {
-        focusedOptionIndex--;
-        $root.find('.soptions-overlay').remove();
-        renderOptions();
-      }
-      e.preventDefault(); break;
-    case TvKey.Down:
-      if (focusedOptionIndex < count - 1) {
-        focusedOptionIndex++;
-        $root.find('.soptions-overlay').remove();
-        renderOptions();
-      }
-      e.preventDefault(); break;
-    case TvKey.Enter:
-      applyOption(); e.preventDefault(); break;
-    case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
-      closeOptions(); e.preventDefault(); break;
-  }
-};
-
-export const settingsPage: Page = {
-  mount(_params: RouteParams) {
-    allSettings = [];
-    focusedIndex = 0;
-    optionsOpen = false;
-    PageUtils.showSpinnerIn($root);
-
-    sidebar.setUnfocusHandler(() => render());
+  protected onMount(_params: RouteParams): void {
+    this.allSettings = [];
+    this.focusedIndex = 0;
+    this.optionsOpen = false;
+    PageUtils.showSpinnerIn(this.$root);
 
     $.when(deviceApi.getDeviceSettings(), deviceApi.checkVip(true)).then(
-      (res: any, isVip: boolean) => {
-        const data = Array.isArray(res) ? res[0] : res;
+      (res: any, isVip: any) => {
+        const data: DeviceSettingsResponse = Array.isArray(res) ? res[0] : res;
+        const vip: boolean = Array.isArray(isVip) ? isVip[0] : isVip;
         if (data && data.settings) {
-          allSettings = parseSettings(data.settings);
+          this.allSettings = parseSettings(data.settings);
           if (data.settings.streamingType && data.settings.streamingType.value) {
             const stValues = data.settings.streamingType.value;
             for (let si = 0; si < stValues.length; si++) {
@@ -408,26 +203,230 @@ export const settingsPage: Page = {
             }
           }
         }
-        vipUser = isVip;
-        if (!isVip) storage.downgradeProxyForNonVip();
-        allSettings.unshift(buildProxyModeSetting(isVip));
-        allSettings.unshift(buildSubSizeSetting());
-        allSettings.unshift(buildQualitySetting());
-        allSettings.unshift(buildStartPageSetting());
-        render();
+        this.vipUser = vip;
+        if (!vip) storage.downgradeProxyForNonVip();
+        this.allSettings.unshift(buildProxyModeSetting(vip));
+        this.allSettings.unshift(buildSubSizeSetting());
+        this.allSettings.unshift(buildQualitySetting());
+        this.allSettings.unshift(buildStartPageSetting());
+        this.render();
       },
       () => {
-        $root.html('<div class="settings-page"><div class="settings-page__title">Ошибка загрузки настроек</div></div>');
+        this.$root.html('<div class="settings-page"><div class="settings-page__title">Ошибка загрузки настроек</div></div>');
       }
     );
-
-    keys.bind(handleKey);
-  },
-
-  unmount() {
-    keys.unbind();
-    PageUtils.clearPage($root);
-    sidebar.setUnfocusHandler(null);
-    allSettings = [];
   }
-};
+
+  protected onUnmount(): void {
+    this.allSettings = [];
+  }
+
+  protected handleKey(e: JQuery.Event): void {
+    if (this.optionsOpen) {
+      this.handleOptionsKey(e);
+      return;
+    }
+
+    const item = this.allSettings[this.focusedIndex];
+
+    switch (e.keyCode) {
+      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
+        sidebar.backOrFocus(e); break;
+      case TvKey.Up:
+        if (this.focusedIndex > 0) { this.focusedIndex--; this.render(); }
+        e.preventDefault(); break;
+      case TvKey.Down:
+        if (this.focusedIndex < this.allSettings.length - 1) { this.focusedIndex++; this.render(); }
+        e.preventDefault(); break;
+      case TvKey.Left:
+        if (item && item.type === 'stepper') { this.stepSubSize(-1); e.preventDefault(); }
+        else if (item && item.type === 'list') { this.cycleListOption(-1); e.preventDefault(); }
+        else { sidebar.focus(); e.preventDefault(); }
+        break;
+      case TvKey.Right:
+        if (item && item.type === 'stepper') { this.stepSubSize(1); e.preventDefault(); }
+        else if (item && item.type === 'list') { this.cycleListOption(1); e.preventDefault(); }
+        break;
+      case TvKey.Enter:
+        if (item && item.type === 'stepper') { e.preventDefault(); break; }
+        this.openOptions(); e.preventDefault(); break;
+    }
+  }
+
+  private render(): void {
+    let html = '';
+    for (let i = 0; i < this.allSettings.length; i++) {
+      html += tplSettingItem({
+        idx: i,
+        label: this.allSettings[i].label,
+        value: getDisplayValue(this.allSettings[i]),
+        focused: !this.optionsOpen && i === this.focusedIndex,
+        stepper: this.allSettings[i].type === 'stepper'
+      });
+    }
+    this.$root.html(tplPage({ items: html, version: __APP_VERSION__ }));
+  }
+
+  private renderOptions(): void {
+    const item = this.allSettings[this.focusedIndex];
+    if (!item) return;
+
+    if (item.type === 'list' && item.options) {
+      const opts = item.options.map((o) => ({
+        label: o.label, selected: o.selected === 1
+      }));
+      this.$root.find('.settings-page__list').append(
+        '<div class="soptions-overlay">' +
+        tplOptions({ title: item.label, options: opts, focused: this.focusedOptionIndex }) +
+        '</div>'
+      );
+    } else {
+      const checkOpts = [
+        { label: 'Выкл', selected: !item.value },
+        { label: 'Вкл', selected: !!item.value }
+      ];
+      this.$root.find('.settings-page__list').append(
+        '<div class="soptions-overlay">' +
+        tplOptions({ title: item.label, options: checkOpts, focused: this.focusedOptionIndex }) +
+        '</div>'
+      );
+    }
+  }
+
+  private closeOptions(): void {
+    this.optionsOpen = false;
+    this.$root.find('.soptions-overlay').remove();
+    this.render();
+  }
+
+  private openOptions(): void {
+    const item = this.allSettings[this.focusedIndex];
+    if (!item) return;
+
+    this.optionsOpen = true;
+
+    if (item.type === 'list' && item.options) {
+      this.focusedOptionIndex = 0;
+      for (let i = 0; i < item.options.length; i++) {
+        if (item.options[i].selected) { this.focusedOptionIndex = i; break; }
+      }
+    } else {
+      this.focusedOptionIndex = item.value ? 1 : 0;
+    }
+
+    this.renderOptions();
+  }
+
+  private applyOption(): void {
+    const item = this.allSettings[this.focusedIndex];
+    if (!item) return;
+
+    if (item.key === '_defaultQuality') {
+      if (item.options) {
+        for (let j = 0; j < item.options.length; j++) {
+          item.options[j].selected = (j === this.focusedOptionIndex) ? 1 : 0;
+        }
+        storage.setDefaultQuality(item.options[this.focusedOptionIndex].id);
+      }
+      this.closeOptions();
+      return;
+    }
+
+    if (item.key === '_startPage') {
+      if (item.options) {
+        for (let k = 0; k < item.options.length; k++) {
+          item.options[k].selected = (k === this.focusedOptionIndex) ? 1 : 0;
+        }
+        storage.setStartPage(Storage.START_PAGE_OPTIONS[this.focusedOptionIndex].id);
+      }
+      this.closeOptions();
+      return;
+    }
+
+    if (item.key === '_proxyMode') {
+      if (item.options) {
+        const available = storage.getAvailableProxyModes(this.vipUser);
+        for (let j = 0; j < item.options.length; j++) {
+          item.options[j].selected = (j === this.focusedOptionIndex) ? 1 : 0;
+        }
+        storage.setProxyMode(available[this.focusedOptionIndex].id);
+      }
+      this.closeOptions();
+      return;
+    }
+
+    const saveData: Record<string, any> = {};
+
+    if (item.type === 'list' && item.options) {
+      for (let i = 0; i < item.options.length; i++) {
+        item.options[i].selected = (i === this.focusedOptionIndex) ? 1 : 0;
+      }
+      saveData[item.key] = item.options[this.focusedOptionIndex].id;
+    } else {
+      item.value = this.focusedOptionIndex === 1 ? 1 : 0;
+      saveData[item.key] = item.value;
+    }
+
+    if (item.key === 'streamingType' && item.options) {
+      const stOpt = item.options[this.focusedOptionIndex];
+      storage.setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
+    }
+
+    deviceApi.saveDeviceSettings(saveData);
+    this.closeOptions();
+  }
+
+  private stepSubSize(dir: number): void {
+    const item = this.allSettings[this.focusedIndex];
+    if (!item || item.key !== '_subSize') return;
+    let size = item.value as number;
+    size = Math.max(Storage.SUB_SIZE_MIN, Math.min(Storage.SUB_SIZE_MAX, size + dir * Storage.SUB_SIZE_STEP));
+    item.value = size;
+    storage.setSubSize(size);
+    this.render();
+  }
+
+  private cycleListOption(dir: number): void {
+    const item = this.allSettings[this.focusedIndex];
+    if (!item || item.type !== 'list' || !item.options || item.options.length === 0) return;
+
+    let currentIdx = 0;
+    for (let i = 0; i < item.options.length; i++) {
+      if (item.options[i].selected) { currentIdx = i; break; }
+    }
+
+    const newIdx = currentIdx + dir;
+    if (newIdx < 0 || newIdx >= item.options.length) return;
+
+    this.focusedOptionIndex = newIdx;
+    this.applyOption();
+  }
+
+  private handleOptionsKey(e: JQuery.Event): void {
+    const item = this.allSettings[this.focusedIndex];
+    const count = (item.type === 'list' && item.options) ? item.options.length : 2;
+
+    switch (e.keyCode) {
+      case TvKey.Up:
+        if (this.focusedOptionIndex > 0) {
+          this.focusedOptionIndex--;
+          this.$root.find('.soptions-overlay').remove();
+          this.renderOptions();
+        }
+        e.preventDefault(); break;
+      case TvKey.Down:
+        if (this.focusedOptionIndex < count - 1) {
+          this.focusedOptionIndex++;
+          this.$root.find('.soptions-overlay').remove();
+          this.renderOptions();
+        }
+        e.preventDefault(); break;
+      case TvKey.Enter:
+        this.applyOption(); e.preventDefault(); break;
+      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
+        this.closeOptions(); e.preventDefault(); break;
+    }
+  }
+}
+
+export const settingsPage = new SettingsPage();
