@@ -70,6 +70,16 @@ public class LogStore : IDisposable
         return (entries, total);
     }
 
+    public LogEntry[] QueryAll(LogsQuery q)
+    {
+        IEnumerable<LogEntry> rows = _col.Query().OrderByDescending(x => x.ServerTs).ToList();
+        if (!string.IsNullOrEmpty(q.Level))
+            rows = rows.Where(x => x.Level == q.Level);
+        if (!string.IsNullOrEmpty(q.Device))
+            rows = rows.Where(x => x.DeviceId.StartsWith(q.Device, StringComparison.OrdinalIgnoreCase));
+        return rows.ToArray();
+    }
+
     public int DeleteOlderThan(DateTimeOffset cutoff) =>
         _col.DeleteMany(x => x.ServerTs < cutoff);
 

@@ -174,9 +174,9 @@ function startSeek(dir: string): void {
   seekPos = Math.max(0, dur > 0 ? Math.min(seekPos, dur - 2) : seekPos);
   seekCount++;
 
-  plog.debug('startSeek {dir} seekPos={seekPos} step={step} count={count}', {
-    dir, seekPos, step, count: seekCount,
-  });
+  if (seekCount === 1) {
+    plog.debug('startSeek {dir} seekPos={seekPos} step={step}', { dir, seekPos, step });
+  }
 
   syncProgressState();
   updateProgress($root, progressState);
@@ -416,8 +416,9 @@ function playSource(url: string): void {
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   playSourceDebug = 'url=' + url.substring(0, 120);
   const cfg = buildHlsConfig();
-  plog.info('playSource startPosition={startPosition} url={url}', {
+  plog.info('playSource startPosition={startPosition} ua={ua} url={url}', {
     startPosition: cfg.startPosition || 0,
+    ua: navigator.userAgent,
     url: url.substring(0, 120),
   });
   const hls = new Hls(cfg);
@@ -462,7 +463,7 @@ function playSource(url: string): void {
 
 function onSourceReady(): void {
   if (!videoEl) return;
-  plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
+  plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: state.position, paused: state.paused, ct: videoEl.currentTime });
   if (state.position > 0) {
     const pos = state.position;
     const v = videoEl;
@@ -579,11 +580,31 @@ function playUrl(url: string, title: string): void {
     hideSpinner();
   });
   videoEl.addEventListener('playing', function () {
-    plog.info('video playing currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+    const v = videoEl;
+    const bl = v ? v.buffered.length : 0;
+    let br = '[none]';
+    if (v && bl > 0) {
+      const parts: string[] = [];
+      for (let i = 0; i < bl; i++) parts.push(v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1));
+      br = parts.join(',');
+    }
+    plog.info('video playing ct={ct} readyState={rs} buffered={br}', {
+      ct: v ? v.currentTime : -1, rs: v ? v.readyState : -1, br,
+    });
     hideSpinner();
   });
   videoEl.addEventListener('seeked', function () {
-    plog.debug('video seeked currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
+    const v = videoEl;
+    const bl = v ? v.buffered.length : 0;
+    let br = '[none]';
+    if (v && bl > 0) {
+      const parts: string[] = [];
+      for (let i = 0; i < bl; i++) parts.push(v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1));
+      br = parts.join(',');
+    }
+    plog.debug('video seeked ct={ct} readyState={rs} buffered={br}', {
+      ct: v ? v.currentTime : -1, rs: v ? v.readyState : -1, br,
+    });
     hideSpinner();
   });
   videoEl.addEventListener('error', function () {
@@ -715,19 +736,25 @@ function handleKey(e: JQuery.Event): void {
 
     case TvKey.Enter: case TvKey.PlayPause:
       if (!playbackStarted) break;
-      plog.info('key Enter/PlayPause paused={paused} videoElPaused={vp}', {
-        paused: state.paused, vp: videoEl.paused,
-      });
-      if (videoEl.paused) { videoEl.play(); state.paused = false; showOsd('play'); }
-      else { videoEl.pause(); state.paused = true; showOsd('pause'); }
+      if (videoEl.paused) {
+        plog.info('key Enter/PlayPause paused → play (was paused={paused} videoElPaused={vp})', {
+          paused: state.paused, vp: videoEl.paused,
+        });
+        videoEl.play(); state.paused = false; showOsd('play');
+      } else {
+        plog.info('key Enter/PlayPause play → paused (was paused={paused} videoElPaused={vp})', {
+          paused: state.paused, vp: videoEl.paused,
+        });
+        videoEl.pause(); state.paused = true; showOsd('pause');
+      }
       showBar(); break;
 
     case TvKey.Play:
-      plog.info('key Play paused={paused} videoElPaused={vp}', { paused: state.paused, vp: videoEl.paused });
+      plog.info('key Play (was paused={paused} videoElPaused={vp})', { paused: state.paused, vp: videoEl.paused });
       if (videoEl.paused) { videoEl.play(); state.paused = false; showOsd('play'); showBar(); }
       break;
     case TvKey.Pause:
-      plog.info('key Pause');
+      plog.info('key Pause (was paused={paused} videoElPaused={vp})', { paused: state.paused, vp: videoEl.paused });
       videoEl.pause(); state.paused = true; showOsd('pause'); showBar(); break;
 
     case TvKey.Left: case TvKey.Rw:
