@@ -22,8 +22,8 @@ export class DetailControls {
 
   readonly bookmarksTpl = (): string =>
     '<span class="detail__rating focusable" data-action="bookmark">' +
-    '<span class="detail__bookmark-arrow">\u25C0</span> ' +
-    'Закладки <span class="detail__rating-value detail__picker-name">-</span>' +
+    'Закладки <span class="detail__bookmark-arrow">\u25C0</span> ' +
+    '<span class="detail__rating-value detail__picker-name">-</span>' +
     ' <span class="detail__bookmark-arrow">\u25B6</span>' +
     '</span>' +
     '<span class="detail__bookmark-tags"></span>';
