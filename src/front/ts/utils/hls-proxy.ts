@@ -2,13 +2,22 @@ import { isProxyAll, getStreamingType } from './storage';
 import { isLegacyTizen } from './platform';
 import { Logger } from './log';
 
+const proxyLog = new Logger('hls-proxy');
+
 const proxyXhrSetup = (xhr: XMLHttpRequest, url: string): void => {
   if (url.startsWith('http://') || url.startsWith('https://')) {
     const isManifest = /\.m3u8(\?|$)/.test(url);
     const newUrl = isManifest
       ? '/hls/rewrite?audio=0&url=' + encodeURIComponent(url)
       : '/hls/proxy?url=' + encodeURIComponent(url);
+    proxyLog.debug('xhrSetup rewrite {type} {url}', {
+      type: isManifest ? 'manifest' : 'segment',
+      url: url.substring(0, 120),
+      newUrl: newUrl.substring(0, 120)
+    });
     xhr.open('GET', newUrl, true);
+  } else {
+    proxyLog.debug('xhrSetup passthrough {url}', { url: url.substring(0, 120) });
   }
 };
 

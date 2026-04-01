@@ -46,11 +46,16 @@ function buildCards(): string {
   let html = '';
   for (var i = 0; i < entries.length; i++) {
     const e = entries[i];
+    const isSerial = e.item.type === 'serial' || e.item.type === 'docuserial';
+    let extra = formatDate(e.last_seen);
+    if (isSerial && e.media.snumber != null && e.media.number != null) {
+      extra = 'S' + e.media.snumber + 'E' + e.media.number + ' · ' + extra;
+    }
     html += tplCard({
       id: e.item.id,
       poster: proxyPosterUrl(e.item.posters.medium),
       title: e.item.title,
-      extra: formatDate(e.last_seen)
+      extra: extra
     });
   }
   return html;

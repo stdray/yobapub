@@ -262,6 +262,7 @@ export interface HistoryMedia {
   readonly id: number;
   readonly title: string;
   readonly number?: number;
+  readonly snumber?: number;
   readonly duration: number;
   readonly thumbnail?: string;
 }

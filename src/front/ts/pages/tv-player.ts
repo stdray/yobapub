@@ -89,6 +89,40 @@ function startPlayback(streamUrl: string): void {
     hls.attachMedia(video);
     plog.debug('HLS attached to video element');
 
+    hls.on(HlsCtor.Events.MANIFEST_LOADING, (_e: unknown, data: { url?: string }) => {
+      plog.debug('HLS MANIFEST_LOADING', { url: data?.url ? data.url.substring(0, 120) : null });
+    });
+    hls.on(HlsCtor.Events.MANIFEST_LOADED, (_e: unknown, data: { levels?: unknown[] }) => {
+      plog.debug('HLS MANIFEST_LOADED', { levels: data?.levels ? data.levels.length : 0 });
+    });
+    hls.on(HlsCtor.Events.LEVEL_LOADING, (_e: unknown, data: { url?: string; level?: number }) => {
+      plog.debug('HLS LEVEL_LOADING', { level: data?.level, url: data?.url ? data.url.substring(0, 120) : null });
+    });
+    hls.on(HlsCtor.Events.LEVEL_LOADED, (_e: unknown, data: { level?: number; details?: { fragments?: unknown[] } }) => {
+      plog.debug('HLS LEVEL_LOADED', { level: data?.level, frags: data?.details?.fragments ? data.details.fragments.length : 0 });
+    });
+    hls.on(HlsCtor.Events.FRAG_LOADING, (_e: unknown, data: { frag?: { sn: number; url?: string } }) => {
+      plog.debug('HLS FRAG_LOADING', { sn: data?.frag?.sn, url: data?.frag?.url ? data.frag.url.substring(0, 120) : null });
+    });
+    hls.on(HlsCtor.Events.FRAG_LOADED, (_e: unknown, data: { frag?: { sn: number } }) => {
+      plog.debug('HLS FRAG_LOADED', { sn: data?.frag?.sn });
+    });
+
+    hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
+      plog.debug('HLS MANIFEST_PARSED');
+      if (video) {
+        video.play().catch((err: unknown) => {
+          plog.warn('autoplay blocked, trying muted', { error: String(err) });
+          if (video) {
+            video.muted = true;
+            video.play().catch((err2: unknown) => {
+              plog.error('muted play also failed', { error: String(err2) });
+            });
+          }
+        });
+      }
+    });
+
     hls.on(HlsCtor.Events.ERROR, (event: unknown, data: any) => {
       const errorInfo: Record<string, unknown> = {
         fatal: data?.fatal,

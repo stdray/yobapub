@@ -43,7 +43,7 @@ export function rewriteHlsManifest(manifest: string, audioIndex: number): string
 
 export function getRewrittenHlsUrl(url: string, audioIndex: number): string {
   const token = getAccessToken() || '';
-  return window.location.origin + '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
+  return '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
     (token ? '&access_token=' + encodeURIComponent(token) : '');
 }
 
