@@ -181,6 +181,7 @@ class Sidebar {
         if (this.activeRoute === 'watching') {
           const now = Date.now();
           if (now - this.lastBackTime < DOUBLE_BACK_MS) {
+            this.lastBackTime = 0;
             goBack();
           } else {
             this.lastBackTime = now;
