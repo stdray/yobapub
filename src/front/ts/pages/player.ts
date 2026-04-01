@@ -399,7 +399,7 @@ function buildHlsConfig(): Record<string, any> {
   cfg.maxMaxBufferLength = 30;
   cfg.maxBufferHole = 1.0;
   cfg.highBufferWatchdogPeriod = 10;
-  cfg.nudgeMaxRetry = 10;
+  cfg.nudgeMaxRetry = 0;
   cfg.abrEwmaFastLive = 5.0;
   cfg.abrEwmaSlowLive = 10.0;
   cfg.abrEwmaFastVoD = 5.0;
