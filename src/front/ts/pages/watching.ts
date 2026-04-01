@@ -7,7 +7,7 @@ import { navigate, setParams } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
 import { clearTokens, proxyPosterUrl } from '../utils/storage';
-import { unlinkDevice } from '../api/device';
+import { unlinkDevice, getUserProfile } from '../api/device';
 import { pageKeys, showSpinnerIn, clearPage, scrollIntoView } from '../utils/page';
 import { gridMove, gridPos } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
@@ -31,14 +31,24 @@ let moviesData: WatchingMovieItem[] = [];
 
 const tplMenuCompiled = doT.template(`
   <div class="sidebar">
+    {{?it.profile}}
+      <div class="sidebar__profile">
+        <img class="sidebar__avatar" src="{{=it.profile.avatar}}" />
+        <div class="sidebar__sub">{{=it.profile.days}} дн.</div>
+      </div>
+    {{?}}
     {{~it.items :item:idx}}
       <div class="sidebar__item{{?item.active}} active{{?}}{{?item.focused}} focused{{?}}" data-menu="{{=idx}}">{{=item.label}}</div>
     {{~}}
   </div>
 `);
 
-export const tplMenu = (data: { readonly items: Array<{ readonly label: string; readonly active: boolean; readonly focused: boolean }> }): string =>
-  tplMenuCompiled(data);
+interface MenuData {
+  readonly items: Array<{ readonly label: string; readonly active: boolean; readonly focused: boolean }>;
+  readonly profile: { readonly avatar: string; readonly days: number } | null;
+}
+
+export const tplMenu = (data: MenuData): string => tplMenuCompiled(data);
 
 const tplSectionCompiled = doT.template(`
   <div class="watching__section-title">{{=it.title}}</div>
@@ -67,7 +77,9 @@ function buildMenu(): string {
       focused: menuFocused && i === menuIndex
     });
   }
-  return tplMenu({ items: items });
+  const up = getUserProfile();
+  const profile = up && up.avatar ? { avatar: proxyPosterUrl(up.avatar), days: up.subscriptionDays } : null;
+  return tplMenu({ items, profile });
 }
 
 function buildRows(): string {
