@@ -15,14 +15,14 @@ import { getBookmarkFolders, getItemFolders, toggleBookmarkItem, createBookmarkF
 const $root = $('#page-movie');
 const keys = new PageKeys();
 
-type FocusArea = 'bookmark' | 'watchlist' | 'play';
+type FocusArea = 'watchlist' | 'play' | 'bookmarks';
 let focusArea: FocusArea = 'play';
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
 
 let allFolders: readonly BookmarkFolder[] = [];
 let itemFolderIds: ReadonlySet<number> = new Set();
-let selectedFolderIdx = 0;
+let pickerIdx = 0;
 
 const tplDetailCompiled = doT.template(`
   <div class="detail">
@@ -30,11 +30,12 @@ const tplDetailCompiled = doT.template(`
     <div class="detail__info">
       <div class="detail__title">{{=it.titleRu}}</div>
       {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
-      <div class="detail__meta detail__row"><span>{{=it.year}} &bull; {{=it.countries}}</span><span class="detail__inline-action" data-action="bookmark"><span class="icon-check">\u2713</span> <span class="detail__folder-name"></span></span></div>
+      <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
       <div class="detail__meta">{{=it.genres}}</div>
       {{?it.duration}}<div class="detail__meta">{{=it.duration}} &bull; {{=it.quality}}p</div>{{?}}
-      <div class="detail__ratings detail__row">{{=it.ratings}}<span class="detail__inline-action{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-check">\u2713</span> Я смотрю</span></div>
+      <div class="detail__ratings">{{=it.ratings}}<span class="detail__watchlist" data-action="watchlist">Я смотрю <span class="icon-check{{?it.inWatchlist}} checked{{?}}">\u2713</span></span></div>
       <div class="detail__actions">{{=it.buttons}}</div>
+      <div class="detail__bookmarks"><span class="detail__bookmarks-label">Закладки:</span><span class="detail__bookmark-tags"></span><span class="detail__bookmark-picker"><span class="detail__bookmark-arrow">\u25C0</span> <span class="detail__picker-name">-</span> <span class="icon-check">\u2713</span> <span class="detail__bookmark-arrow">\u25B6</span></span></div>
       <div class="detail__plot">{{=it.plot}}</div>
     </div>
   </div>
@@ -56,12 +57,21 @@ const tplDetail = (data: {
 }): string =>
   tplDetailCompiled(data);
 
-const updateFolderLabel = (): void => {
-  const folder = allFolders[selectedFolderIdx];
-  const name = folder ? folder.title : '-';
-  const isIn = folder ? itemFolderIds.has(folder.id) : false;
-  $root.find('.detail__folder-name').text(name);
-  $root.find('.detail__inline-action[data-action="bookmark"]').toggleClass('active', isIn);
+const renderBookmarks = (): void => {
+  const tags = allFolders
+    .filter((f) => itemFolderIds.has(f.id))
+    .map((f) => '<span class="detail__bookmark-tag">' + f.title + '</span>')
+    .join('');
+  $root.find('.detail__bookmark-tags').html(tags);
+
+  const folder = allFolders[pickerIdx];
+  if (folder) {
+    $root.find('.detail__picker-name').text(folder.title);
+    $root.find('.detail__bookmark-picker .icon-check').toggleClass('checked', itemFolderIds.has(folder.id));
+  } else {
+    $root.find('.detail__picker-name').text('-');
+    $root.find('.detail__bookmark-picker .icon-check').removeClass('checked');
+  }
 };
 
 const loadBookmarks = (itemId: number): void => {
@@ -69,14 +79,14 @@ const loadBookmarks = (itemId: number): void => {
     if (foldersResp.items.length > 0) {
       allFolders = foldersResp.items;
       itemFolderIds = new Set(itemFoldersResp.folders.map((f) => f.id));
-      selectedFolderIdx = 0;
-      updateFolderLabel();
+      pickerIdx = 0;
+      renderBookmarks();
     } else {
       createBookmarkFolder('Favorites').done((resp) => {
         allFolders = resp.items;
         itemFolderIds = new Set();
-        selectedFolderIdx = 0;
-        updateFolderLabel();
+        pickerIdx = 0;
+        renderBookmarks();
       });
     }
   });
@@ -93,8 +103,6 @@ const render = (item: Item): void => {
   const buttons = '<div class="btn" data-action="play">' +
     (resumeTime > 0 ? 'Продолжить с ' + formatDuration(resumeTime) : 'Смотреть') + '</div>';
 
-  const ratings = renderRatings(item);
-
   $root.html(tplDetail({
     poster: storage.proxyPosterUrl(item.posters.big),
     titleRu: title[0],
@@ -104,27 +112,27 @@ const render = (item: Item): void => {
     genres: item.genres.map((g) => g.title).join(', '),
     duration: item.duration ? formatDuration(item.duration.average) : '',
     quality: item.quality,
-    ratings: ratings,
+    ratings: renderRatings(item),
     buttons: buttons,
     plot: item.plot || '',
     inWatchlist: item.in_watchlist
   }));
 
   focusArea = 'play';
-  selectedFolderIdx = 0;
+  pickerIdx = 0;
   updateFocus();
-
   loadBookmarks(item.id);
 };
 
 const updateFocus = (): void => {
   $root.find('.btn').removeClass('focused');
-  $root.find('.detail__inline-action').removeClass('focused');
+  $root.find('.detail__watchlist').removeClass('focused');
+  $root.find('.detail__bookmark-picker').removeClass('focused');
 
-  if (focusArea === 'bookmark') {
-    $root.find('.detail__inline-action[data-action="bookmark"]').addClass('focused');
-  } else if (focusArea === 'watchlist') {
-    $root.find('.detail__inline-action[data-action="watchlist"]').addClass('focused');
+  if (focusArea === 'watchlist') {
+    $root.find('.detail__watchlist').addClass('focused');
+  } else if (focusArea === 'bookmarks') {
+    $root.find('.detail__bookmark-picker').addClass('focused');
   } else {
     $root.find('.btn').eq(0).addClass('focused');
   }
@@ -135,59 +143,62 @@ const handleKey = (e: JQuery.Event): void => {
     case TvKey.Return:
     case TvKey.Backspace:
     case TvKey.Escape:
-      router.goBack(); e.preventDefault(); return;
+      if (focusArea === 'bookmarks') {
+        focusArea = 'play'; updateFocus();
+      } else {
+        router.goBack();
+      }
+      e.preventDefault(); return;
   }
 
-  if (focusArea === 'bookmark') {
+  if (focusArea === 'watchlist') {
     switch (e.keyCode) {
-      case TvKey.Left:
-        if (selectedFolderIdx > 0) { selectedFolderIdx--; updateFolderLabel(); }
-        e.preventDefault(); break;
-      case TvKey.Right:
-        if (selectedFolderIdx < allFolders.length - 1) { selectedFolderIdx++; updateFolderLabel(); }
-        e.preventDefault(); break;
-      case TvKey.Down:
-        focusArea = 'watchlist'; updateFocus();
-        e.preventDefault(); break;
-      case TvKey.Enter: {
-        const folder = allFolders[selectedFolderIdx];
-        if (folder && currentItem) {
-          toggleBookmarkItem(currentItem.id, folder.id).done(() => {
-            const updated = new Set(itemFolderIds);
-            if (updated.has(folder.id)) { updated.delete(folder.id); } else { updated.add(folder.id); }
-            itemFolderIds = updated;
-            updateFolderLabel();
-          });
-        }
-        e.preventDefault(); break;
-      }
-    }
-  } else if (focusArea === 'watchlist') {
-    switch (e.keyCode) {
-      case TvKey.Up:
-        focusArea = 'bookmark'; updateFocus();
-        e.preventDefault(); break;
       case TvKey.Down:
         focusArea = 'play'; updateFocus();
         e.preventDefault(); break;
       case TvKey.Enter:
         if (currentItem) {
           toggleWatchlist(currentItem.id).done((resp) => {
-            $root.find('.detail__inline-action[data-action="watchlist"]').toggleClass('active', resp.watching);
+            $root.find('.detail__watchlist .icon-check').toggleClass('checked', resp.watching);
           });
         }
         e.preventDefault(); break;
     }
-  } else {
+  } else if (focusArea === 'play') {
     switch (e.keyCode) {
       case TvKey.Up:
         focusArea = 'watchlist'; updateFocus();
         e.preventDefault(); break;
+      case TvKey.Down:
+        focusArea = 'bookmarks'; updateFocus();
+        e.preventDefault(); break;
       case TvKey.Enter:
-        if (currentItem) {
-          router.navigateMoviePlayer(currentItem.id);
+        if (currentItem) { router.navigateMoviePlayer(currentItem.id); }
+        e.preventDefault(); break;
+    }
+  } else if (focusArea === 'bookmarks') {
+    switch (e.keyCode) {
+      case TvKey.Left:
+        if (pickerIdx > 0) { pickerIdx--; renderBookmarks(); }
+        e.preventDefault(); break;
+      case TvKey.Right:
+        if (pickerIdx < allFolders.length - 1) { pickerIdx++; renderBookmarks(); }
+        e.preventDefault(); break;
+      case TvKey.Up:
+        focusArea = 'play'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter: {
+        const folder = allFolders[pickerIdx];
+        if (folder && currentItem) {
+          toggleBookmarkItem(currentItem.id, folder.id).done(() => {
+            const updated = new Set(itemFolderIds);
+            if (updated.has(folder.id)) { updated.delete(folder.id); } else { updated.add(folder.id); }
+            itemFolderIds = updated;
+            renderBookmarks();
+          });
         }
         e.preventDefault(); break;
+      }
     }
   }
 };
@@ -199,9 +210,8 @@ export const moviePage: Page = {
     allFolders = [];
     itemFolderIds = new Set();
     PageUtils.showSpinnerIn($root);
-    const id = params.id!;
 
-    loadItemWithWatching(id,
+    loadItemWithWatching(params.id!,
       (item, watching) => {
         currentItem = item;
         watchingInfo = watching;

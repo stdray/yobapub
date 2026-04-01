@@ -286,12 +286,6 @@ html, body {
   margin-bottom: 16px;
 }
 
-.detail__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .detail__ratings {
   display: flex;
   align-items: center;
@@ -315,7 +309,8 @@ html, body {
   margin-bottom: 30px;
 }
 
-.detail__inline-action {
+/* Watchlist indicator in ratings row */
+.detail__watchlist {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -324,17 +319,16 @@ html, body {
   color: #888;
   border: 2px solid transparent;
   border-radius: 6px;
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-left: 20px;
+  margin-left: auto;
+  margin-right: 40px;
 }
 
-.detail__inline-action.focused {
+.detail__watchlist.focused {
   border-color: #e94560;
   color: #fff;
 }
 
-.detail__inline-action .icon-check {
+.icon-check {
   display: inline-block;
   width: 20px;
   height: 20px;
@@ -344,19 +338,61 @@ html, body {
   line-height: 20px;
   font-size: 14px;
   color: transparent;
-  flex-shrink: 0;
 }
 
-.detail__inline-action.active .icon-check {
+.icon-check.checked {
   background: #e94560;
   color: #fff;
 }
 
-.detail__folder-name {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Bookmarks row */
+.detail__bookmarks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 22px;
+  color: #aaa;
+  margin-bottom: 20px;
+  min-height: 32px;
+}
+
+.detail__bookmarks-label {
+  color: #888;
+  margin-right: 4px;
+}
+
+.detail__bookmark-tag {
+  padding: 2px 12px;
+  background: rgba(233, 69, 96, 0.2);
+  color: #e94560;
+  border-radius: 4px;
+  font-size: 20px;
+}
+
+.detail__bookmark-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  color: #888;
+  margin-left: auto;
+}
+
+.detail__bookmark-picker.focused {
+  border-color: #e94560;
+  color: #fff;
+}
+
+.detail__bookmark-arrow {
+  font-size: 18px;
+  color: #666;
+}
+
+.detail__bookmark-picker.focused .detail__bookmark-arrow {
+  color: #e94560;
 }
 
 .detail__actions {
