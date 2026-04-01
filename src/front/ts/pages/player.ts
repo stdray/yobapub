@@ -516,7 +516,9 @@ class PlayerController {
   private onSourceReady(): void {
     if (!this.videoEl) return;
     plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime });
-    if (this.state.position > 0) {
+    if (this.state.position > 0 && isLegacyTizen()) {
+      // Tizen 2.3: startPosition is ignored by hls.js on Chromium 28.
+      // Wait for playback to stabilize, then seek manually.
       const pos = this.state.position;
       const v = this.videoEl;
       let done = false;
