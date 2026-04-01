@@ -100,7 +100,7 @@ app.MapPost("/api/playback-error", async (HttpContext ctx, PlaybackErrorStore st
     return Results.Ok();
 });
 
-app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory factory, HttpContext ctx) =>
+app.MapGet("/hls/rewrite", async (string url, int audio, bool? proxy, IHttpClientFactory factory, HttpContext ctx) =>
 {
     if (string.IsNullOrEmpty(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
         (uri.Scheme != "http" && uri.Scheme != "https"))
@@ -140,7 +140,7 @@ app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory fact
     }
 
     var manifest = await response.Content.ReadAsStringAsync();
-    manifest = HlsRewriter.Rewrite(manifest, url, audio);
+    manifest = HlsRewriter.Rewrite(manifest, url, audio, proxy == true);
 
     return Results.Content(manifest, "application/x-mpegurl");
 });

@@ -76,9 +76,9 @@ function startPlayback(streamUrl: string): void {
 
     const hlsConfig: Record<string, any> = buildBaseHlsConfig();
 
-    if (applyHlsProxy(hlsConfig)) {
+    if (applyHlsProxy()) {
       plog.debug('Proxy enabled, will rewrite URLs');
-      streamUrl = '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0';
+      streamUrl = '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0&proxy=true';
     }
 
     hls = new HlsCtor(hlsConfig);

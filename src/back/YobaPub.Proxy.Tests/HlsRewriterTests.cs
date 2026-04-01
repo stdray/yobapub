@@ -167,4 +167,93 @@ public class HlsRewriterTests
         // exactly one DEFAULT=YES per group (3 groups)
         Assert.Equal(3, yesCount);
     }
+
+    // ── proxyUrls ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ProxyUrls_Hls4_VideoStreamUrlsRewrittenToProxy()
+    {
+        var manifest = Fixture("hls4_master.m3u8");
+        var result = HlsRewriter.Rewrite(manifest,
+            "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 2, proxyUrls: true);
+
+        var urlLines = result.Split('\n')
+            .Where(l => l.Length > 0 && l[0] != '#')
+            .ToList();
+
+        Assert.NotEmpty(urlLines);
+        Assert.All(urlLines, l =>
+        {
+            if (l.Contains(".m3u8"))
+                Assert.StartsWith("/hls/rewrite?url=", l);
+            else
+                Assert.StartsWith("/hls/proxy?url=", l);
+        });
+        Assert.DoesNotContain(urlLines, l => l.Contains("://cdn"));
+    }
+
+    [Fact]
+    public void ProxyUrls_Hls4_SubManifestsIncludeProxyTrue()
+    {
+        var manifest = Fixture("hls4_master.m3u8");
+        var result = HlsRewriter.Rewrite(manifest,
+            "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 2, proxyUrls: true);
+
+        var m3u8Lines = result.Split('\n')
+            .Where(l => l.StartsWith("/hls/rewrite?"))
+            .ToList();
+
+        Assert.NotEmpty(m3u8Lines);
+        Assert.All(m3u8Lines, l => Assert.Contains("&proxy=true", l));
+    }
+
+    [Fact]
+    public void ProxyUrls_Hls4_AudioUriRewrittenToProxy()
+    {
+        var manifest = Fixture("hls4_master.m3u8");
+        var result = HlsRewriter.Rewrite(manifest,
+            "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 2, proxyUrls: true);
+
+        var audioLines = result.Split('\n')
+            .Where(l => l.StartsWith("#EXT-X-MEDIA") && l.Contains("URI=\""))
+            .ToList();
+
+        Assert.NotEmpty(audioLines);
+        Assert.All(audioLines, l =>
+        {
+            Assert.Contains("URI=\"/hls/rewrite?url=", l);
+            Assert.Contains("&proxy=true", l);
+        });
+    }
+
+    [Fact]
+    public void ProxyUrls_Hls2_SegmentUrlsRewrittenToProxy()
+    {
+        var manifest = Fixture("hls2_media_playlist.m3u8");
+        var result = HlsRewriter.Rewrite(manifest,
+            "http://cdn2cdn.com/hls2/TOKEN/index-v1a1.m3u8?loc=ru", audioIndex: 2, proxyUrls: true);
+
+        var urlLines = result.Split('\n')
+            .Where(l => l.Length > 0 && l[0] != '#')
+            .ToList();
+
+        Assert.NotEmpty(urlLines);
+        Assert.All(urlLines, l => Assert.StartsWith("/hls/proxy?url=", l));
+    }
+
+    [Fact]
+    public void ProxyUrls_False_UrlsRemainAbsolute()
+    {
+        var manifest = Fixture("hls4_master.m3u8");
+        var result = HlsRewriter.Rewrite(manifest,
+            "http://cdn2cdn.com/hls4/TOKEN/137590.m3u8?loc=ru", audioIndex: 2, proxyUrls: false);
+
+        var urlLines = result.Split('\n')
+            .Where(l => l.Length > 0 && l[0] != '#')
+            .ToList();
+
+        Assert.NotEmpty(urlLines);
+        Assert.All(urlLines, l => Assert.Contains("://", l));
+        Assert.DoesNotContain(urlLines, l => l.StartsWith("/hls/"));
+    }
 }

@@ -15,7 +15,7 @@ public static class HlsRewriter
     private static readonly System.Text.RegularExpressions.Regex _relativeUri =
         new(@"URI=""([^""]+)""", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    public static string Rewrite(string manifest, string sourceUrl, int audioIndex)
+    public static string Rewrite(string manifest, string sourceUrl, int audioIndex, bool proxyUrls = false)
     {
         manifest = manifest.Replace("\r\n", "\n").Replace('\r', '\n');
         var baseUrl = sourceUrl[..(sourceUrl.LastIndexOf('/') + 1)];
@@ -49,6 +49,34 @@ public static class HlsRewriter
             if (line.Contains("URI=\""))
                 lines[i] = _relativeUri.Replace(lines[i], m =>
                     m.Groups[1].Value.Contains("://") ? m.Value : $"URI=\"{baseUrl}{m.Groups[1].Value}\"");
+        }
+
+        // rewrite absolute URLs to go through proxy
+        if (proxyUrls)
+        {
+            lines = lines.Select(l =>
+            {
+                var trimmed = l.Trim();
+                if (trimmed.Length > 0 && trimmed[0] != '#' && trimmed.Contains("://"))
+                {
+                    return trimmed.Contains(".m3u8")
+                        ? "/hls/rewrite?url=" + Uri.EscapeDataString(trimmed) + "&audio=" + audioIndex + "&proxy=true"
+                        : "/hls/proxy?url=" + Uri.EscapeDataString(trimmed);
+                }
+                if (trimmed.Contains("URI=\""))
+                {
+                    return _relativeUri.Replace(l, m =>
+                    {
+                        var uri = m.Groups[1].Value;
+                        if (!uri.Contains("://")) return m.Value;
+                        var rewritten = uri.Contains(".m3u8")
+                            ? "/hls/rewrite?url=" + Uri.EscapeDataString(uri) + "&audio=" + audioIndex + "&proxy=true"
+                            : "/hls/proxy?url=" + Uri.EscapeDataString(uri);
+                        return $"URI=\"{rewritten}\"";
+                    });
+                }
+                return l;
+            }).ToArray();
         }
 
         return string.Join('\n', lines);

@@ -6,7 +6,7 @@ import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
 import { getStreamingType } from '../utils/storage';
-import { buildBaseHlsConfig, applyHlsProxy, logPlaybackStart } from '../utils/hls-proxy';
+import { buildBaseHlsConfig, logPlaybackStart } from '../utils/hls-proxy';
 import { showHlsError } from '../utils/hls-error';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 import { Logger } from '../utils/log';
@@ -462,7 +462,6 @@ class PlayerController {
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
     this.playSourceDebug = 'url=' + url.substring(0, 120);
     const cfg = this.buildHlsConfig();
-    applyHlsProxy(cfg);
     logPlaybackStart(plog, url, { startPosition: cfg.startPosition || 0 });
     const hls = new Hls(cfg);
     this.hlsInstance = hls;
