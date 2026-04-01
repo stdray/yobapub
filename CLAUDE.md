@@ -75,4 +75,3 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 ## Backend Proxy
 
 `src/back/YobaPub.Proxy/` — .NET reverse proxy with HLS manifest rewriting (`HlsRewriter.cs`). Rewrites m3u8 URLs for audio track selection. Config in `appsettings.json`.
-

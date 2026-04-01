@@ -2,7 +2,7 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { loadItemWithWatching } from '../api/items';
-import { Item, Season, WatchingInfoItem } from '../types/api';
+import { Item, Season, BookmarkFolder, WatchingInfoItem } from '../types/api';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
@@ -10,20 +10,22 @@ import { renderRatings } from '../utils/templates';
 import { formatTimeShort } from '../utils/format';
 import { storage } from '../utils/storage';
 import { toggleWatchlist } from '../api/watching';
-import { showBookmarkPicker } from '../utils/bookmark-picker';
+import { getBookmarkFolders, getItemFolders, toggleBookmarkItem, createBookmarkFolder } from '../api/bookmarks';
 
 const $root = $('#page-serial');
 const keys = new PageKeys();
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
 
-const PLAY_BTN_COUNT = 3; // play, bookmark, watchlist
-type FocusArea = 'play' | 'seasons' | 'episodes';
+type FocusArea = 'bookmark' | 'watchlist' | 'play' | 'seasons' | 'episodes';
 let focusArea: FocusArea = 'play';
-let focusedPlayBtn = 0;
 let selectedSeason = 0;
 let focusedEpisode = 0;
 let focusedSeasonTab = 0;
+
+let allFolders: readonly BookmarkFolder[] = [];
+let itemFolderIds: ReadonlySet<number> = new Set();
+let selectedFolderIdx = 0;
 
 const tplDetailCompiled = doT.template(`
   <div class="detail">
@@ -31,11 +33,11 @@ const tplDetailCompiled = doT.template(`
     <div class="detail__info">
       <div class="detail__title">{{=it.titleRu}}</div>
       {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
-      <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
+      <div class="detail__meta detail__row"><span>{{=it.year}} &bull; {{=it.countries}}</span><span class="detail__inline-action" data-action="bookmark"><span class="icon-check">\u2713</span> <span class="detail__folder-name"></span></span></div>
       <div class="detail__meta">{{=it.genres}}</div>
-      {{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}
+      <div class="detail__ratings detail__row">{{=it.ratings}}<span class="detail__inline-action{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-check">\u2713</span> Я смотрю</span></div>
       <div class="detail__plot">{{=it.plot}}</div>
-      <div class="detail__actions"><div class="btn" data-action="play">{{=it.playLabel}}</div><div class="detail__actions-sep"></div><div class="detail__quick-btn" data-action="bookmark"><span class="icon-check">\u2713</span> Закладки</div><div class="detail__quick-btn{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-check">\u2713</span> Я смотрю</div></div>
+      <div class="detail__actions"><div class="btn" data-action="play">{{=it.playLabel}}</div></div>
       <div class="episodes">
         <div class="episodes__seasons">{{=it.seasonTabs}}</div>
         <div class="episodes__list">{{=it.episodes}}</div>
@@ -44,7 +46,7 @@ const tplDetailCompiled = doT.template(`
   </div>
 `);
 
-export const tplDetail = (data: {
+const tplDetail = (data: {
   readonly poster: string;
   readonly titleRu: string;
   readonly titleEn: string;
@@ -64,7 +66,7 @@ const tplSeasonTabCompiled = doT.template(`
   <div class="episodes__season-tab{{?it.active}} active{{?}}" data-season="{{=it.idx}}">Сезон {{=it.num}}</div>
 `);
 
-export const tplSeasonTab = (data: { readonly idx: number; readonly num: number; readonly active: boolean }): string =>
+const tplSeasonTab = (data: { readonly idx: number; readonly num: number; readonly active: boolean }): string =>
   tplSeasonTabCompiled(data);
 
 const tplEpisodeCompiled = doT.template(`
@@ -75,7 +77,7 @@ const tplEpisodeCompiled = doT.template(`
   </div>
 `);
 
-export const tplEpisode = (data: { readonly idx: number; readonly number: number; readonly title: string; readonly status: string }): string =>
+const tplEpisode = (data: { readonly idx: number; readonly number: number; readonly title: string; readonly status: string }): string =>
   tplEpisodeCompiled(data);
 
 const getEpisodeStatus = (seasonNum: number, epNum: number): { time: number; status: number } => {
@@ -134,6 +136,32 @@ const buildEpisodes = (season: Season | undefined): string => {
   return html;
 };
 
+const updateFolderLabel = (): void => {
+  const folder = allFolders[selectedFolderIdx];
+  const name = folder ? folder.title : '-';
+  const isIn = folder ? itemFolderIds.has(folder.id) : false;
+  $root.find('.detail__folder-name').text(name);
+  $root.find('.detail__inline-action[data-action="bookmark"]').toggleClass('active', isIn);
+};
+
+const loadBookmarks = (itemId: number): void => {
+  $.when(getBookmarkFolders(), getItemFolders(itemId)).done((foldersResp, itemFoldersResp) => {
+    if (foldersResp.items.length > 0) {
+      allFolders = foldersResp.items;
+      itemFolderIds = new Set(itemFoldersResp.folders.map((f) => f.id));
+      selectedFolderIdx = 0;
+      updateFolderLabel();
+    } else {
+      createBookmarkFolder('Favorites').done((resp) => {
+        allFolders = resp.items;
+        itemFolderIds = new Set();
+        selectedFolderIdx = 0;
+        updateFolderLabel();
+      });
+    }
+  });
+};
+
 const render = (item: Item): void => {
   const title = item.title.split(' / ');
   const seasons = item.seasons || [];
@@ -169,7 +197,7 @@ const render = (item: Item): void => {
 
   focusedSeasonTab = selectedSeason;
   focusArea = 'play';
-  focusedPlayBtn = 0;
+  selectedFolderIdx = 0;
   focusedEpisode = resumeEp ? resumeEp.episodeIdx : 0;
 
   updateFocus();
@@ -177,17 +205,22 @@ const render = (item: Item): void => {
   if (resumeEp) {
     $root.find('.episode').eq(resumeEp.episodeIdx).addClass('current');
   }
+
+  loadBookmarks(item.id);
 };
 
-const playButtons = (): JQuery => $root.find('.btn, .detail__quick-btn');
-
 const updateFocus = (): void => {
-  playButtons().removeClass('focused');
+  $root.find('.btn').removeClass('focused');
+  $root.find('.detail__inline-action').removeClass('focused');
   $root.find('.episodes__season-tab').removeClass('focused');
   $root.find('.episode').removeClass('focused');
 
-  if (focusArea === 'play') {
-    playButtons().eq(focusedPlayBtn).addClass('focused');
+  if (focusArea === 'bookmark') {
+    $root.find('.detail__inline-action[data-action="bookmark"]').addClass('focused');
+  } else if (focusArea === 'watchlist') {
+    $root.find('.detail__inline-action[data-action="watchlist"]').addClass('focused');
+  } else if (focusArea === 'play') {
+    $root.find('.btn').eq(0).addClass('focused');
   } else if (focusArea === 'seasons') {
     $root.find('.episodes__season-tab').eq(focusedSeasonTab).addClass('focused');
   } else if (focusArea === 'episodes') {
@@ -220,21 +253,56 @@ const handleKey = (e: JQuery.Event): void => {
       router.goBack(); e.preventDefault(); return;
   }
 
-  if (focusArea === 'play') {
+  if (focusArea === 'bookmark') {
     switch (e.keyCode) {
       case TvKey.Left:
-        if (focusedPlayBtn > 0) { focusedPlayBtn--; updateFocus(); }
+        if (selectedFolderIdx > 0) { selectedFolderIdx--; updateFolderLabel(); }
         e.preventDefault(); break;
       case TvKey.Right:
-        if (focusedPlayBtn < PLAY_BTN_COUNT - 1) { focusedPlayBtn++; updateFocus(); }
+        if (selectedFolderIdx < allFolders.length - 1) { selectedFolderIdx++; updateFolderLabel(); }
+        e.preventDefault(); break;
+      case TvKey.Down:
+        focusArea = 'watchlist'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter: {
+        const folder = allFolders[selectedFolderIdx];
+        if (folder && currentItem) {
+          toggleBookmarkItem(currentItem.id, folder.id).done(() => {
+            const updated = new Set(itemFolderIds);
+            if (updated.has(folder.id)) { updated.delete(folder.id); } else { updated.add(folder.id); }
+            itemFolderIds = updated;
+            updateFolderLabel();
+          });
+        }
+        e.preventDefault(); break;
+      }
+    }
+  } else if (focusArea === 'watchlist') {
+    switch (e.keyCode) {
+      case TvKey.Up:
+        focusArea = 'bookmark'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Down:
+        focusArea = 'play'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter:
+        if (currentItem) {
+          toggleWatchlist(currentItem.id).done((resp) => {
+            $root.find('.detail__inline-action[data-action="watchlist"]').toggleClass('active', resp.watching);
+          });
+        }
+        e.preventDefault(); break;
+    }
+  } else if (focusArea === 'play') {
+    switch (e.keyCode) {
+      case TvKey.Up:
+        focusArea = 'watchlist'; updateFocus();
         e.preventDefault(); break;
       case TvKey.Down:
         if (seasons.length > 0) { focusArea = 'seasons'; updateFocus(); }
         e.preventDefault(); break;
-      case TvKey.Enter: {
-        const $btn = playButtons().eq(focusedPlayBtn);
-        const action = $btn.data('action');
-        if (action === 'play' && currentItem) {
+      case TvKey.Enter:
+        if (currentItem) {
           const resume = findResumeEpisode();
           if (resume) {
             router.navigateSerialPlayer(currentItem.id, resume.season, resume.episode);
@@ -242,15 +310,8 @@ const handleKey = (e: JQuery.Event): void => {
             const firstEp = seasons[0].episodes[0];
             router.navigateSerialPlayer(currentItem.id, seasons[0].number, firstEp.number);
           }
-        } else if (action === 'bookmark' && currentItem) {
-          showBookmarkPicker(currentItem.id);
-        } else if (action === 'watchlist' && currentItem) {
-          toggleWatchlist(currentItem.id).done((resp) => {
-            $root.find('.detail__quick-btn[data-action="watchlist"]').toggleClass('active', resp.watching);
-          });
         }
         e.preventDefault(); break;
-      }
     }
   } else if (focusArea === 'seasons') {
     switch (e.keyCode) {
@@ -293,6 +354,7 @@ const handleKey = (e: JQuery.Event): void => {
 export const serialPage: Page = {
   mount(params: RouteParams) {
     currentItem = null; watchingInfo = null; selectedSeason = 0;
+    allFolders = []; itemFolderIds = new Set();
     PageUtils.showSpinnerIn($root);
     const id = params.id!;
 

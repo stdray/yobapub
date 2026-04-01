@@ -2,7 +2,7 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { loadItemWithWatching } from '../api/items';
-import { Item, WatchingInfoItem } from '../types/api';
+import { Item, BookmarkFolder, WatchingInfoItem } from '../types/api';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
@@ -10,14 +10,19 @@ import { renderRatings } from '../utils/templates';
 import { formatDuration } from '../utils/format';
 import { storage } from '../utils/storage';
 import { toggleWatchlist } from '../api/watching';
-import { showBookmarkPicker } from '../utils/bookmark-picker';
+import { getBookmarkFolders, getItemFolders, toggleBookmarkItem, createBookmarkFolder } from '../api/bookmarks';
 
 const $root = $('#page-movie');
 const keys = new PageKeys();
-const ACTION_COUNT = 3; // play, bookmark, watchlist
-let focusedBtn = 0;
+
+type FocusArea = 'bookmark' | 'watchlist' | 'play';
+let focusArea: FocusArea = 'play';
 let currentItem: Item | null = null;
 let watchingInfo: WatchingInfoItem | null = null;
+
+let allFolders: readonly BookmarkFolder[] = [];
+let itemFolderIds: ReadonlySet<number> = new Set();
+let selectedFolderIdx = 0;
 
 const tplDetailCompiled = doT.template(`
   <div class="detail">
@@ -25,17 +30,17 @@ const tplDetailCompiled = doT.template(`
     <div class="detail__info">
       <div class="detail__title">{{=it.titleRu}}</div>
       {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
-      <div class="detail__meta">{{=it.year}} &bull; {{=it.countries}}</div>
+      <div class="detail__meta detail__row"><span>{{=it.year}} &bull; {{=it.countries}}</span><span class="detail__inline-action" data-action="bookmark"><span class="icon-check">\u2713</span> <span class="detail__folder-name"></span></span></div>
       <div class="detail__meta">{{=it.genres}}</div>
       {{?it.duration}}<div class="detail__meta">{{=it.duration}} &bull; {{=it.quality}}p</div>{{?}}
-      {{?it.ratings}}<div class="detail__ratings">{{=it.ratings}}</div>{{?}}
-      <div class="detail__actions">{{=it.buttons}}<div class="detail__actions-sep"></div><div class="detail__quick-btn" data-action="bookmark"><span class="icon-check">\u2713</span> Закладки</div><div class="detail__quick-btn{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-check">\u2713</span> Я смотрю</div></div>
+      <div class="detail__ratings detail__row">{{=it.ratings}}<span class="detail__inline-action{{?it.inWatchlist}} active{{?}}" data-action="watchlist"><span class="icon-check">\u2713</span> Я смотрю</span></div>
+      <div class="detail__actions">{{=it.buttons}}</div>
       <div class="detail__plot">{{=it.plot}}</div>
     </div>
   </div>
 `);
 
-export const tplDetail = (data: {
+const tplDetail = (data: {
   readonly poster: string;
   readonly titleRu: string;
   readonly titleEn: string;
@@ -50,6 +55,32 @@ export const tplDetail = (data: {
   readonly inWatchlist: boolean;
 }): string =>
   tplDetailCompiled(data);
+
+const updateFolderLabel = (): void => {
+  const folder = allFolders[selectedFolderIdx];
+  const name = folder ? folder.title : '-';
+  const isIn = folder ? itemFolderIds.has(folder.id) : false;
+  $root.find('.detail__folder-name').text(name);
+  $root.find('.detail__inline-action[data-action="bookmark"]').toggleClass('active', isIn);
+};
+
+const loadBookmarks = (itemId: number): void => {
+  $.when(getBookmarkFolders(), getItemFolders(itemId)).done((foldersResp, itemFoldersResp) => {
+    if (foldersResp.items.length > 0) {
+      allFolders = foldersResp.items;
+      itemFolderIds = new Set(itemFoldersResp.folders.map((f) => f.id));
+      selectedFolderIdx = 0;
+      updateFolderLabel();
+    } else {
+      createBookmarkFolder('Favorites').done((resp) => {
+        allFolders = resp.items;
+        itemFolderIds = new Set();
+        selectedFolderIdx = 0;
+        updateFolderLabel();
+      });
+    }
+  });
+};
 
 const render = (item: Item): void => {
   const title = item.title.split(' / ');
@@ -79,15 +110,24 @@ const render = (item: Item): void => {
     inWatchlist: item.in_watchlist
   }));
 
-  focusedBtn = 0;
+  focusArea = 'play';
+  selectedFolderIdx = 0;
   updateFocus();
+
+  loadBookmarks(item.id);
 };
 
-const allButtons = (): JQuery => $root.find('.btn, .detail__quick-btn');
-
 const updateFocus = (): void => {
-  allButtons().removeClass('focused');
-  allButtons().eq(focusedBtn).addClass('focused');
+  $root.find('.btn').removeClass('focused');
+  $root.find('.detail__inline-action').removeClass('focused');
+
+  if (focusArea === 'bookmark') {
+    $root.find('.detail__inline-action[data-action="bookmark"]').addClass('focused');
+  } else if (focusArea === 'watchlist') {
+    $root.find('.detail__inline-action[data-action="watchlist"]').addClass('focused');
+  } else {
+    $root.find('.btn').eq(0).addClass('focused');
+  }
 };
 
 const handleKey = (e: JQuery.Event): void => {
@@ -96,25 +136,58 @@ const handleKey = (e: JQuery.Event): void => {
     case TvKey.Backspace:
     case TvKey.Escape:
       router.goBack(); e.preventDefault(); return;
-    case TvKey.Left:
-      if (focusedBtn > 0) { focusedBtn--; updateFocus(); }
-      e.preventDefault(); break;
-    case TvKey.Right:
-      if (focusedBtn < ACTION_COUNT - 1) { focusedBtn++; updateFocus(); }
-      e.preventDefault(); break;
-    case TvKey.Enter: {
-      const $btn = allButtons().eq(focusedBtn);
-      const action = $btn.data('action');
-      if (action === 'play' && currentItem) {
-        router.navigateMoviePlayer(currentItem.id);
-      } else if (action === 'bookmark' && currentItem) {
-        showBookmarkPicker(currentItem.id);
-      } else if (action === 'watchlist' && currentItem) {
-        toggleWatchlist(currentItem.id).done((resp) => {
-          $root.find('.detail__quick-btn[data-action="watchlist"]').toggleClass('active', resp.watching);
-        });
+  }
+
+  if (focusArea === 'bookmark') {
+    switch (e.keyCode) {
+      case TvKey.Left:
+        if (selectedFolderIdx > 0) { selectedFolderIdx--; updateFolderLabel(); }
+        e.preventDefault(); break;
+      case TvKey.Right:
+        if (selectedFolderIdx < allFolders.length - 1) { selectedFolderIdx++; updateFolderLabel(); }
+        e.preventDefault(); break;
+      case TvKey.Down:
+        focusArea = 'watchlist'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter: {
+        const folder = allFolders[selectedFolderIdx];
+        if (folder && currentItem) {
+          toggleBookmarkItem(currentItem.id, folder.id).done(() => {
+            const updated = new Set(itemFolderIds);
+            if (updated.has(folder.id)) { updated.delete(folder.id); } else { updated.add(folder.id); }
+            itemFolderIds = updated;
+            updateFolderLabel();
+          });
+        }
+        e.preventDefault(); break;
       }
-      e.preventDefault(); break;
+    }
+  } else if (focusArea === 'watchlist') {
+    switch (e.keyCode) {
+      case TvKey.Up:
+        focusArea = 'bookmark'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Down:
+        focusArea = 'play'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter:
+        if (currentItem) {
+          toggleWatchlist(currentItem.id).done((resp) => {
+            $root.find('.detail__inline-action[data-action="watchlist"]').toggleClass('active', resp.watching);
+          });
+        }
+        e.preventDefault(); break;
+    }
+  } else {
+    switch (e.keyCode) {
+      case TvKey.Up:
+        focusArea = 'watchlist'; updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter:
+        if (currentItem) {
+          router.navigateMoviePlayer(currentItem.id);
+        }
+        e.preventDefault(); break;
     }
   }
 };
@@ -123,6 +196,8 @@ export const moviePage: Page = {
   mount(params: RouteParams) {
     currentItem = null;
     watchingInfo = null;
+    allFolders = [];
+    itemFolderIds = new Set();
     PageUtils.showSpinnerIn($root);
     const id = params.id!;
 
