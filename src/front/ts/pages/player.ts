@@ -5,7 +5,9 @@ import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { goBack } from '../router';
 import { TvKey, isLegacyTizen } from '../utils/platform';
-import { getStreamingType, isProxyAll, proxyUrl } from '../utils/storage';
+import { getStreamingType } from '../utils/storage';
+import { applyHlsProxy, logPlaybackStart } from '../utils/hls-proxy';
+import { showHlsError } from '../utils/hls-error';
 import { pageKeys, showSpinnerIn, clearPage } from '../utils/page';
 import { Logger } from '../utils/log';
 
@@ -377,7 +379,6 @@ class PlayerController {
       const f = this.media.files[this.state.quality];
       let hlsUrl = this.getHlsUrl(f);
       if (!hlsUrl) return;
-      if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
       this.media.hlsUrl = hlsUrl;
       const audioIndex = this.media.audios.length > 0 ? this.media.audios[this.state.audio].index : 1;
       const rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
@@ -466,12 +467,8 @@ class PlayerController {
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
     this.playSourceDebug = 'url=' + url.substring(0, 120);
     const cfg = this.buildHlsConfig();
-    plog.info('playSource startPosition={startPosition} ua={ua} yobapub_ver={yobapub_ver} url={url}', {
-      startPosition: cfg.startPosition || 0,
-      ua: navigator.userAgent,
-      yobapub_ver: __APP_VERSION__,
-      url: url.substring(0, 120),
-    });
+    applyHlsProxy(cfg);
+    logPlaybackStart(plog, url, { startPosition: cfg.startPosition || 0 });
     const hls = new Hls(cfg);
     this.hlsInstance = hls;
     hls.on(Hls.Events.FRAG_LOADING, (_e: string, data: { frag?: { sn: number; start: number; duration: number } }) => {
@@ -506,7 +503,16 @@ class PlayerController {
         hls.recoverMediaError();
         return;
       }
-      this.showPlaybackError(null, url, 'hls fatal: type=' + data.type + ' details=' + data.details + (data.response ? ' status=' + data.response.code : ''));
+      this.destroyPlayer();
+      showHlsError(plog, this.$root, data, 'player');
+      this.keys.unbind();
+      this.keys.bind((e: JQuery.Event) => {
+        const kc = this.getKeyCode(e);
+        if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape) {
+          goBack();
+          e.preventDefault();
+        }
+      });
     });
     hls.loadSource(url);
     hls.attachMedia(this.videoEl);
@@ -552,6 +558,10 @@ class PlayerController {
     this.$root.find('.player__spinner').hide();
   }
 
+  private getHlsDomain(): string {
+    try { return new URL(this.media.hlsUrl).hostname; } catch { return ''; }
+  }
+
   private getVideoErrorMessage(error: MediaError | null): string {
     if (!error) return 'Неизвестная ошибка воспроизведения';
     switch (error.code) {
@@ -568,23 +578,22 @@ class PlayerController {
     }
   }
 
-  private showPlaybackError(error: MediaError | null, url: string, debugMsg?: string): void {
+  private showPlaybackError(error: MediaError | null, url: string): void {
     const msg = this.getVideoErrorMessage(error);
     const code = error ? error.code : 0;
     const detail = error && (error as { message?: string }).message ? (error as { message?: string }).message : '';
-    plog.error('playbackError {code} {msg} {detail} {debugMsg}', {
-      code, msg, detail: detail || null, debugMsg: debugMsg || null,
+    const domain = this.getHlsDomain();
+    plog.error('playbackError {code} {msg} {detail} {domain}', {
+      code, msg, detail: detail || null, domain,
       url: url.substring(0, 120), ua: navigator.userAgent,
     });
-    console.error('[Player] Playback error: code=' + code + ' msg=' + msg + (detail ? ' detail=' + detail : '') + ' url=' + url);
-    console.error('[Player] UA=' + navigator.userAgent);
     this.destroyPlayer();
     this.$root.html(
       '<div class="player">' +
         '<div class="player__title" style="padding:60px;">' +
           '<div>' + msg + '</div>' +
+          (domain ? '<div class="player__error-debug">' + domain + '</div>' : '') +
           '<div class="player__error-debug">Код ошибки: ' + code + '</div>' +
-          '<div class="player__error-debug">' + (debugMsg || this.playSourceDebug) + '</div>' +
           '<div class="player__error-debug">' + navigator.userAgent + '</div>' +
         '</div>' +
       '</div>'

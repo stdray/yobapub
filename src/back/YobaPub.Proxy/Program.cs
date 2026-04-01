@@ -145,6 +145,52 @@ app.MapGet("/hls/rewrite", async (string url, int audio, IHttpClientFactory fact
     return Results.Content(manifest, "application/x-mpegurl");
 });
 
+app.MapGet("/hls/proxy", async (string url, IHttpClientFactory factory, HttpContext ctx) =>
+{
+    if (string.IsNullOrEmpty(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+        (uri.Scheme != "http" && uri.Scheme != "https"))
+    {
+        ctx.Response.StatusCode = 400;
+        return;
+    }
+
+    using var client = factory.CreateClient("proxy");
+    using var req = new HttpRequestMessage(HttpMethod.Get, uri);
+
+    var skipHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { "Host", "Connection", "Transfer-Encoding" };
+    foreach (var h in ctx.Request.Headers)
+    {
+        if (skipHeaders.Contains(h.Key)) continue;
+        req.Headers.TryAddWithoutValidation(h.Key, h.Value.ToArray());
+    }
+
+    HttpResponseMessage response;
+    try
+    {
+        response = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError("HLS proxy exception: {msg} url={url}", ex.Message, url);
+        ctx.Response.StatusCode = 502;
+        return;
+    }
+
+    using (response)
+    {
+        ctx.Response.StatusCode = (int)response.StatusCode;
+
+        if (response.Content.Headers.ContentType != null)
+            ctx.Response.ContentType = response.Content.Headers.ContentType.ToString();
+
+        if (response.Content.Headers.ContentLength is { } len)
+            ctx.Response.ContentLength = len;
+
+        await response.Content.CopyToAsync(ctx.Response.Body);
+    }
+});
+
 app.MapGet("/.well-known/assetlinks.json", () => Results.Json(
     new[] {
         new {

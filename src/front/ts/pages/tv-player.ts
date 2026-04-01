@@ -4,7 +4,8 @@ import { goBack } from '../router';
 import { TvKey } from '../utils/platform';
 import { pageKeys, clearPage } from '../utils/page';
 import { Logger } from '../utils/log';
-import { isProxyAll } from '../utils/storage';
+import { applyHlsProxy, logPlaybackStart } from '../utils/hls-proxy';
+import { showHlsError } from '../utils/hls-error';
 
 const $root = $('#page-tv-player');
 const keys = pageKeys();
@@ -78,35 +79,15 @@ function startPlayback(streamUrl: string): void {
       maxMaxBufferLength: 60
     };
 
-    // If proxy is enabled, rewrite segment URLs to go through proxy
-    if (isProxyAll()) {
-      plog.debug('Proxy enabled, will rewrite segment URLs');
-
-      const rewriteUrl = (url: string): string => {
-        // Only rewrite absolute CDN URLs to proxy
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-          return '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=0';
-        }
-        return url;
-      };
-
-      hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
-        const rewritten = rewriteUrl(url);
-        if (rewritten !== url) {
-          plog.debug('Rewrote segment URL to proxy', {
-            from: url.substring(0, 60),
-            to: rewritten.substring(0, 60)
-          });
-        }
-        return { url: rewritten, xhr };
-      };
+    if (applyHlsProxy(hlsConfig)) {
+      plog.debug('Proxy enabled, will rewrite URLs');
+      streamUrl = '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0';
     }
 
     hls = new HlsCtor(hlsConfig);
-    plog.debug('HLS instance created', { proxyEnabled: isProxyAll() });
+    logPlaybackStart(plog, streamUrl);
 
     hls.loadSource(streamUrl);
-    plog.debug('HLS source loaded', { streamUrl: streamUrl.substring(0, 80) });
 
     hls.attachMedia(video);
     plog.debug('HLS attached to video element');
@@ -152,9 +133,16 @@ function startPlayback(streamUrl: string): void {
             plog.error('Recovery failed', { error: String(e) });
           }
         } else {
-          plog.error('Fatal HLS error, stopping playback');
           stopPlayback();
-          goBack();
+          showHlsError(plog, $root, data, 'tv-player');
+          keys.unbind();
+          keys.bind((e: JQuery.Event) => {
+            if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace ||
+                e.keyCode === TvKey.Escape || e.keyCode === TvKey.Stop) {
+              goBack();
+              e.preventDefault();
+            }
+          });
         }
       }
     });
