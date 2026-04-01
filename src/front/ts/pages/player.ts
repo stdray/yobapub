@@ -23,25 +23,8 @@ import { InfoState, updateInfoBadge, showInfo, hideInfo } from './player/info';
 
 const $root = $('#page-player');
 const keys = pageKeys();
-let markTimer: number | null = null;
-let videoEl: HTMLVideoElement | null = null;
 
-
-let currentItem: Item | null = null;
-let currentSeason: number | undefined;
-let currentEpisode: number | undefined;
-let currentVideo: number | undefined;
-
-let currentFiles: VideoFile[] = [];
-let currentAudios: AudioTrack[] = [];
-let currentSubs: Subtitle[] = [];
-let currentTitle = '';
-let currentDuration = 0;
-let currentHlsUrl = '';
-let hlsInstance: Hls | null = null;
-let playSourceDebug = '';
-let playbackStarted = false;
-
+// --- Interfaces ---
 
 interface PlayState {
   quality: number;
@@ -51,7 +34,57 @@ interface PlayState {
   paused: boolean;
 }
 
+interface MediaContext {
+  item: Item | null;
+  season: number | undefined;
+  episode: number | undefined;
+  video: number | undefined;
+  files: VideoFile[];
+  audios: AudioTrack[];
+  subs: Subtitle[];
+  title: string;
+  duration: number;
+  hlsUrl: string;
+}
+
+interface SeekState {
+  pos: number;
+  count: number;
+  dir: string;
+  active: boolean;
+  applyTimer: number | null;
+}
+
+// --- Module state ---
+
+let videoEl: HTMLVideoElement | null = null;
+let hlsInstance: Hls | null = null;
+let playSourceDebug = '';
+let playbackStarted = false;
+let markTimer: number | null = null;
+
+const media: MediaContext = {
+  item: null,
+  season: undefined,
+  episode: undefined,
+  video: undefined,
+  files: [],
+  audios: [],
+  subs: [],
+  title: '',
+  duration: 0,
+  hlsUrl: '',
+};
+
 let state: PlayState = { quality: 0, audio: 0, sub: -1, position: 0, paused: false };
+
+const seekState: SeekState = {
+  pos: -1,
+  count: 0,
+  dir: '',
+  active: false,
+  applyTimer: null,
+};
 
 // --- Progress state ---
 
@@ -66,12 +99,12 @@ const progressState: ProgressState = {
   barSeekEl: null
 };
 
-function syncProgressState(): void {
+const syncProgressState = (): void => {
   progressState.videoEl = videoEl;
-  progressState.currentDuration = currentDuration;
-  progressState.seeking = seeking;
-  progressState.seekPos = seekPos;
-}
+  progressState.currentDuration = media.duration;
+  progressState.seeking = seekState.active;
+  progressState.seekPos = seekState.pos;
+};
 
 // --- Panel state ---
 
@@ -83,48 +116,42 @@ const panelState: PanelState = {
   listSection: 0
 };
 
-function getInfoState(): InfoState {
-  return {
-    files: currentFiles,
-    audios: currentAudios,
-    subs: currentSubs,
-    selectedQuality: state.quality,
-    selectedAudio: state.audio,
-    selectedSub: state.sub
-  };
-}
+const getInfoState = (): InfoState => ({
+  files: media.files,
+  audios: media.audios,
+  subs: media.subs,
+  selectedQuality: state.quality,
+  selectedAudio: state.audio,
+  selectedSub: state.sub
+});
 
-function hasHlsUrl(): boolean {
-  return currentFiles.length > 0;
-}
+const hasHlsUrl = (): boolean => media.files.length > 0;
 
-function getPanelData(): PanelData {
-  return {
-    audioItems: getAudioItems(currentAudios, state.audio, videoEl),
-    subItems: getSubItems(currentSubs, state.sub),
-    qualityItems: getQualityItems(currentFiles, state.quality),
-    audioEnabled: currentAudios.length > 1 && hasHlsUrl(),
-    subsEnabled: currentSubs.length > 0,
-    qualityEnabled: currentFiles.length > 1
-  };
-}
+const getPanelData = (): PanelData => ({
+  audioItems: getAudioItems(media.audios, state.audio, videoEl),
+  subItems: getSubItems(media.subs, state.sub),
+  qualityItems: getQualityItems(media.files, state.quality),
+  audioEnabled: media.audios.length > 1 && hasHlsUrl(),
+  subsEnabled: media.subs.length > 0,
+  qualityEnabled: media.files.length > 1
+});
 
 const panelCallbacks: PanelCallbacks = {
-  onShowBar: function () { showBar(); },
-  onHideBar: function () { hideBar(); },
-  onClearBarTimer: function () { clearBarTimer(); },
-  onApplyAudio: function (idx) {
+  onShowBar: () => { showBar(); },
+  onHideBar: () => { hideBar(); },
+  onClearBarTimer: () => { clearBarTimer(); },
+  onApplyAudio: (idx) => {
     continuePlaying({ quality: state.quality, audio: idx, sub: state.sub, position: currentPosition(), paused: state.paused });
   },
-  onApplySub: function (menuIdx) {
+  onApplySub: (menuIdx) => {
     continuePlaying({ quality: state.quality, audio: state.audio, sub: menuIdx - 1, position: currentPosition(), paused: state.paused });
   },
-  onApplyQuality: function (idx) {
+  onApplyQuality: (idx) => {
     if (idx !== state.quality) {
       continuePlaying({ quality: idx, audio: state.audio, sub: state.sub, position: currentPosition(), paused: state.paused });
     }
   },
-  onSavePrefs: function () { doSavePrefs(); },
+  onSavePrefs: () => { doSavePrefs(); },
   getData: getPanelData
 };
 
@@ -133,7 +160,7 @@ const panelCallbacks: PanelCallbacks = {
 let toastTimer: number | null = null;
 let osdTimer: number | null = null;
 
-function showToast(text: string): void {
+const showToast = (text: string): void => {
   let $toast = $root.find('.player__toast');
   if ($toast.length === 0) {
     $root.find('.player').append('<div class="player__toast"></div>');
@@ -141,41 +168,35 @@ function showToast(text: string): void {
   }
   $toast.text(text).removeClass('hidden');
   if (toastTimer !== null) clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(function () { $toast.addClass('hidden'); toastTimer = null; }, 1500);
-}
+  toastTimer = window.setTimeout(() => { $toast.addClass('hidden'); toastTimer = null; }, 1500);
+};
 
-function showOsd(icon: string): void {
+const showOsd = (icon: string): void => {
   const symbols: Record<string, string> = { play: '\u25B6', pause: '\u275A\u275A', rw: '\u23EA', ff: '\u23E9' };
   $root.find('.player__osd').text(symbols[icon] || icon).removeClass('hidden');
   if (osdTimer) clearTimeout(osdTimer);
-  osdTimer = window.setTimeout(function () {
+  osdTimer = window.setTimeout(() => {
     $root.find('.player__osd').addClass('hidden');
     osdTimer = null;
   }, 700);
-}
+};
 
 // --- Seek ---
 
-let seekPos = -1;
-let seekCount = 0;
-let seekDir = '';
-let seeking = false;
-let seekApplyTimer: number | null = null;
-
-function startSeek(dir: string): void {
-  seeking = true;
-  if (seekDir !== dir) { seekDir = dir; seekCount = 0; }
-  if (seekPos === -1 && videoEl) seekPos = videoEl.currentTime;
+const startSeek = (dir: string): void => {
+  seekState.active = true;
+  if (seekState.dir !== dir) { seekState.dir = dir; seekState.count = 0; }
+  if (seekState.pos === -1 && videoEl) seekState.pos = videoEl.currentTime;
 
   syncProgressState();
-  const step = 10 + Math.pow(Math.min(seekCount, 3000), 3) / 1000;
+  const step = 10 + Math.pow(Math.min(seekState.count, 3000), 3) / 1000;
   const dur = getVideoDuration(progressState);
-  seekPos += dir === 'right' ? step : -step;
-  seekPos = Math.max(0, dur > 0 ? Math.min(seekPos, dur - 2) : seekPos);
-  seekCount++;
+  seekState.pos += dir === 'right' ? step : -step;
+  seekState.pos = Math.max(0, dur > 0 ? Math.min(seekState.pos, dur - 2) : seekState.pos);
+  seekState.count++;
 
-  if (seekCount === 1) {
-    plog.debug('startSeek {dir} seekPos={seekPos} step={step}', { dir, seekPos, step });
+  if (seekState.count === 1) {
+    plog.debug('startSeek {dir} seekPos={seekPos} step={step}', { dir, seekPos: seekState.pos, step });
   }
 
   syncProgressState();
@@ -183,55 +204,55 @@ function startSeek(dir: string): void {
   showOsd(dir === 'right' ? 'ff' : 'rw');
   showBar();
 
-  if (seekApplyTimer) clearTimeout(seekApplyTimer);
-  seekApplyTimer = window.setTimeout(applySeek, 2000);
-}
+  if (seekState.applyTimer) clearTimeout(seekState.applyTimer);
+  seekState.applyTimer = window.setTimeout(applySeek, 2000);
+};
 
-function applySeek(): void {
-  if (!seeking || seekPos < 0 || !videoEl) return;
+const applySeek = (): void => {
+  if (!seekState.active || seekState.pos < 0 || !videoEl) return;
   syncProgressState();
   const dur = getVideoDuration(progressState);
-  if (dur > 0) seekPos = Math.min(seekPos, dur - 2);
-  seekPos = Math.max(0, seekPos);
-  let pos = seekPos;
+  if (dur > 0) seekState.pos = Math.min(seekState.pos, dur - 2);
+  seekState.pos = Math.max(0, seekState.pos);
+  const pos = seekState.pos;
   plog.info('applySeek pos={pos} dur={dur}', { pos, dur });
   resetSeek();
   continuePlaying({ quality: state.quality, audio: state.audio, sub: state.sub, position: pos, paused: state.paused });
   showBar();
-}
+};
 
-function resetSeek(): void {
-  seekPos = -1; seekCount = 0; seekDir = ''; seeking = false;
-  if (seekApplyTimer) { clearTimeout(seekApplyTimer); seekApplyTimer = null; }
+const resetSeek = (): void => {
+  seekState.pos = -1; seekState.count = 0; seekState.dir = ''; seekState.active = false;
+  if (seekState.applyTimer) { clearTimeout(seekState.applyTimer); seekState.applyTimer = null; }
   $root.find('.player__bar-seek').text('');
-}
+};
 
 // --- Track navigation ---
 
-function navigateTrack(dir: number): boolean {
-  if (!currentItem) return false;
+const navigateTrack = (dir: number): boolean => {
+  if (!media.item) return false;
 
-  if (currentSeason !== undefined && currentEpisode !== undefined && currentItem.seasons) {
-    for (var si = 0; si < currentItem.seasons.length; si++) {
-      const s = currentItem.seasons[si];
-      if (s.number !== currentSeason) continue;
-      for (var ei = 0; ei < s.episodes.length; ei++) {
-        if (s.episodes[ei].number !== currentEpisode) continue;
+  if (media.season !== undefined && media.episode !== undefined && media.item.seasons) {
+    for (let si = 0; si < media.item.seasons.length; si++) {
+      const s = media.item.seasons[si];
+      if (s.number !== media.season) continue;
+      for (let ei = 0; ei < s.episodes.length; ei++) {
+        if (s.episodes[ei].number !== media.episode) continue;
         const targetIdx = ei + dir;
         if (targetIdx >= 0 && targetIdx < s.episodes.length) {
           savePosition(); destroyPlayer();
-          currentEpisode = s.episodes[targetIdx].number;
+          media.episode = s.episodes[targetIdx].number;
           remountTrack();
           return true;
         }
         const targetSeason = si + dir;
-        if (targetSeason >= 0 && targetSeason < currentItem.seasons.length) {
-          const ts = currentItem.seasons[targetSeason];
+        if (targetSeason >= 0 && targetSeason < media.item.seasons.length) {
+          const ts = media.item.seasons[targetSeason];
           const ep = dir > 0 ? ts.episodes[0] : ts.episodes[ts.episodes.length - 1];
           if (ep) {
             savePosition(); destroyPlayer();
-            currentSeason = ts.number;
-            currentEpisode = ep.number;
+            media.season = ts.number;
+            media.episode = ep.number;
             remountTrack();
             return true;
           }
@@ -239,54 +260,54 @@ function navigateTrack(dir: number): boolean {
         return false;
       }
     }
-  } else if (currentVideo !== undefined && currentItem.videos) {
-    const newVideo = currentVideo + dir;
-    if (newVideo >= 1 && newVideo <= currentItem.videos.length) {
+  } else if (media.video !== undefined && media.item.videos) {
+    const newVideo = media.video + dir;
+    if (newVideo >= 1 && newVideo <= media.item.videos.length) {
       savePosition(); destroyPlayer();
-      currentVideo = newVideo;
+      media.video = newVideo;
       remountTrack();
       return true;
     }
   }
   return false;
-}
+};
 
-function remountTrack(): void {
-  if (!currentItem) return;
-  let media: MediaInfo | null = null;
+const remountTrack = (): void => {
+  if (!media.item) return;
+  let found: MediaInfo | null = null;
   let pos = 0;
 
-  if (currentSeason !== undefined && currentEpisode !== undefined) {
-    media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
-    pos = getResumeTime(currentItem, currentSeason, currentEpisode);
-    wasWatched = isEpisodeWatched(currentItem, currentSeason, currentEpisode);
-  } else if (currentVideo !== undefined) {
-    media = findVideoMedia(currentItem, currentVideo);
-    pos = getResumeTime(currentItem, undefined, undefined, currentVideo);
-    wasWatched = isVideoWatched(currentItem, currentVideo);
+  if (media.season !== undefined && media.episode !== undefined) {
+    found = findEpisodeMedia(media.item, media.season, media.episode);
+    pos = getResumeTime(media.item, media.season, media.episode);
+    wasWatched = isEpisodeWatched(media.item, media.season, media.episode);
+  } else if (media.video !== undefined) {
+    found = findVideoMedia(media.item, media.video);
+    pos = getResumeTime(media.item, undefined, undefined, media.video);
+    wasWatched = isVideoWatched(media.item, media.video);
   }
 
-  if (!media) return;
+  if (!found) return;
 
-  const itemTitle = currentItem.title.split(' / ')[0];
-  currentTitle = media.title;
-  currentDuration = media.duration;
-  currentAudios = media.audios;
-  const prefs = currentItem ? getTitlePrefs(currentItem.id) : null;
+  const itemTitle = media.item.title.split(' / ')[0];
+  media.title = found.title;
+  media.duration = found.duration;
+  media.audios = found.audios;
+  const prefs = media.item ? getTitlePrefs(media.item.id) : null;
 
-  loadMediaLinks(media.mid, function (files, subs) {
-    currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
-    currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-    const q = restoreQualityIndex(currentFiles, prefs);
-    const a = restoreAudioIndex(currentAudios, prefs);
-    const s = restoreSubIndex(currentSubs, prefs);
+  loadMediaLinks(found.mid, (files, subs) => {
+    media.files = files.slice().sort((a, b) => b.w - a.w);
+    media.subs = subs.filter((s) => s.url && !s.embed);
+    const q = restoreQualityIndex(media.files, prefs);
+    const a = restoreAudioIndex(media.audios, prefs);
+    const sub = restoreSubIndex(media.subs, prefs);
 
-    if (currentFiles.length === 0) return;
-    continuePlaying({ quality: q, audio: a, sub: s, position: pos, paused: false }, itemTitle + ' - ' + currentTitle);
+    if (media.files.length === 0) return;
+    continuePlaying({ quality: q, audio: a, sub, position: pos, paused: false }, itemTitle + ' - ' + media.title);
   });
-}
+};
 
-function getHlsUrl(f: VideoFile): string {
+const getHlsUrl = (f: VideoFile): string => {
   const hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
   const hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
   if (isLegacyTizen()) return hls2;
@@ -294,14 +315,14 @@ function getHlsUrl(f: VideoFile): string {
   if (sp === 'hls4') return hls4;
   if (sp === 'hls2') return hls2;
   return hls4 || hls2;
-}
+};
 
-function currentPosition(): number {
-  if (seeking && seekPos >= 0) return seekPos;
+const currentPosition = (): number => {
+  if (seekState.active && seekState.pos >= 0) return seekState.pos;
   return videoEl ? videoEl.currentTime : 0;
-}
+};
 
-function continuePlaying(next: PlayState, title?: string): void {
+const continuePlaying = (next: PlayState, title?: string): void => {
   const needSource = next.quality !== state.quality || next.audio !== state.audio || !videoEl;
   const needSub = next.sub !== state.sub;
   const needSeek = !needSource && Math.abs(next.position - currentPosition()) > 2;
@@ -313,19 +334,19 @@ function continuePlaying(next: PlayState, title?: string): void {
   });
 
   state = { quality: next.quality, audio: next.audio, sub: next.sub, position: next.position, paused: next.paused };
-  if (seeking) resetSeek();
+  if (seekState.active) resetSeek();
 
   if (needSource) {
-    if (currentFiles.length === 0) return;
-    const f = currentFiles[state.quality];
+    if (media.files.length === 0) return;
+    const f = media.files[state.quality];
     let hlsUrl = getHlsUrl(f);
     if (!hlsUrl) return;
     if (isProxyAll()) hlsUrl = proxyUrl(hlsUrl);
-    currentHlsUrl = hlsUrl;
-    const audioIndex = currentAudios.length > 0 ? currentAudios[state.audio].index : 1;
+    media.hlsUrl = hlsUrl;
+    const audioIndex = media.audios.length > 0 ? media.audios[state.audio].index : 1;
     const rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
     if (!videoEl) {
-      playUrl(rewriteUrl, title || currentTitle);
+      playUrl(rewriteUrl, title || media.title);
     } else {
       showSpinner();
       playSource(rewriteUrl);
@@ -338,62 +359,62 @@ function continuePlaying(next: PlayState, title?: string): void {
   }
 
   if (needSub && videoEl) {
-    loadSubtitleTrack(videoEl, $root, currentSubs, state.sub);
+    loadSubtitleTrack(videoEl, $root, media.subs, state.sub);
   }
-}
+};
 
 // --- Bar show/hide ---
 
 let barTimer: number | null = null;
 let progressTimer: number | null = null;
 
-function startProgressTimer(): void {
+const startProgressTimer = (): void => {
   stopProgressTimer();
-  progressTimer = window.setInterval(function () {
+  progressTimer = window.setInterval(() => {
     syncProgressState();
     updateProgress($root, progressState);
   }, 1000);
-}
+};
 
-function stopProgressTimer(): void {
+const stopProgressTimer = (): void => {
   if (progressTimer !== null) { clearInterval(progressTimer); progressTimer = null; }
-}
+};
 
-function showBar(): void {
+const showBar = (): void => {
   $root.find('.player__header, .player__gradient, .player__bar').removeClass('hidden');
   showInfo($root, getInfoState());
   syncProgressState();
   updateProgress($root, progressState);
   startProgressTimer();
   clearBarTimer();
-  if (!panelState.open && !seeking) {
+  if (!panelState.open && !seekState.active) {
     barTimer = window.setTimeout(hideBar, 4000);
   }
-}
+};
 
-function hideBar(): void {
+const hideBar = (): void => {
   stopProgressTimer();
   $root.find('.player__header, .player__gradient, .player__bar').addClass('hidden');
   hideInfo($root);
-}
+};
 
-function clearBarTimer(): void {
+const clearBarTimer = (): void => {
   if (barTimer !== null) { clearTimeout(barTimer); barTimer = null; }
-}
+};
 
 // --- Audio / Sub / Quality switching ---
 
-function doSavePrefs(): void {
-  if (!currentItem) return;
-  saveCurrentPrefs(currentItem.id, currentFiles, currentAudios, currentSubs, state.quality, state.audio, state.sub);
-}
+const doSavePrefs = (): void => {
+  if (!media.item) return;
+  saveCurrentPrefs(media.item.id, media.files, media.audios, media.subs, state.quality, state.audio, state.sub);
+};
 
 
 
 // --- Playback ---
 
-function buildHlsConfig(): Record<string, any> {
-  const cfg: Record<string, any> = {};
+const buildHlsConfig = (): Record<string, number> => {
+  const cfg: Record<string, number> = {};
   if (state.position > 0) cfg.startPosition = state.position;
   cfg.maxBufferLength = 10;
   cfg.maxMaxBufferLength = 30;
@@ -408,11 +429,11 @@ function buildHlsConfig(): Record<string, any> {
   cfg.manifestLoadingMaxRetry = 3;
   cfg.levelLoadingMaxRetry = 4;
   return cfg;
-}
+};
 
-function playSource(url: string): void {
+const playSource = (url: string): void => {
   if (!videoEl) return;
-  currentHlsUrl = url;
+  media.hlsUrl = url;
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   playSourceDebug = 'url=' + url.substring(0, 120);
   const cfg = buildHlsConfig();
@@ -424,7 +445,7 @@ function playSource(url: string): void {
   });
   const hls = new Hls(cfg);
   hlsInstance = hls;
-  hls.on(Hls.Events.FRAG_LOADING, function (_e: any, data: any) {
+  hls.on(Hls.Events.FRAG_LOADING, (_e: string, data: { frag?: { sn: number; start: number; duration: number } }) => {
     const frag = data.frag;
     if (frag) {
       plog.info('hls FRAG_LOADING sn={sn} start={start} dur={dur}', {
@@ -432,11 +453,11 @@ function playSource(url: string): void {
       });
     }
   });
-  hls.on(Hls.Events.MANIFEST_PARSED, function () {
+  hls.on(Hls.Events.MANIFEST_PARSED, () => {
     plog.info('hls MANIFEST_PARSED');
     onSourceReady();
   });
-  hls.on(Hls.Events.ERROR, function (_e: any, data: any) {
+  hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {
     if (!data.fatal) {
       plog.debug('hls error (non-fatal) {type} {details} {reason} {fragUrl}', {
         type: data.type, details: data.details,
@@ -460,9 +481,9 @@ function playSource(url: string): void {
   });
   hls.loadSource(url);
   hls.attachMedia(videoEl);
-}
+};
 
-function onSourceReady(): void {
+const onSourceReady = (): void => {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: state.position, paused: state.paused, ct: videoEl.currentTime });
   if (state.position > 0) {
@@ -486,23 +507,23 @@ function onSourceReady(): void {
   }
   playbackStarted = true;
   if (state.sub >= 0 && videoEl) {
-    loadSubtitleTrack(videoEl, $root, currentSubs, state.sub);
+    loadSubtitleTrack(videoEl, $root, media.subs, state.sub);
   }
   hideSpinner();
   startMarkTimer();
   showBar();
   updateInfoBadge($root, getInfoState());
-}
+};
 
-function showSpinner(): void {
+const showSpinner = (): void => {
   $root.find('.player__spinner').show();
-}
+};
 
-function hideSpinner(): void {
+const hideSpinner = (): void => {
   $root.find('.player__spinner').hide();
-}
+};
 
-function getVideoErrorMessage(error: MediaError | null): string {
+const getVideoErrorMessage = (error: MediaError | null): string => {
   if (!error) return 'Неизвестная ошибка воспроизведения';
   switch (error.code) {
     case MediaError.MEDIA_ERR_ABORTED:
@@ -516,12 +537,12 @@ function getVideoErrorMessage(error: MediaError | null): string {
     default:
       return 'Ошибка воспроизведения (код: ' + error.code + ')';
   }
-}
+};
 
-function showPlaybackError(error: MediaError | null, url: string, debugMsg?: string): void {
-  let msg = getVideoErrorMessage(error);
-  let code = error ? error.code : 0;
-  const detail = error && (error as any).message ? (error as any).message : '';
+const showPlaybackError = (error: MediaError | null, url: string, debugMsg?: string): void => {
+  const msg = getVideoErrorMessage(error);
+  const code = error ? error.code : 0;
+  const detail = error && (error as { message?: string }).message ? (error as { message?: string }).message : '';
   plog.error('playbackError {code} {msg} {detail} {debugMsg}', {
     code, msg, detail: detail || null, debugMsg: debugMsg || null,
     url: url.substring(0, 120), ua: navigator.userAgent,
@@ -540,16 +561,16 @@ function showPlaybackError(error: MediaError | null, url: string, debugMsg?: str
     '</div>'
   );
   keys.unbind();
-  keys.bind(function (e: JQuery.Event) {
+  keys.bind((e: JQuery.Event) => {
     const kc = getKeyCode(e);
     if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape) {
       goBack();
       e.preventDefault();
     }
   });
-}
+};
 
-function playUrl(url: string, title: string): void {
+const playUrl = (url: string, title: string): void => {
   const itemTitle = title.split(' - ')[0] || title;
   const epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
   $root.html(tplPlayer({ title: itemTitle, episode: epTitle }));
@@ -560,23 +581,23 @@ function playUrl(url: string, title: string): void {
   progressState.barSeekEl = null;
 
   const sourceUrl = url;
-  videoEl.addEventListener('ended', function () {
+  videoEl.addEventListener('ended', () => {
     plog.info('video ended currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     if (!markedWatched) markWatched();
     if (!navigateTrack(1)) goBack();
   });
-  videoEl.addEventListener('waiting', function () {
+  videoEl.addEventListener('waiting', () => {
     plog.debug('video waiting currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     showSpinner();
   });
-  videoEl.addEventListener('seeking', function () {
+  videoEl.addEventListener('seeking', () => {
     plog.debug('video seeking currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
   });
-  videoEl.addEventListener('canplay', function () {
+  videoEl.addEventListener('canplay', () => {
     plog.debug('video canplay currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     hideSpinner();
   });
-  videoEl.addEventListener('playing', function () {
+  videoEl.addEventListener('playing', () => {
     const v = videoEl;
     const bl = v ? v.buffered.length : 0;
     let br = '[none]';
@@ -590,7 +611,7 @@ function playUrl(url: string, title: string): void {
     });
     hideSpinner();
   });
-  videoEl.addEventListener('seeked', function () {
+  videoEl.addEventListener('seeked', () => {
     const v = videoEl;
     const bl = v ? v.buffered.length : 0;
     let br = '[none]';
@@ -604,52 +625,52 @@ function playUrl(url: string, title: string): void {
     });
     hideSpinner();
   });
-  videoEl.addEventListener('error', function () {
+  videoEl.addEventListener('error', () => {
     const err2 = videoEl ? videoEl.error : null;
     plog.error('video error code={code} message={message}', {
       code: err2 ? err2.code : null,
-      message: err2 ? (err2 as any).message || null : null,
+      message: err2 ? (err2 as { message?: string }).message || null : null,
     });
     if (videoEl) showPlaybackError(videoEl.error, sourceUrl);
   });
 
   applySubSize();
   playSource(url);
-}
+};
 
 // --- Mark time ---
 
 let markedWatched = false;
 let wasWatched = false;
 
-function startMarkTimer(): void {
+const startMarkTimer = (): void => {
   stopMarkTimer();
   markedWatched = false;
-  markTimer = window.setInterval(function () {
-    if (!videoEl || !currentItem) return;
+  markTimer = window.setInterval(() => {
+    if (!videoEl || !media.item) return;
     const time = Math.floor(videoEl.currentTime);
     if (time <= 0) return;
-    if (currentSeason !== undefined && currentEpisode !== undefined) {
-      markTime(currentItem.id, currentEpisode, time, currentSeason);
-    } else if (currentVideo !== undefined) {
-      markTime(currentItem.id, currentVideo, time);
+    if (media.season !== undefined && media.episode !== undefined) {
+      markTime(media.item.id, media.episode, time, media.season);
+    } else if (media.video !== undefined) {
+      markTime(media.item.id, media.video, time);
     }
     // After ~30s of playback, reset watched status so the item
     // reappears as "in progress" instead of "watched".
     if (wasWatched) {
       wasWatched = false;
       plog.info('resetting watched status after 30s of playback');
-      if (currentSeason !== undefined && currentEpisode !== undefined) {
-        toggleWatched(currentItem.id, currentEpisode, currentSeason);
-      } else if (currentVideo !== undefined) {
-        toggleWatched(currentItem.id, currentVideo);
+      if (media.season !== undefined && media.episode !== undefined) {
+        toggleWatched(media.item.id, media.episode, media.season);
+      } else if (media.video !== undefined) {
+        toggleWatched(media.item.id, media.video);
       }
     }
     if (!markedWatched) {
       syncProgressState();
       const dur = getVideoDuration(progressState);
       if (dur > 0) {
-        const isSerial = currentSeason !== undefined;
+        const isSerial = media.season !== undefined;
         const threshold = isSerial ? 120 : 420;
         if (dur - time <= threshold) {
           markedWatched = true;
@@ -658,33 +679,33 @@ function startMarkTimer(): void {
       }
     }
   }, 30000);
-}
+};
 
-function stopMarkTimer(): void {
+const stopMarkTimer = (): void => {
   if (markTimer !== null) { clearInterval(markTimer); markTimer = null; }
-}
+};
 
-function savePosition(): void {
-  if (!videoEl || !currentItem) return;
+const savePosition = (): void => {
+  if (!videoEl || !media.item) return;
   const time = Math.floor(videoEl.currentTime);
   if (time <= 0) return;
-  if (currentSeason !== undefined && currentEpisode !== undefined) {
-    markTime(currentItem.id, currentEpisode, time, currentSeason);
-  } else if (currentVideo !== undefined) {
-    markTime(currentItem.id, currentVideo, time);
+  if (media.season !== undefined && media.episode !== undefined) {
+    markTime(media.item.id, media.episode, time, media.season);
+  } else if (media.video !== undefined) {
+    markTime(media.item.id, media.video, time);
   }
-}
+};
 
-function markWatched(): void {
-  if (!currentItem) return;
-  if (currentSeason !== undefined && currentEpisode !== undefined) {
-    toggleWatched(currentItem.id, currentEpisode, currentSeason);
-  } else if (currentVideo !== undefined) {
-    toggleWatched(currentItem.id, currentVideo);
+const markWatched = (): void => {
+  if (!media.item) return;
+  if (media.season !== undefined && media.episode !== undefined) {
+    toggleWatched(media.item.id, media.episode, media.season);
+  } else if (media.video !== undefined) {
+    toggleWatched(media.item.id, media.video);
   }
-}
+};
 
-function destroyPlayer(): void {
+const destroyPlayer = (): void => {
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
@@ -703,17 +724,17 @@ function destroyPlayer(): void {
   progressState.barPctEl = null;
   progressState.barDurationEl = null;
   progressState.barSeekEl = null;
-  currentHlsUrl = '';
-}
+  media.hlsUrl = '';
+};
 
 // --- Keys ---
 
-function getKeyCode(e: JQuery.Event): number {
-  const orig = (e as any).originalEvent as KeyboardEvent;
+const getKeyCode = (e: JQuery.Event): number => {
+  const orig = (e as { originalEvent?: KeyboardEvent }).originalEvent;
   return (orig && orig.keyCode) ? orig.keyCode : (e.keyCode || 0);
-}
+};
 
-function handleKey(e: JQuery.Event): void {
+const handleKey = (e: JQuery.Event): void => {
   const kc = getKeyCode(e);
   if (!videoEl) {
     if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
@@ -775,72 +796,72 @@ function handleKey(e: JQuery.Event): void {
       changeSubSize(-1, showToast); break;
   }
   e.preventDefault();
-}
+};
 
 // --- Page ---
 
-export var playerPage: Page = {
-  mount: function (params: RouteParams) {
-    currentItem = null;
-    currentSeason = params.season;
-    currentEpisode = params.episode;
-    currentVideo = params.video;
+export const playerPage: Page = {
+  mount: (params: RouteParams) => {
+    media.item = null;
+    media.season = params.season;
+    media.episode = params.episode;
+    media.video = params.video;
     playbackStarted = false;
     panelState.open = false;
     panelState.listOpen = false;
-    currentFiles = [];
-    currentAudios = [];
-    currentSubs = [];
+    media.files = [];
+    media.audios = [];
+    media.subs = [];
     state = { quality: 0, audio: 0, sub: -1, position: 0, paused: false };
 
     showSpinnerIn($root);
-    let id = params.id!;
+    const id = params.id!;
 
     getItem(id).then(
-      function (itemRes: any) {
+      (itemRes: { item: Item }) => {
         const data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
-        currentItem = data.item;
-        if (!currentItem) return;
+        media.item = data.item;
+        if (!media.item) return;
 
-        let media: MediaInfo | null = null;
+        let found: MediaInfo | null = null;
         let pos = 0;
 
-        if (currentSeason !== undefined && currentEpisode !== undefined) {
-          media = findEpisodeMedia(currentItem, currentSeason, currentEpisode);
-          pos = getResumeTime(currentItem, currentSeason, currentEpisode);
-          wasWatched = isEpisodeWatched(currentItem, currentSeason, currentEpisode);
-        } else if (currentVideo !== undefined) {
-          media = findVideoMedia(currentItem, currentVideo);
-          pos = getResumeTime(currentItem, undefined, undefined, currentVideo);
-          wasWatched = isVideoWatched(currentItem, currentVideo);
+        if (media.season !== undefined && media.episode !== undefined) {
+          found = findEpisodeMedia(media.item, media.season, media.episode);
+          pos = getResumeTime(media.item, media.season, media.episode);
+          wasWatched = isEpisodeWatched(media.item, media.season, media.episode);
+        } else if (media.video !== undefined) {
+          found = findVideoMedia(media.item, media.video);
+          pos = getResumeTime(media.item, undefined, undefined, media.video);
+          wasWatched = isVideoWatched(media.item, media.video);
         }
 
-        if (!media) {
+        if (!found) {
           $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
           return;
         }
 
-        currentTitle = media.title;
-        currentDuration = media.duration;
-        currentAudios = media.audios;
-        const itemTitle = currentItem.title.split(' / ')[0];
-        const prefs = getTitlePrefs(currentItem.id);
+        media.title = found.title;
+        media.duration = found.duration;
+        media.audios = found.audios;
+        const itemTitle = media.item.title.split(' / ')[0];
+        const prefs = getTitlePrefs(media.item.id);
 
-        loadMediaLinks(media.mid, function (files, subs) {
-          currentFiles = files.slice().sort(function (a, b) { return b.w - a.w; });
-          currentSubs = subs.filter(function (s) { return s.url && !s.embed; });
-          const q = restoreQualityIndex(currentFiles, prefs);
-          const a = restoreAudioIndex(currentAudios, prefs);
-          const s = restoreSubIndex(currentSubs, prefs);
+        loadMediaLinks(found.mid, (files, subs) => {
+          media.files = files.slice().sort((a, b) => b.w - a.w);
+          media.subs = subs.filter((s) => s.url && !s.embed);
+          const q = restoreQualityIndex(media.files, prefs);
+          const a = restoreAudioIndex(media.audios, prefs);
+          const sub = restoreSubIndex(media.subs, prefs);
 
-          if (currentFiles.length === 0) {
+          if (media.files.length === 0) {
             $root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
             return;
           }
-          continuePlaying({ quality: q, audio: a, sub: s, position: pos, paused: false }, itemTitle + ' - ' + currentTitle);
+          continuePlaying({ quality: q, audio: a, sub, position: pos, paused: false }, itemTitle + ' - ' + media.title);
         });
       },
-      function () {
+      () => {
         $root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка загрузки</div></div>');
       }
     );
@@ -848,7 +869,7 @@ export var playerPage: Page = {
     keys.bind(handleKey);
   },
 
-  unmount: function () {
+  unmount: () => {
     destroyPlayer();
     keys.unbind();
     clearPage($root);
