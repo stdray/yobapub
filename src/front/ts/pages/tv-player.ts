@@ -84,11 +84,7 @@ function startPlayback(streamUrl: string): void {
     hls = new HlsCtor(hlsConfig);
     logPlaybackStart(plog, streamUrl);
 
-    hls.loadSource(streamUrl);
-
-    hls.attachMedia(video);
-    plog.debug('HLS attached to video element');
-
+    // Register all events before loadSource/attachMedia
     hls.on(HlsCtor.Events.MANIFEST_LOADING, (_e: unknown, data: { url?: string }) => {
       plog.debug('HLS MANIFEST_LOADING', { url: data?.url ? data.url.substring(0, 120) : null });
     });
@@ -177,6 +173,10 @@ function startPlayback(streamUrl: string): void {
         }
       }
     });
+
+    hls.loadSource(streamUrl);
+    hls.attachMedia(video);
+    plog.debug('HLS attached to video element');
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     plog.info('Using native HLS playback');
     video.src = streamUrl;

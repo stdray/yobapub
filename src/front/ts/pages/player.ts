@@ -478,11 +478,12 @@ class PlayerController {
       plog.info('hls MANIFEST_PARSED');
       this.onSourceReady();
     });
-    hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {
+    hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; error?: unknown; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {
       if (!data.fatal) {
-        plog.debug('hls error (non-fatal) {type} {details} {reason} {fragUrl}', {
+        plog.debug('hls error (non-fatal) {type} {details} {reason} {error} {fragUrl}', {
           type: data.type, details: data.details,
           reason: data.reason || null,
+          error: data.error ? String(data.error).substring(0, 200) : null,
           fragUrl: data.frag ? (data.frag.url || '').substring(0, 120) : null,
           fragSn: data.frag ? data.frag.sn : null,
           fragStart: data.frag ? data.frag.start : null,
