@@ -95,7 +95,7 @@ html, body {
   width: 280px;
   flex-shrink: 0;
   background: #16162a;
-  padding: 40px 0;
+  padding: 40px 0 40px 16px;
   display: flex;
   flex-direction: column;
 }
