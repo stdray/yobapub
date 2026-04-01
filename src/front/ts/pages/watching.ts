@@ -3,7 +3,7 @@ import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { getWatchingMovies, getWatchingSerials } from '../api/watching';
 import { WatchingSerialItem, WatchingMovieItem } from '../types/api';
-import { navigate, setParams } from '../router';
+import { navigate, setParams, goBack } from '../router';
 import { TvKey } from '../utils/platform';
 import { CARDS_PER_ROW } from '../settings';
 import { clearTokens, proxyPosterUrl } from '../utils/storage';
@@ -147,6 +147,9 @@ function updateFocus(): void {
   }
 }
 
+let lastBackTime = 0;
+const DOUBLE_BACK_MS = 3000;
+
 function handleKey(e: JQuery.Event): void {
   if (menuFocused) { handleMenuKey(e); return; }
   handleContentKey(e);
@@ -172,6 +175,17 @@ function handleMenuKey(e: JQuery.Event): void {
       else if (menuIndex === 6) { navigate('settings'); }
       else if (menuIndex === 7) { unlinkDevice().always(function () { clearTokens(); navigate('login'); }); }
       e.preventDefault(); break;
+    case TvKey.Return:
+    case TvKey.Backspace:
+    case TvKey.Escape: {
+      const now = Date.now();
+      if (now - lastBackTime < DOUBLE_BACK_MS) {
+        goBack();
+      } else {
+        lastBackTime = now;
+      }
+      e.preventDefault(); break;
+    }
   }
 }
 
@@ -221,6 +235,12 @@ function handleContentKey(e: JQuery.Event): void {
         const isSerial = item.type === 'serial' || item.type === 'docuserial';
         navigate(isSerial ? 'serial' : 'movie', { id: item.id });
       }
+      e.preventDefault(); break;
+    case TvKey.Return:
+    case TvKey.Backspace:
+    case TvKey.Escape:
+      menuFocused = true; updateFocus();
+      lastBackTime = Date.now();
       e.preventDefault(); break;
   }
 }

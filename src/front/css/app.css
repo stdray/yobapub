@@ -133,6 +133,7 @@ html, body {
   font-size: 28px;
   color: #888;
   cursor: pointer;
+  outline: none;
   border-left: 4px solid transparent;
 }
 
@@ -985,6 +986,55 @@ video::cue {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 5;
+}
+
+/* --- Exit dialog --- */
+.exit-dialog {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.exit-dialog.hidden { display: none; }
+
+.exit-dialog__box {
+  background: #1e1e3a;
+  border-radius: 16px;
+  padding: 48px 64px;
+  text-align: center;
+}
+
+.exit-dialog__text {
+  font-size: 36px;
+  color: #eee;
+  margin-bottom: 40px;
+}
+
+.exit-dialog__buttons {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+}
+
+.exit-dialog__btn {
+  font-size: 28px;
+  padding: 16px 48px;
+  border: 3px solid transparent;
+  border-radius: 10px;
+  color: #ccc;
+  cursor: pointer;
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.exit-dialog__btn.focused {
+  border-color: #e94560;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* --- History --- */

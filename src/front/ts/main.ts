@@ -2,7 +2,8 @@ import objectFitImages from 'object-fit-images';
 import '../css/app.css';
 import { configure } from './api/client';
 import { registerPage, navigate, setExitHandler } from './router';
-import { registerTizenKeys, getDeviceInfo } from './utils/platform';
+import { registerTizenKeys, getDeviceInfo, exitApp } from './utils/platform';
+import { showExitDialog } from './utils/exit-dialog';
 import { getAccessToken, getStartPage, setProxyAll } from './utils/storage';
 import { apiPostWithRefresh } from './api/client';
 import { loginPage } from './pages/login';
@@ -62,8 +63,12 @@ if (getAccessToken()) {
   navigate('login');
 }
 
-if ((window as any).NativeApp) {
-  setExitHandler(function() {
+const closeApp = (): void => {
+  if ((window as any).NativeApp) {
     (window as any).NativeApp.exit();
-  });
-}
+  } else {
+    exitApp();
+  }
+};
+
+setExitHandler(() => showExitDialog(closeApp));
