@@ -356,6 +356,11 @@ html, body {
   color: #e94560;
 }
 
+.detail__picker-name {
+  color: #888;
+  font-weight: normal;
+}
+
 .detail__bookmark-tag {
   font-size: 24px;
   margin-right: 30px;
