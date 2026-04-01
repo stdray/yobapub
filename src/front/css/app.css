@@ -331,15 +331,19 @@ html, body {
 
 /* Focusable rating-style items */
 .detail__rating.focusable {
+  padding: 6px 16px;
+  font-size: 22px;
+  background: #2a2a4a;
   border: 2px solid transparent;
   border-radius: 6px;
-  padding: 2px 8px;
-  margin-right: 22px;
+  color: #aaa;
   cursor: pointer;
+  outline: none;
 }
 
 .detail__rating.focusable.focused {
   border-color: #e94560;
+  color: #fff;
 }
 
 .detail__bookmark-arrow {
