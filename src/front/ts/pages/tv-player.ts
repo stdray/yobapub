@@ -27,6 +27,7 @@ function render(title: string): void {
   plog.debug('video element rendered', { videoExists: !!video });
 
   if (video) {
+    const v = video;
     // Логирование видео-событий
     video.addEventListener('play', () => plog.debug('video: play'));
     video.addEventListener('playing', () => plog.debug('video: playing'));
@@ -50,7 +51,7 @@ function render(title: string): void {
     video.addEventListener('loadeddata', () => plog.debug('video: loadeddata'));
     video.addEventListener('canplay', () => plog.debug('video: canplay'));
     video.addEventListener('canplaythrough', () => plog.debug('video: canplaythrough'));
-    video.addEventListener('durationchange', () => plog.debug('video: durationchange', { duration: video.duration }));
+    video.addEventListener('durationchange', () => plog.debug('video: durationchange', { duration: v.duration }));
     video.addEventListener('timeupdate', () => {
       // Not logging timeupdate as it fires constantly
     });

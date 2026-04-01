@@ -25,7 +25,6 @@ const $root = $('#page-player');
 const keys = pageKeys();
 let markTimer: number | null = null;
 let videoEl: HTMLVideoElement | null = null;
-let videoStalled = false;
 
 
 let currentItem: Item | null = null;
@@ -336,7 +335,6 @@ function continuePlaying(next: PlayState, title?: string): void {
 
   if (needSeek && videoEl) {
     videoEl.currentTime = next.position;
-    if (!next.paused) safePlay(videoEl);
   }
 
   if (needSub && videoEl) {
@@ -401,7 +399,7 @@ function buildHlsConfig(): Record<string, any> {
   cfg.maxMaxBufferLength = 30;
   cfg.maxBufferHole = 1.0;
   cfg.highBufferWatchdogPeriod = 10;
-  cfg.nudgeMaxRetry = 0;
+  cfg.nudgeMaxRetry = 10;
   cfg.abrEwmaFastLive = 5.0;
   cfg.abrEwmaSlowLive = 10.0;
   cfg.abrEwmaFastVoD = 5.0;
@@ -445,14 +443,6 @@ function playSource(url: string): void {
         fragSn: data.frag ? data.frag.sn : null,
         fragStart: data.frag ? data.frag.start : null,
       });
-      // If the fragment covering our resume position can't be parsed,
-      // skip past it so hls.js loads the next one.
-      if (data.details === 'fragParsingError' && data.frag && videoEl
-          && videoEl.readyState < 2 /* HAVE_CURRENT_DATA */) {
-        const skipTo = (data.frag.start || 0) + (data.frag.duration || 10) + 0.5;
-        plog.warn('skipping broken fragment, seeking to {skipTo}', { skipTo });
-        videoEl.currentTime = skipTo;
-      }
       return;
     }
     plog.error('hls fatal {type} {details} {status}', {
@@ -470,57 +460,30 @@ function playSource(url: string): void {
   hls.attachMedia(videoEl);
 }
 
-function safePlay(v: HTMLVideoElement): void {
-  plog.info('safePlay paused={paused} readyState={readyState} seeking={seeking} currentTime={ct}', {
-    paused: v.paused, readyState: v.readyState, seeking: v.seeking, ct: v.currentTime,
-  });
-  const pr = v.play();
-  if (pr && typeof (pr as any).catch === 'function') {
-    (pr as any).catch(function (err: Error) {
-      plog.error('play() rejected {name} {message}', { name: err.name, message: err.message });
-    });
-  }
-}
-
-
 function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused}', { pos: state.position, paused: state.paused });
-  if (state.position > 0 && hlsInstance) {
-    // Wait for hls.js to buffer a fragment near the resume position,
-    // then seek and play. On Tizen 2.3 (Chromium 28) seeking before data
-    // arrives causes a permanent stall.
+  if (state.position > 0) {
     const pos = state.position;
     const v = videoEl;
-    const hls = hlsInstance;
-    plog.info('onSourceReady waiting for frag near pos={pos}', { pos });
-    const onFragBuffered = (_e: any, data: any) => {
-      const frag = data.frag;
-      if (!frag) return;
-      const fragEnd = (frag.start || 0) + (frag.duration || 0);
-      plog.info('onSourceReady FRAG_BUFFERED sn={sn} start={start} end={end} target={pos}', {
-        sn: frag.sn, start: frag.start, end: fragEnd, pos,
-      });
-      // Skip fragments that are too far before our target
-      if (fragEnd < pos - 5) return;
-      hls.off(Hls.Events.FRAG_BUFFERED, onFragBuffered);
-      if (v !== videoEl) return;
-      // On Chromium 28, seeked event never fires on a paused video via MSE.
-      // Must call play() first, then seek — same as manual seek which works.
-      plog.info('onSourceReady frag ready, play then seek to {pos}', { pos });
-      safePlay(v);
-      window.setTimeout(() => {
-        if (v !== videoEl) return;
-        plog.info('onSourceReady seeking to {pos} ct={ct} seeking={seeking}', {
-          pos, ct: v.currentTime, seeking: v.seeking,
-        });
+    let seekDone = false;
+    let seekTimer: number | null = null;
+    const doSeek = function () {
+      if (seekDone) return;
+      seekDone = true;
+      if (seekTimer !== null) { clearTimeout(seekTimer); seekTimer = null; }
+      v.removeEventListener('playing', doSeek);
+      v.removeEventListener('canplay', doSeek);
+      if (Math.abs(v.currentTime - pos) > 2) {
         v.currentTime = pos;
-      }, 200);
+      }
     };
-    hls.on(Hls.Events.FRAG_BUFFERED, onFragBuffered);
+    v.addEventListener('playing', doSeek);
+    v.addEventListener('canplay', doSeek);
+    seekTimer = window.setTimeout(doSeek, 3000);
+    if (!state.paused) v.play();
   } else {
-    plog.info('onSourceReady no resume pos, calling play paused={paused}', { paused: state.paused });
-    if (!state.paused) safePlay(videoEl);
+    if (!state.paused) videoEl.play();
   }
   playbackStarted = true;
   if (state.sub >= 0 && videoEl) {
@@ -616,18 +579,12 @@ function playUrl(url: string, title: string): void {
     hideSpinner();
   });
   videoEl.addEventListener('playing', function () {
-    videoStalled = false;
     plog.info('video playing currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     hideSpinner();
   });
   videoEl.addEventListener('seeked', function () {
     plog.debug('video seeked currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
     hideSpinner();
-  });
-  videoEl.addEventListener('stalled', function () {
-    videoStalled = true;
-    plog.warn('video stalled currentTime={currentTime}', { currentTime: videoEl ? videoEl.currentTime : -1 });
-    showSpinner();
   });
   videoEl.addEventListener('error', function () {
     const err2 = videoEl ? videoEl.error : null;
@@ -710,7 +667,6 @@ function markWatched(): void {
 }
 
 function destroyPlayer(): void {
-  videoStalled = false;
   savePosition();
   stopMarkTimer();
   stopProgressTimer();
@@ -759,10 +715,10 @@ function handleKey(e: JQuery.Event): void {
 
     case TvKey.Enter: case TvKey.PlayPause:
       if (!playbackStarted) break;
-      plog.info('key Enter/PlayPause paused={paused} stalled={stalled} videoElPaused={vp}', {
-        paused: state.paused, stalled: videoStalled, vp: videoEl.paused,
+      plog.info('key Enter/PlayPause paused={paused} videoElPaused={vp}', {
+        paused: state.paused, vp: videoEl.paused,
       });
-      if (videoEl.paused || videoStalled) { videoStalled = false; safePlay(videoEl); state.paused = false; showOsd('play'); }
+      if (videoEl.paused) { videoEl.play(); state.paused = false; showOsd('play'); }
       else { videoEl.pause(); state.paused = true; showOsd('pause'); }
       showBar(); break;
 
