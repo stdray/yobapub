@@ -61,7 +61,7 @@ export class DeviceApi {
     return d;
   };
 
-  readonly unlinkDevice = (): JQueryDeferred<unknown> =>
+  readonly unlinkDevice = (): JQueryDeferred<void> =>
     apiClient.apiPostWithRefresh('/v1/device/unlink');
 
   readonly checkVip = (forceRefresh = false): JQueryDeferred<boolean> => {
@@ -91,7 +91,7 @@ export class DeviceApi {
 
   readonly getUserProfile = (): UserProfile | null => this.cachedProfile;
 
-  readonly saveDeviceSettings = (settings: Record<string, unknown>): JQueryDeferred<unknown> => {
+  readonly saveDeviceSettings = (settings: Record<string, number | string>): JQueryDeferred<void> => {
     const d = $.Deferred();
     this.getDeviceId().then(
       (id: number) => {

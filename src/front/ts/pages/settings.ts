@@ -355,7 +355,7 @@ class SettingsPage extends SidebarPage {
       return;
     }
 
-    const saveData: Record<string, any> = {};
+    const saveData: Record<string, number | string> = {};
 
     if (item.type === 'list' && item.options) {
       for (let i = 0; i < item.options.length; i++) {
