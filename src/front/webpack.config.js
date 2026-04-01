@@ -11,7 +11,7 @@ function getAppVersion() {
     var count = execSync('git rev-list --count HEAD', { encoding: 'utf-8' }).trim();
     return count + '-' + hash + ' (' + date + ')';
   } catch (e) {
-    return 'unknown';
+    return process.env.APP_VERSION || 'unknown';
   }
 }
 

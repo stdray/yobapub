@@ -51,6 +51,7 @@ jobs:
           IMAGE="ghcr.io/${{ github.repository }}"
           SHA="${{ github.sha }}"
           docker build \
+            --build-arg APP_VERSION="${SHA::7}" \
             -t "$IMAGE:${SHA::7}" \
             -t "$IMAGE:latest" \
             .

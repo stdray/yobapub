@@ -4,6 +4,8 @@ WORKDIR /src
 COPY src/front/package.json src/front/package-lock.json ./
 RUN npm ci
 COPY src/front/ .
+ARG APP_VERSION=unknown
+ENV APP_VERSION=$APP_VERSION
 RUN npx webpack --mode production
 
 # Stage 2: Build backend

@@ -61,3 +61,4 @@ local.properties
 old
 err/
 .claude
+*.tsv

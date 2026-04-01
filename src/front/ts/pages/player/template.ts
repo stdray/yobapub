@@ -2,7 +2,7 @@ import * as doT from 'dot';
 
 const tplPlayerCompiled = doT.template(`
   <div class="player">
-    <video preload="auto"></video>
+    <video></video>
     <div class="player__spinner"><div class="spinner__circle"></div></div>
     <div class="player__info hidden"></div>
     <div class="player__osd hidden"></div>

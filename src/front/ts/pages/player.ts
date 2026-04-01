@@ -399,7 +399,7 @@ function buildHlsConfig(): Record<string, any> {
   cfg.maxMaxBufferLength = 30;
   cfg.maxBufferHole = 1.0;
   cfg.highBufferWatchdogPeriod = 10;
-  cfg.nudgeMaxRetry = 0;
+  cfg.nudgeMaxRetry = 3;
   cfg.abrEwmaFastLive = 5.0;
   cfg.abrEwmaSlowLive = 10.0;
   cfg.abrEwmaFastVoD = 5.0;
@@ -416,9 +416,10 @@ function playSource(url: string): void {
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   playSourceDebug = 'url=' + url.substring(0, 120);
   const cfg = buildHlsConfig();
-  plog.info('playSource startPosition={startPosition} ua={ua} url={url}', {
+  plog.info('playSource startPosition={startPosition} ua={ua} ver={ver} url={url}', {
     startPosition: cfg.startPosition || 0,
     ua: navigator.userAgent,
+    ver: __APP_VERSION__,
     url: url.substring(0, 120),
   });
   const hls = new Hls(cfg);
@@ -464,22 +465,21 @@ function playSource(url: string): void {
 function onSourceReady(): void {
   if (!videoEl) return;
   plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: state.position, paused: state.paused, ct: videoEl.currentTime });
-  if (state.position > 0 && hlsInstance) {
+  if (state.position > 0) {
     const pos = state.position;
     const v = videoEl;
-    const hls = hlsInstance;
     let done = false;
-    const onFrag = (_e: any, _data: any) => {
-      if (done) return;
+    const onTimeUpdate = () => {
+      if (done || v !== videoEl) return;
+      if (v.currentTime < 1 && v.buffered.length === 0) return;
       done = true;
-      hls.off(Hls.Events.FRAG_BUFFERED, onFrag);
-      if (v !== videoEl) return;
-      plog.info('onSourceReady fragBuffered ct={ct} pos={pos}', { ct: v.currentTime, pos });
+      v.removeEventListener('timeupdate', onTimeUpdate);
+      plog.info('onSourceReady stable ct={ct}, seeking to {pos}', { ct: v.currentTime, pos });
       if (Math.abs(v.currentTime - pos) > 2) {
         v.currentTime = pos;
       }
     };
-    hls.on(Hls.Events.FRAG_BUFFERED, onFrag);
+    v.addEventListener('timeupdate', onTimeUpdate);
     v.play();
   } else {
     if (!state.paused) videoEl.play();
