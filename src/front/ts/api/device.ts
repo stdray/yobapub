@@ -47,9 +47,9 @@ export function unlinkDevice(): JQueryDeferred<any> {
   return apiPostWithRefresh('/v1/device/unlink');
 }
 
-export function checkVip(): JQueryDeferred<boolean> {
+export function checkVip(forceRefresh = false): JQueryDeferred<boolean> {
   const d = $.Deferred<boolean>();
-  if (cachedVip !== null) {
+  if (cachedVip !== null && !forceRefresh) {
     d.resolve(cachedVip);
     return d;
   }

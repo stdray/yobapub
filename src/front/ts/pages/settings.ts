@@ -395,7 +395,7 @@ export var settingsPage: Page = {
     optionsOpen = false;
     showSpinnerIn($root);
 
-    $.when(getDeviceSettings(), checkVip()).then(
+    $.when(getDeviceSettings(), checkVip(true)).then(
       function (res: any, isVip: boolean) {
         const data = Array.isArray(res) ? res[0] : res;
         if (data && data.settings) {
