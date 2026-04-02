@@ -37,8 +37,16 @@ builder.Services.AddHttpClient("proxy")
         AllowAutoRedirect = true
     });
 
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseMiddleware<UniversalProxyMiddleware>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
