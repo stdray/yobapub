@@ -27,27 +27,21 @@ if (-not $localIp) {
 $subnet = ($localIp -split '\.')[0..2] -join '.'
 Write-Host "Subnet: $subnet.0/24 (from $localIp)" -ForegroundColor DarkGray
 
-# Scan common ADB ports: 5555 (default) and 30000-50000 range (wireless debug)
-$ports = @(5555)
-Write-Host "Scanning port 5555..." -ForegroundColor DarkGray
-
+# Scan port 5555 (default ADB over network)
 $tasks = @{}
-foreach ($port in $ports) {
-    1..254 | ForEach-Object {
-        $ip = "$subnet.$_"
-        $key = "${ip}:${port}"
-        $c = [System.Net.Sockets.TcpClient]::new()
-        $tasks[$key] = @{ Client = $c; Task = $c.ConnectAsync($ip, $port) }
-    }
+1..254 | ForEach-Object {
+    $ip = "$subnet.$_"
+    $c = [System.Net.Sockets.TcpClient]::new()
+    $tasks[$ip] = @{ Client = $c; Task = $c.ConnectAsync($ip, 5555) }
 }
 Start-Sleep -Seconds 2
 
 $foundEndpoints = @()
-foreach ($key in $tasks.Keys) {
-    $t = $tasks[$key]
+foreach ($ip in $tasks.Keys) {
+    $t = $tasks[$ip]
     try {
         if ($t.Task.IsCompleted -and -not $t.Task.IsFaulted) {
-            $foundEndpoints += $key
+            $foundEndpoints += "${ip}:5555"
         }
     } catch {}
     $t.Client.Dispose()
