@@ -50,9 +50,11 @@ Start-Sleep -Seconds 2
 $tvIps = @()
 foreach ($ip in $tasks.Keys) {
     $t = $tasks[$ip]
-    if ($t.Task.Wait(0) -and -not $t.Task.IsFaulted) {
-        $tvIps += $ip
-    }
+    try {
+        if ($t.Task.IsCompleted -and -not $t.Task.IsFaulted) {
+            $tvIps += $ip
+        }
+    } catch {}
     $t.Client.Dispose()
 }
 
