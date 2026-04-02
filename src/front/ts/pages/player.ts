@@ -499,10 +499,37 @@ class PlayerController {
     hls.on(Hls.Events.FRAG_LOADING, (_e: string, data: { frag?: { sn: number; start: number; duration: number } }) => {
       const frag = data.frag;
       if (frag) {
-        plog.info('hls FRAG_LOADING sn={sn} start={start} dur={dur}', {
+        plog.debug('hls FRAG_LOADING sn={sn} start={start} dur={dur}', {
           sn: frag.sn, start: frag.start, dur: frag.duration,
         });
       }
+    });
+    hls.on(Hls.Events.FRAG_LOADED, (_e: string, data: { frag?: { sn: number; start: number; duration: number }; stats?: { total: number; trequest: number; tfirst: number; tload: number } }) => {
+      const frag = data.frag;
+      const stats = data.stats;
+      if (frag && stats) {
+        const loadMs = stats.tload - stats.trequest;
+        const sizeKb = (stats.total / 1024).toFixed(0);
+        plog.info('hls FRAG_LOADED sn={sn} start={start} dur={dur} size={size}KB load={load}ms', {
+          sn: frag.sn, start: frag.start, dur: frag.duration,
+          size: sizeKb, load: loadMs,
+        });
+      }
+    });
+    hls.on(Hls.Events.LEVEL_SWITCHING, (_e: string, data: { level?: number; width?: number; height?: number; bitrate?: number; codecs?: string }) => {
+      plog.info('hls LEVEL_SWITCHING level={level} {w}x{h} bitrate={br} codecs={codecs}', {
+        level: data.level, w: data.width, h: data.height,
+        br: data.bitrate, codecs: data.codecs || null,
+      });
+    });
+    hls.on(Hls.Events.LEVEL_SWITCHED, (_e: string, data: { level?: number }) => {
+      const hlsAny = hls as unknown as { readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number; readonly codecs?: string }> };
+      const lvl = hlsAny.levels && data.level !== undefined ? hlsAny.levels[data.level] : undefined;
+      plog.info('hls LEVEL_SWITCHED level={level} {w}x{h} bitrate={br} codecs={codecs}', {
+        level: data.level,
+        w: lvl ? lvl.width : null, h: lvl ? lvl.height : null,
+        br: lvl ? lvl.bitrate : null, codecs: lvl ? lvl.codecs || null : null,
+      });
     });
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       const hlsAny = hls as unknown as { readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number }> };
@@ -516,7 +543,7 @@ class PlayerController {
     });
     hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; error?: unknown; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {
       if (!data.fatal) {
-        plog.debug('hls error (non-fatal) {type} {details} {reason} {error} {fragUrl}', {
+        plog.warn('hls error (non-fatal) {type} {details} {reason} {error} {fragUrl}', {
           type: data.type, details: data.details,
           reason: data.reason || null,
           error: data.error ? String(data.error).substring(0, 200) : null,
@@ -526,9 +553,13 @@ class PlayerController {
         });
         return;
       }
-      plog.error('hls fatal {type} {details} {status}', {
+      const hlsFatalLvl = (hls as unknown as { readonly currentLevel?: number }).currentLevel;
+      plog.error('hls fatal {type} {details} {status} currentLevel={currentLevel}', {
         type: data.type, details: data.details,
         status: data.response ? data.response.code : null,
+        currentLevel: hlsFatalLvl !== undefined ? hlsFatalLvl : null,
+        reason: data.reason || null,
+        error: data.error ? String(data.error).substring(0, 200) : null,
       });
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
         plog.warn('hls recoverMediaError');
@@ -617,9 +648,15 @@ class PlayerController {
     const code = error ? error.code : 0;
     const detail = error && (error as { message?: string }).message ? (error as { message?: string }).message : '';
     const domain = this.getHlsDomain();
-    plog.error('playbackError {code} {msg} {detail} {domain}', {
+    const hlsAny = this.hlsInstance as unknown as { readonly currentLevel?: number; readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number; readonly codecs?: string }> } | null;
+    const curLevel = hlsAny && hlsAny.currentLevel !== undefined && hlsAny.currentLevel >= 0 && hlsAny.levels
+      ? hlsAny.levels[hlsAny.currentLevel] : undefined;
+    plog.error('playbackError {code} {msg} {detail} {domain} hlsLevel={hlsLevel} hlsRes={hlsRes} hlsCodecs={hlsCodecs}', {
       code, msg, detail: detail || null, domain,
       url: url.substring(0, 120), ua: navigator.userAgent,
+      hlsLevel: hlsAny ? hlsAny.currentLevel : null,
+      hlsRes: curLevel ? curLevel.width + 'x' + curLevel.height : null,
+      hlsCodecs: curLevel ? curLevel.codecs || null : null,
     });
     this.destroyPlayer();
     this.$root.html(
@@ -686,12 +723,22 @@ class PlayerController {
       this.hideSpinner();
     });
     this.videoEl.addEventListener('error', () => {
-      const err2 = this.videoEl ? this.videoEl.error : null;
-      plog.error('video error code={code} message={message}', {
+      const v = this.videoEl;
+      const err2 = v ? v.error : null;
+      const hlsAny = this.hlsInstance as unknown as { readonly currentLevel?: number; readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number; readonly codecs?: string }> } | null;
+      const curLevel = hlsAny && hlsAny.currentLevel !== undefined && hlsAny.currentLevel >= 0 && hlsAny.levels
+        ? hlsAny.levels[hlsAny.currentLevel] : undefined;
+      plog.error('video error code={code} message={message} ct={ct} readyState={rs} buffered={br} hlsLevel={hlsLevel} hlsCodecs={hlsCodecs} hlsBitrate={hlsBitrate}', {
         code: err2 ? err2.code : null,
         message: err2 ? (err2 as { message?: string }).message || null : null,
+        ct: v ? v.currentTime : null,
+        rs: v ? v.readyState : null,
+        br: this.formatBuffered(v || null),
+        hlsLevel: hlsAny ? hlsAny.currentLevel : null,
+        hlsCodecs: curLevel ? curLevel.codecs || null : null,
+        hlsBitrate: curLevel ? curLevel.bitrate : null,
       });
-      if (this.videoEl) this.showPlaybackError(this.videoEl.error, sourceUrl);
+      if (v) this.showPlaybackError(v.error, sourceUrl);
     });
 
     applySubSize();
