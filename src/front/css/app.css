@@ -325,6 +325,20 @@ html, body {
   margin-bottom: 30px;
 }
 
+.detail__personnel {
+  margin-bottom: 30px;
+}
+
+.detail__crew {
+  font-size: 24px;
+  line-height: 1.5;
+  color: #aaa;
+}
+
+.detail__crew-label {
+  color: #777;
+}
+
 .icon-check {
   display: inline-block;
   width: 20px;

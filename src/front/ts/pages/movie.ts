@@ -6,7 +6,7 @@ import { Item, WatchingInfoItem } from '../types/api';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
-import { renderRatings } from '../utils/templates';
+import { renderRatings, renderPersonnel } from '../utils/templates';
 import { formatDuration } from '../utils/format';
 import { storage } from '../utils/storage';
 import { DetailControls } from '../utils/detail-controls';
@@ -33,6 +33,7 @@ const tplDetailCompiled = doT.template(`
       <div class="detail__ratings">{{=it.ratings}}{{=it.watchlistTpl}}</div>
       <div class="detail__actions">{{=it.buttons}}</div>
       <div class="detail__plot">{{=it.plot}}</div>
+      {{?it.personnel}}<div class="detail__personnel">{{=it.personnel}}</div>{{?}}
     </div>
   </div>
 `);
@@ -51,6 +52,7 @@ const tplDetail = (data: {
   readonly plot: string;
   readonly bookmarksTpl: string;
   readonly watchlistTpl: string;
+  readonly personnel: string;
 }): string =>
   tplDetailCompiled(data);
 
@@ -78,7 +80,8 @@ const render = (item: Item): void => {
     buttons: buttons,
     plot: item.plot || '',
     bookmarksTpl: controls.bookmarksTpl(),
-    watchlistTpl: controls.watchlistTpl(item.in_watchlist)
+    watchlistTpl: controls.watchlistTpl(item.in_watchlist),
+    personnel: renderPersonnel(item)
   }));
 
   focusArea = 'play';

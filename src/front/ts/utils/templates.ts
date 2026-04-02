@@ -15,6 +15,17 @@ const tplEmptyTextCompiled = doT.template(`<div class="watching__section-title" 
 export const tplEmptyText = (data: { readonly text: string }): string =>
   tplEmptyTextCompiled(data);
 
+export const renderPersonnel = (item: { director?: string; cast?: string }): string => {
+  const lines: ReadonlyArray<{ readonly label: string; readonly value: string | undefined }> = [
+    { label: 'Режиссёр', value: item.director },
+    { label: 'Актёры', value: item.cast },
+  ];
+  return lines
+    .filter((l) => l.value)
+    .map((l) => '<div class="detail__crew"><span class="detail__crew-label">' + l.label + ':</span> ' + l.value + '</div>')
+    .join('');
+};
+
 export const renderRatings = (item: { rating?: number; kinopoisk_rating?: number; imdb_rating?: number }): string => {
   let html = '';
   if (item.rating) html += tplRating({ label: 'KP', value: item.rating });
