@@ -1,0 +1,262 @@
+$ErrorActionPreference = 'Stop'
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# ── Bundled tools ──
+$SdkRoot = Join-Path $ScriptDir 'sdk'
+$Sdb = Join-Path $SdkRoot 'tools\sdb.exe'
+$Tizen = Join-Path $SdkRoot 'tools\ide\bin\tizen.bat'
+$CertManager = Join-Path $SdkRoot 'tools\certificate-manager\CertificateManager.bat'
+$DataPath = Join-Path $ScriptDir 'sdk-data'
+
+foreach ($tool in @($Sdb, $Tizen, $CertManager)) {
+    if (-not (Test-Path $tool)) {
+        Write-Host "ERROR: Missing $tool" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Generate sdk.info
+if (-not (Test-Path $DataPath)) { New-Item -ItemType Directory -Path $DataPath | Out-Null }
+"TIZEN_SDK_INSTALLED_PATH=$SdkRoot`nTIZEN_SDK_DATA_PATH=$DataPath" |
+    Set-Content -Path (Join-Path $SdkRoot 'sdk.info') -Encoding ASCII
+
+# ── Find .wgt ──
+$Wgt = Get-ChildItem "$ScriptDir\*.wgt" | Select-Object -First 1
+if (-not $Wgt) {
+    Write-Host "ERROR: No .wgt file found in $ScriptDir" -ForegroundColor Red
+    Write-Host "Download from: https://github.com/stdray/yobapub/releases" -ForegroundColor Yellow
+    exit 1
+}
+Write-Host "Widget: $($Wgt.Name)" -ForegroundColor Cyan
+
+# ── Scan for TVs ──
+Write-Host "`nScanning network for Tizen TVs..." -ForegroundColor Yellow
+
+$localIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
+    $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
+    $_.IPAddress -notlike '172.1?.*' -and $_.IPAddress -notlike '172.2?.*' -and
+    $_.IPAddress -notlike '172.3?.*' -and $_.PrefixOrigin -ne 'WellKnown'
+} | Sort-Object -Property InterfaceIndex | Select-Object -First 1).IPAddress
+
+if (-not $localIp) {
+    Write-Host "ERROR: Could not determine local IP." -ForegroundColor Red
+    exit 1
+}
+
+$subnet = ($localIp -split '\.')[0..2] -join '.'
+Write-Host "Subnet: $subnet.0/24 (from $localIp)" -ForegroundColor DarkGray
+
+$jobs = 1..254 | ForEach-Object {
+    $ip = "$subnet.$_"
+    Start-Job -ScriptBlock {
+        param($ip)
+        try {
+            $c = [System.Net.Sockets.TcpClient]::new()
+            $r = $c.BeginConnect($ip, 26101, $null, $null)
+            if ($r.AsyncWaitHandle.WaitOne(300)) {
+                $c.EndConnect($r)
+                $c.Close()
+                return $ip
+            }
+            $c.Close()
+        } catch {}
+        return $null
+    } -ArgumentList $ip
+}
+
+$tvIps = $jobs | Wait-Job | Receive-Job | Where-Object { $_ }
+$jobs | Remove-Job -Force
+
+if (-not $tvIps -or @($tvIps).Count -eq 0) {
+    Write-Host "`nNo Tizen TVs found on the network." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "TV must be in Developer Mode. See README.md for setup instructions." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "When enabling Developer Mode on your TV, enter one of these IPs:" -ForegroundColor White
+    Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
+        $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
+        $_.PrefixOrigin -ne 'WellKnown'
+    } | ForEach-Object {
+        $ifName = (Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue).Name
+        if ($ifName) { Write-Host "  $($_.IPAddress)  ($ifName)" -ForegroundColor Cyan }
+    }
+    Write-Host ""
+    Write-Host "After configuring Developer Mode, reboot the TV and re-run this script." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Or enter TV IP manually: " -NoNewline
+    $manualIp = Read-Host
+    if (-not $manualIp) { exit 1 }
+    $tvIps = @($manualIp)
+}
+
+# ── Connect and list devices ──
+$Devices = @()
+foreach ($ip in $tvIps) {
+    & $Sdb connect "${ip}:26101" 2>&1 | Out-Null
+}
+Start-Sleep -Seconds 1
+
+$deviceLines = & $Sdb devices 2>&1 | Where-Object { $_ -match '^\S+\s+(device|offline)' }
+foreach ($line in $deviceLines) {
+    if ($line -match '^(\S+)\s+(device|offline)\s*(.*)$') {
+        $Devices += [PSCustomObject]@{
+            Id     = $Matches[1]
+            Status = $Matches[2]
+            Name   = $Matches[3].Trim()
+        }
+    }
+}
+
+if ($Devices.Count -eq 0) {
+    Write-Host "ERROR: No devices connected." -ForegroundColor Red
+    exit 1
+}
+
+# ── Select device ──
+Write-Host "`nAvailable devices:" -ForegroundColor Green
+for ($i = 0; $i -lt $Devices.Count; $i++) {
+    $d = $Devices[$i]
+    $status = if ($d.Status -eq 'offline') { ' [OFFLINE]' } else { '' }
+    Write-Host "  [$($i + 1)] $($d.Name)  ($($d.Id))$status"
+}
+
+if ($Devices.Count -eq 1) {
+    $Selected = $Devices[0]
+    Write-Host "`nUsing: $($Selected.Name) ($($Selected.Id))" -ForegroundColor Cyan
+} else {
+    $choice = Read-Host "`nSelect device (1-$($Devices.Count))"
+    $idx = [int]$choice - 1
+    if ($idx -lt 0 -or $idx -ge $Devices.Count) {
+        Write-Host "Invalid selection." -ForegroundColor Red
+        exit 1
+    }
+    $Selected = $Devices[$idx]
+}
+
+if ($Selected.Status -eq 'offline') {
+    Write-Host "ERROR: Device is offline." -ForegroundColor Red
+    exit 1
+}
+
+# ── Find or create signing profile ──
+$ProfileDir = Join-Path $DataPath 'profile'
+$ProfilesXml = Join-Path $ProfileDir 'profiles.xml'
+
+$searchPaths = @(
+    $ProfilesXml,
+    "D:\programs\tizen\tizen-studio-cli-data\profile\profiles.xml",
+    "C:\tizen-studio-cli-data\profile\profiles.xml",
+    "$env:USERPROFILE\tizen-studio-data\profile\profiles.xml",
+    "D:\programs\tizen\tizen-studio-data\profile\profiles.xml",
+    "C:\tizen-studio-data\profile\profiles.xml"
+)
+
+$FoundProfiles = @()
+foreach ($p in $searchPaths) {
+    if ((Test-Path $p) -and (Select-String -Path $p -Pattern 'distributor="1".*key=".+\.p12"' -Quiet)) {
+        $FoundProfiles += $p
+    }
+}
+
+if ($FoundProfiles.Count -gt 0) {
+    if ($FoundProfiles.Count -eq 1) {
+        $FoundProfile = $FoundProfiles[0]
+    } else {
+        Write-Host "`nFound signing profiles:" -ForegroundColor Green
+        for ($i = 0; $i -lt $FoundProfiles.Count; $i++) {
+            $profName = ([xml](Get-Content $FoundProfiles[$i])).profiles.active
+            Write-Host "  [$($i + 1)] $profName  ($($FoundProfiles[$i]))"
+        }
+        $choice = Read-Host "Select profile (1-$($FoundProfiles.Count))"
+        $idx = [int]$choice - 1
+        if ($idx -lt 0 -or $idx -ge $FoundProfiles.Count) {
+            Write-Host "Invalid selection." -ForegroundColor Red
+            exit 1
+        }
+        $FoundProfile = $FoundProfiles[$idx]
+    }
+
+    Write-Host "`nUsing signing profile: $FoundProfile" -ForegroundColor DarkGray
+    if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Path $ProfileDir | Out-Null }
+    if ($FoundProfile -ne $ProfilesXml) {
+        Copy-Item $FoundProfile $ProfilesXml -Force
+    }
+    & $Tizen cli-config "default.profiles.path=$ProfilesXml" 2>&1 | Out-Null
+} else {
+    Write-Host "`nNo signing profile found. Certificate Manager will open." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Create a Samsung certificate:" -ForegroundColor White
+    Write-Host "  1. Click [+] to create a new profile" -ForegroundColor White
+    Write-Host "  2. Select 'Samsung' (not Tizen)" -ForegroundColor White
+    Write-Host "  3. Author Certificate -> Create new -> sign in with Samsung Account" -ForegroundColor White
+    Write-Host "  4. Distributor Certificate -> Create new -> select your TV's DUID" -ForegroundColor White
+    Write-Host "  5. Click Finish, then close Certificate Manager" -ForegroundColor White
+    Write-Host ""
+    Read-Host "Press Enter to open Certificate Manager"
+
+    if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Path $ProfileDir | Out-Null }
+
+    $cmProcess = Start-Process -FilePath $CertManager -PassThru
+    $cmProcess.WaitForExit()
+
+    if (-not (Test-Path $ProfilesXml)) {
+        Write-Host "ERROR: No profile created. Please try again." -ForegroundColor Red
+        exit 1
+    }
+
+    $FoundProfile = $ProfilesXml
+    Write-Host "Profile created!" -ForegroundColor Green
+    & $Tizen cli-config "default.profiles.path=$ProfilesXml" 2>&1 | Out-Null
+}
+
+$activeProfile = ([xml](Get-Content $ProfilesXml)).profiles.active
+Write-Host "Signing profile: $activeProfile" -ForegroundColor DarkGray
+
+# ── Re-sign .wgt ──
+Write-Host "`nRe-signing widget..." -ForegroundColor Yellow
+
+$BuildDir = Join-Path $ScriptDir '.build'
+if (Test-Path $BuildDir) { Remove-Item $BuildDir -Recurse -Force }
+New-Item -ItemType Directory -Path $BuildDir | Out-Null
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::ExtractToDirectory($Wgt.FullName, $BuildDir)
+
+Get-ChildItem "$BuildDir\author-signature.xml", "$BuildDir\signature*.xml" -ErrorAction SilentlyContinue |
+    Remove-Item -Force
+
+& $Tizen package -t wgt -s $activeProfile -- $BuildDir
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Re-signing failed." -ForegroundColor Red
+    Remove-Item $BuildDir -Recurse -Force
+    exit 1
+}
+
+$SignedWgt = Get-ChildItem "$BuildDir\*.wgt" | Select-Object -First 1
+if (-not $SignedWgt) {
+    Write-Host "ERROR: Signed .wgt not found." -ForegroundColor Red
+    Remove-Item $BuildDir -Recurse -Force
+    exit 1
+}
+
+# ── Install ──
+Write-Host "`nInstalling on $($Selected.Name)..." -ForegroundColor Yellow
+& $Tizen install -n $SignedWgt.FullName -s $Selected.Id
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Installation failed." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Common causes:" -ForegroundColor Yellow
+    Write-Host "  - Certificate DUID does not match this TV" -ForegroundColor Yellow
+    Write-Host "  - Delete sdk-data\ folder and re-run to create a new certificate" -ForegroundColor Yellow
+    Remove-Item $BuildDir -Recurse -Force
+    exit 1
+}
+
+# ── Launch ──
+Write-Host "`nLaunching app..." -ForegroundColor Yellow
+& $Sdb -s $Selected.Id shell 0 was_execute kBJ9Z4MzKK.yobapub 2>&1 | Out-Null
+
+# Cleanup
+Remove-Item $BuildDir -Recurse -Force
+
+Write-Host "`nDone!" -ForegroundColor Green
