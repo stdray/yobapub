@@ -39,26 +39,22 @@ if (-not $localIp) {
 $subnet = ($localIp -split '\.')[0..2] -join '.'
 Write-Host "Subnet: $subnet.0/24 (from $localIp)" -ForegroundColor DarkGray
 
-$jobs = 1..254 | ForEach-Object {
+$tasks = @{}
+1..254 | ForEach-Object {
     $ip = "$subnet.$_"
-    Start-Job -ScriptBlock {
-        param($ip)
-        try {
-            $c = [System.Net.Sockets.TcpClient]::new()
-            $r = $c.BeginConnect($ip, 26101, $null, $null)
-            if ($r.AsyncWaitHandle.WaitOne(300)) {
-                $c.EndConnect($r)
-                $c.Close()
-                return $ip
-            }
-            $c.Close()
-        } catch {}
-        return $null
-    } -ArgumentList $ip
+    $c = [System.Net.Sockets.TcpClient]::new()
+    $tasks[$ip] = @{ Client = $c; Task = $c.ConnectAsync($ip, 26101) }
 }
+Start-Sleep -Milliseconds 500
 
-$tvIps = $jobs | Wait-Job | Receive-Job | Where-Object { $_ }
-$jobs | Remove-Job -Force
+$tvIps = @()
+foreach ($ip in $tasks.Keys) {
+    $t = $tasks[$ip]
+    if ($t.Task.Wait(0) -and -not $t.Task.IsFaulted) {
+        $tvIps += $ip
+    }
+    $t.Client.Dispose()
+}
 
 if (-not $tvIps -or @($tvIps).Count -eq 0) {
     Write-Host "`nNo Tizen TVs found on the network." -ForegroundColor Red
