@@ -96,7 +96,10 @@ if (-not $tvIps -or @($tvIps).Count -eq 0) {
 # ── Connect and list devices ──
 $Devices = @()
 foreach ($ip in $tvIps) {
-    & $Sdb connect "${ip}:26101" 2>&1 | Out-Null
+    $result = & $Sdb connect "${ip}:26101" 2>&1 | Out-String
+    if ($result -match 'failed') {
+        Write-Host "  Failed to connect to ${ip}" -ForegroundColor DarkGray
+    }
 }
 Start-Sleep -Seconds 1
 
@@ -112,7 +115,24 @@ foreach ($line in $deviceLines) {
 }
 
 if ($Devices.Count -eq 0) {
-    Write-Host "ERROR: No devices connected." -ForegroundColor Red
+    Write-Host "`nERROR: Found TVs but could not connect." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Your TV's Developer Mode must have THIS computer's IP:" -ForegroundColor Yellow
+    Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
+        $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
+        $_.PrefixOrigin -ne 'WellKnown'
+    } | ForEach-Object {
+        $adapter = Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue
+        if ($adapter) {
+            $isVirtual = $adapter.InterfaceDescription -match 'Loopback|WSL|Docker' -or
+                ($adapter.Name -match 'vEthernet' -and $adapter.Name -match 'Default|WSL|Docker')
+            if (-not $isVirtual) {
+                Write-Host "  $($_.IPAddress)  ($($adapter.Name))" -ForegroundColor Cyan
+            }
+        }
+    }
+    Write-Host ""
+    Write-Host "On TV: Apps > press 1-2-3-4-5 > set IP above > reboot TV" -ForegroundColor White
     exit 1
 }
 
