@@ -258,6 +258,13 @@ New-Item -ItemType Directory -Path $BuildDir | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::ExtractToDirectory($Wgt.FullName, $BuildDir)
 
+# Read app ID from config.xml
+$configXml = [xml](Get-Content (Join-Path $BuildDir 'config.xml'))
+$ns = New-Object System.Xml.XmlNamespaceManager($configXml.NameTable)
+$ns.AddNamespace('tizen', 'http://tizen.org/ns/widgets')
+$AppId = $configXml.SelectSingleNode('//tizen:application', $ns).GetAttribute('id')
+Write-Host "App ID: $AppId" -ForegroundColor DarkGray
+
 Get-ChildItem "$BuildDir\author-signature.xml", "$BuildDir\signature*.xml" -ErrorAction SilentlyContinue |
     Remove-Item -Force
 
@@ -279,7 +286,7 @@ Write-Host "`nInstalling on $($Selected.Name)..." -ForegroundColor Yellow
 & $Tizen install -n $SignedWgt.FullName -s $Selected.Id
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Installation failed. Trying to uninstall old version and retry..." -ForegroundColor Yellow
-    & $Sdb -s $Selected.Id shell 0 vd_appuninstall kBJ9Z4MzKK.yobapub 2>&1 | Out-Null
+    & $Sdb -s $Selected.Id shell 0 vd_appuninstall $AppId 2>&1 | Out-Null
     Start-Sleep -Seconds 2
     & $Tizen install -n $SignedWgt.FullName -s $Selected.Id
     if ($LASTEXITCODE -ne 0) {
@@ -290,7 +297,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "`nLaunching app..." -ForegroundColor Yellow
-& $Sdb -s $Selected.Id shell 0 was_execute kBJ9Z4MzKK.yobapub 2>&1 | Out-Null
+& $Sdb -s $Selected.Id shell 0 was_execute $AppId 2>&1 | Out-Null
 
 Remove-Item $BuildDir -Recurse -Force
 
