@@ -142,7 +142,7 @@ jobs:
 
       - name: Rename APK
         run: |
-          mv src/apk/app/build/outputs/apk/release/app-release.apk \
+          sudo mv src/apk/app/build/outputs/apk/release/app-release.apk \
              "yobapub-androidtv-$SEMVER.apk"
 
       # ── Tizen (cert generated on the fly) ──
@@ -157,7 +157,7 @@ jobs:
 
       - name: Rename Tizen widget
         run: |
-          mv src/tizen-widget/*.wgt "yobapub-tizen-$SEMVER.wgt"
+          sudo mv src/tizen-widget/*.wgt "yobapub-tizen-$SEMVER.wgt"
 
       # ── GitHub Release ──
       - uses: softprops/action-gh-release@v2
