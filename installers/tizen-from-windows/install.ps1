@@ -45,7 +45,7 @@ $tasks = @{}
     $c = [System.Net.Sockets.TcpClient]::new()
     $tasks[$ip] = @{ Client = $c; Task = $c.ConnectAsync($ip, 26101) }
 }
-Start-Sleep -Milliseconds 500
+Start-Sleep -Seconds 2
 
 $tvIps = @()
 foreach ($ip in $tasks.Keys) {
@@ -72,7 +72,8 @@ if (-not $tvIps -or @($tvIps).Count -eq 0) {
     } | ForEach-Object {
         $adapter = Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue
         if ($adapter) {
-            $isVirtual = $adapter.InterfaceDescription -match 'Hyper-V|Virtual|vEthernet|Loopback|WSL|Docker'
+            $isVirtual = $adapter.InterfaceDescription -match 'Loopback|WSL|Docker' -or
+                ($adapter.Name -match 'vEthernet' -and $adapter.Name -match 'Default|WSL|Docker')
             [PSCustomObject]@{
                 IP = $_.IPAddress
                 Name = $adapter.Name
