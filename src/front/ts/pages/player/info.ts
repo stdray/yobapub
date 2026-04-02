@@ -1,14 +1,16 @@
 import $ from 'jquery';
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
+import Hls from 'hls.js';
 
 
 export interface InfoState {
-  files: VideoFile[];
-  audios: AudioTrack[];
-  subs: Subtitle[];
-  selectedQuality: number;
-  selectedAudio: number;
-  selectedSub: number;
+  readonly files: VideoFile[];
+  readonly audios: AudioTrack[];
+  readonly subs: Subtitle[];
+  readonly selectedQuality: number;
+  readonly selectedAudio: number;
+  readonly selectedSub: number;
+  readonly hlsInstance: Hls | null;
 }
 
 export const getStreamInfo = (state: InfoState): string => {
@@ -33,6 +35,17 @@ export const getStreamInfo = (state: InfoState): string => {
 
   if (state.selectedSub >= 0 && state.selectedSub < state.subs.length) {
     parts.push('Sub: ' + state.subs[state.selectedSub].lang.toUpperCase());
+  }
+
+  if (state.hlsInstance) {
+    const hls = state.hlsInstance as { readonly levels?: ReadonlyArray<{ readonly bitrate?: number }>; readonly currentLevel?: number };
+    const level = hls.levels && hls.currentLevel !== undefined && hls.currentLevel >= 0
+      ? hls.levels[hls.currentLevel]
+      : undefined;
+    if (level && level.bitrate) {
+      const mbps = (level.bitrate / 1000000).toFixed(1);
+      parts.push(mbps + ' Mbps');
+    }
   }
 
   return parts.join(' &bull; ');

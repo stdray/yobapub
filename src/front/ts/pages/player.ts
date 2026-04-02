@@ -177,6 +177,7 @@ class PlayerController {
       selectedQuality: this.state.quality,
       selectedAudio: this.state.audio,
       selectedSub: this.state.sub,
+      hlsInstance: this.hlsInstance,
     };
   }
 
@@ -456,6 +457,36 @@ class PlayerController {
     return cfg;
   }
 
+  private pinQualityLevel(hls: Hls): void {
+    const hlsAny = hls as unknown as { levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number }>; currentLevel: number };
+    const levels = hlsAny.levels;
+    if (!levels || levels.length <= 1) return;
+
+    const target = this.media.files[this.state.quality];
+    if (!target) return;
+
+    let bestIdx = -1;
+    for (let i = 0; i < levels.length; i++) {
+      if (levels[i].height === target.h || levels[i].width === target.w) {
+        bestIdx = i;
+        break;
+      }
+    }
+
+    if (bestIdx >= 0) {
+      hlsAny.currentLevel = bestIdx;
+      plog.info('pinQualityLevel idx={idx} target={w}x{h} level={lw}x{lh} bitrate={br}', {
+        idx: bestIdx, w: target.w, h: target.h,
+        lw: levels[bestIdx].width, lh: levels[bestIdx].height,
+        br: levels[bestIdx].bitrate,
+      });
+    } else {
+      plog.warn('pinQualityLevel: no matching level for {w}x{h}, levels={count}', {
+        w: target.w, h: target.h, count: levels.length,
+      });
+    }
+  }
+
   private playSource(url: string): void {
     if (!this.videoEl) return;
     this.media.hlsUrl = url;
@@ -474,7 +505,13 @@ class PlayerController {
       }
     });
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      plog.info('hls MANIFEST_PARSED');
+      const hlsAny = hls as unknown as { readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number }> };
+      const lvls = hlsAny.levels || [];
+      plog.info('hls MANIFEST_PARSED levels={count} details={details}', {
+        count: lvls.length,
+        details: lvls.map((l) => l.width + 'x' + l.height + '@' + l.bitrate).join(', '),
+      });
+      this.pinQualityLevel(hls);
       this.onSourceReady();
     });
     hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; error?: unknown; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {
