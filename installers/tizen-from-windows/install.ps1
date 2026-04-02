@@ -257,16 +257,17 @@ if ($FoundProfiles.Count -gt 0) {
     if ($FoundProfile -ne $ProfilesXml) {
         Copy-Item $FoundProfile $ProfilesXml -Force
     }
-    & $Tizen cli-config "default.profiles.path=$ProfilesXml" 2>&1 | Out-Null
+    & $Tizen cli-config "`"default.profiles.path=$ProfilesXml`"" 2>&1 | Out-Null
 } else {
     Write-Host "`nNo signing profile found. Certificate Manager will open." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Create a Samsung certificate:" -ForegroundColor White
     Write-Host "  1. Click [+] to create a new profile" -ForegroundColor White
     Write-Host "  2. Select 'Samsung' (not Tizen)" -ForegroundColor White
-    Write-Host "  3. Author Certificate -> Create new -> sign in with Samsung Account" -ForegroundColor White
-    Write-Host "  4. Distributor Certificate -> Create new -> select your TV's DUID" -ForegroundColor White
-    Write-Host "  5. Click Finish, then close Certificate Manager" -ForegroundColor White
+    Write-Host "  3. Select 'TV'" -ForegroundColor White
+    Write-Host "  4. Author Certificate -> Create new -> sign in with Samsung Account" -ForegroundColor White
+    Write-Host "  5. Distributor Certificate -> Create new -> select your TV's DUID" -ForegroundColor White
+    Write-Host "  6. Click Finish, then close Certificate Manager" -ForegroundColor White
     Write-Host ""
     Read-Host "Press Enter to open Certificate Manager"
 
@@ -281,7 +282,7 @@ if ($FoundProfiles.Count -gt 0) {
     }
 
     Write-Host "Profile created!" -ForegroundColor Green
-    & $Tizen cli-config "default.profiles.path=$ProfilesXml" 2>&1 | Out-Null
+    & $Tizen cli-config "`"default.profiles.path=$ProfilesXml`"" 2>&1 | Out-Null
 }
 
 $activeProfile = ([xml](Get-Content $ProfilesXml)).profiles.active

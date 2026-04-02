@@ -42,14 +42,15 @@
 
 1. Нажмите **[+]** для создания нового профиля
 2. Выберите **Samsung** (не Tizen!)
-3. Придумайте имя профиля (любое)
-4. **Author Certificate** -> **Create a new author certificate**
+3. Выберите **TV**
+4. Придумайте имя профиля (любое)
+5. **Author Certificate** -> **Create a new author certificate**
    - Заполните имя и пароль
    - Войдите в **Samsung Account** (создайте на [account.samsung.com](https://account.samsung.com) если нет)
-5. **Distributor Certificate** -> **Create a new distributor certificate**
+6. **Distributor Certificate** -> **Create a new distributor certificate**
    - Privilege level: **Partner**
    - В списке DUID выберите ваш телевизор (он должен быть подключен)
-6. Нажмите **Finish**
+7. Нажмите **Finish**
 7. Закройте Certificate Manager
 
 Скрипт автоматически подхватит созданный профиль и продолжит установку.
