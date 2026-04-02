@@ -138,7 +138,7 @@ jobs:
             -e ANDROID_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}" \
             -w /build \
             "ghcr.io/${{ github.repository }}-build-env:latest" \
-            ./gradlew assembleRelease
+            bash -c 'chmod +x gradlew && ./gradlew assembleRelease'
 
       - name: Rename APK
         run: |
