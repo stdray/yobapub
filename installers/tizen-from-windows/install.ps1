@@ -5,10 +5,9 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SdkRoot = Join-Path $ScriptDir 'sdk'
 $Sdb = Join-Path $SdkRoot 'tools\sdb.exe'
 $Tizen = Join-Path $SdkRoot 'tools\ide\bin\tizen.bat'
-$CertManager = Join-Path $SdkRoot 'tools\certificate-manager\CertificateManager.bat'
 $DataPath = Join-Path $ScriptDir 'sdk-data'
 
-foreach ($tool in @($Sdb, $Tizen, $CertManager)) {
+foreach ($tool in @($Sdb, $Tizen)) {
     if (-not (Test-Path $tool)) {
         Write-Host "ERROR: Missing $tool" -ForegroundColor Red
         exit 1
@@ -67,7 +66,6 @@ if (-not $tvIps -or @($tvIps).Count -eq 0) {
     Write-Host "When enabling Developer Mode on your TV, enter one of these IPs" -ForegroundColor Yellow
     Write-Host "(most likely first):" -ForegroundColor Yellow
     Write-Host ""
-    # Show IPs sorted: physical adapters first, then virtual
     $allIps = Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
         $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
         $_.PrefixOrigin -ne 'WellKnown'
@@ -213,80 +211,40 @@ if ($wgtFiles.Count -eq 0) {
 Write-Host "Widget: $($Wgt.Name)" -ForegroundColor Cyan
 
 # ══════════════════════════════════════════
-# Step 3: Find or create signing profile
+# Step 3: Ensure signing certificate
 # ══════════════════════════════════════════
+$AuthorP12 = Join-Path $DataPath 'keystore\author\author.p12'
 $ProfileDir = Join-Path $DataPath 'profile'
 $ProfilesXml = Join-Path $ProfileDir 'profiles.xml'
+$ProfileName = 'yobapub'
+$DistP12 = Join-Path $SdkRoot 'tools\certificate-generator\certificates\distributor\tizen-distributor-signer.p12'
+$DistCa = Join-Path $SdkRoot 'tools\certificate-generator\certificates\distributor\tizen-distributor-ca.cer'
 
-$searchPaths = @(
-    $ProfilesXml,
-    "D:\programs\tizen\tizen-studio-cli-data\profile\profiles.xml",
-    "C:\tizen-studio-cli-data\profile\profiles.xml",
-    "$env:USERPROFILE\tizen-studio-data\profile\profiles.xml",
-    "D:\programs\tizen\tizen-studio-data\profile\profiles.xml",
-    "C:\tizen-studio-data\profile\profiles.xml"
-)
-
-$FoundProfiles = @()
-foreach ($p in $searchPaths) {
-    if ((Test-Path $p) -and (Select-String -Path $p -Pattern 'distributor="1".*key=".+\.p12"' -Quiet)) {
-        $FoundProfiles += $p
-    }
-}
-
-if ($FoundProfiles.Count -gt 0) {
-    if ($FoundProfiles.Count -eq 1) {
-        $FoundProfile = $FoundProfiles[0]
-    } else {
-        Write-Host "`nFound signing profiles:" -ForegroundColor Green
-        for ($i = 0; $i -lt $FoundProfiles.Count; $i++) {
-            $profName = ([xml](Get-Content $FoundProfiles[$i])).profiles.active
-            Write-Host "  [$($i + 1)] $profName  ($($FoundProfiles[$i]))"
-        }
-        $choice = Read-Host "Select profile (1-$($FoundProfiles.Count))"
-        $idx = [int]$choice - 1
-        if ($idx -lt 0 -or $idx -ge $FoundProfiles.Count) {
-            Write-Host "Invalid selection." -ForegroundColor Red
-            exit 1
-        }
-        $FoundProfile = $FoundProfiles[$idx]
-    }
-
-    Write-Host "`nUsing signing profile: $FoundProfile" -ForegroundColor DarkGray
-    if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Path $ProfileDir | Out-Null }
-    if ($FoundProfile -ne $ProfilesXml) {
-        Copy-Item $FoundProfile $ProfilesXml -Force
-    }
-    & $Tizen cli-config "`"default.profiles.path=$ProfilesXml`"" 2>&1 | Out-Null
-} else {
-    Write-Host "`nNo signing profile found. Certificate Manager will open." -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Create a Samsung certificate:" -ForegroundColor White
-    Write-Host "  1. Click [+] to create a new profile" -ForegroundColor White
-    Write-Host "  2. Select 'Samsung' (not Tizen)" -ForegroundColor White
-    Write-Host "  3. Select 'TV'" -ForegroundColor White
-    Write-Host "  4. Author Certificate -> Create new -> sign in with Samsung Account" -ForegroundColor White
-    Write-Host "  5. Distributor Certificate -> Create new -> select your TV's DUID" -ForegroundColor White
-    Write-Host "  6. Click Finish, then close Certificate Manager" -ForegroundColor White
-    Write-Host ""
-    Read-Host "Press Enter to open Certificate Manager"
-
-    if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Path $ProfileDir | Out-Null }
-
-    $cmProcess = Start-Process -FilePath $CertManager -PassThru
-    $cmProcess.WaitForExit()
-
-    if (-not (Test-Path $ProfilesXml)) {
-        Write-Host "ERROR: No profile created. Please try again." -ForegroundColor Red
+if (-not (Test-Path $AuthorP12)) {
+    Write-Host "`nCreating signing certificate (first run)..." -ForegroundColor Yellow
+    & $Tizen certificate -a yobapub -p yobapub123 -f author
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $AuthorP12)) {
+        Write-Host "ERROR: Failed to create certificate." -ForegroundColor Red
         exit 1
     }
-
-    Write-Host "Profile created!" -ForegroundColor Green
-    & $Tizen cli-config "`"default.profiles.path=$ProfilesXml`"" 2>&1 | Out-Null
+    Write-Host "Certificate created" -ForegroundColor Green
+} else {
+    Write-Host "`nUsing existing certificate" -ForegroundColor DarkGray
 }
 
-$activeProfile = ([xml](Get-Content $ProfilesXml)).profiles.active
-Write-Host "Signing profile: $activeProfile" -ForegroundColor DarkGray
+# Write profiles.xml
+if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Path $ProfileDir | Out-Null }
+@"
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<profiles active="$ProfileName" version="3.1">
+<profile name="$ProfileName">
+<profileitem ca="" distributor="0" key="$AuthorP12" password="yobapub123" rootca=""/>
+<profileitem ca="$DistCa" distributor="1" key="$DistP12" password="tizenpkcs12passfordsigner" rootca=""/>
+<profileitem ca="" distributor="2" key="" password="" rootca=""/>
+</profile>
+</profiles>
+"@ | Set-Content -Path $ProfilesXml -Encoding UTF8
+& $Tizen cli-config "`"default.profiles.path=$ProfilesXml`"" 2>&1 | Out-Null
 
 # ══════════════════════════════════════════
 # Step 4: Re-sign, install, launch
@@ -303,7 +261,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 Get-ChildItem "$BuildDir\author-signature.xml", "$BuildDir\signature*.xml" -ErrorAction SilentlyContinue |
     Remove-Item -Force
 
-& $Tizen package -t wgt -s $activeProfile -- $BuildDir
+& $Tizen package -t wgt -s $ProfileName -- $BuildDir
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Re-signing failed." -ForegroundColor Red
     Remove-Item $BuildDir -Recurse -Force
@@ -322,9 +280,8 @@ Write-Host "`nInstalling on $($Selected.Name)..." -ForegroundColor Yellow
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Installation failed." -ForegroundColor Red
     Write-Host ""
-    Write-Host "Common causes:" -ForegroundColor Yellow
-    Write-Host "  - Certificate DUID does not match this TV" -ForegroundColor Yellow
-    Write-Host "  - Delete sdk-data\ folder and re-run to create a new certificate" -ForegroundColor Yellow
+    Write-Host "If updating from a different certificate, uninstall the app from TV first" -ForegroundColor Yellow
+    Write-Host "and re-run this script." -ForegroundColor Yellow
     Remove-Item $BuildDir -Recurse -Force
     exit 1
 }
