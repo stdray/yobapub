@@ -194,6 +194,20 @@ html, body {
     0 0 50px rgba(233, 69, 96, 0.3);
 }
 
+.sidebar-active .card.focused .card__poster {
+  border-color: rgba(233, 69, 96, 0.3);
+  box-shadow: none;
+}
+
+.sidebar-active .folder-item.focused {
+  border-color: rgba(233, 69, 96, 0.3);
+}
+
+.sidebar-active .kb__key.focused {
+  background: rgba(229, 9, 20, 0.3);
+  transform: none;
+}
+
 .card__poster {
   width: 100%;
   padding-bottom: 140%;

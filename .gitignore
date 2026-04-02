@@ -68,3 +68,9 @@ err/
 # Local keys/certs documentation (not for repo)
 docs/local-keys.md
 keys/
+
+# Tizen installer runtime data
+installers/tizen-from-windows/.build/
+installers/tizen-from-windows/*.wgt
+installers/tizen-from-windows/sdk-data/
+installers/tizen-from-windows/sdk/

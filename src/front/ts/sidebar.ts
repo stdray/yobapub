@@ -68,6 +68,7 @@ class Sidebar {
   private menuIndex = 0;
   private focused = false;
   private activeRoute: RouteName | null = null;
+  private onFocus: (() => void) | null = null;
   private onUnfocus: (() => void) | null = null;
   private lastBackTime = 0;
 
@@ -82,6 +83,7 @@ class Sidebar {
   hide(): void {
     this.$el.addClass('hidden');
     this.focused = false;
+    this.onFocus = null;
     this.onUnfocus = null;
   }
 
@@ -96,6 +98,11 @@ class Sidebar {
   focus(): void {
     this.focused = true;
     this.updateFocus();
+    if (this.onFocus) this.onFocus();
+  }
+
+  setFocusHandler(handler: (() => void) | null): void {
+    this.onFocus = handler;
   }
 
   setUnfocusHandler(handler: (() => void) | null): void {
