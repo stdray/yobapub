@@ -74,3 +74,8 @@ installers/tizen-from-windows/.build/
 installers/tizen-from-windows/*.wgt
 installers/tizen-from-windows/sdk-data/
 installers/tizen-from-windows/sdk/
+
+# Android TV installer runtime data
+installers/androidtv-from-windows/*.apk
+installers/androidtv-from-windows/adb.exe
+installers/androidtv-from-windows/*.dll
