@@ -1,16 +1,15 @@
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
-import { storage, Storage, TitlePrefs } from '../../utils/storage';
-import { platform } from '../../utils/platform';
+import { storage, Storage, QualityId, TitlePrefs } from '../../utils/storage';
 
 export type { TitlePrefs };
 
 export const pickDefaultQualityIndex = (files: VideoFile[]): number => {
   let savedId = storage.getDefaultQuality();
   if (savedId === -1) {
-    savedId = platform.isLegacyTizen() ? 3 : 0;
+    savedId = QualityId.HD;
     storage.setDefaultQuality(savedId);
   }
-  if (savedId === 0 || files.length === 0) return 0;
+  if (savedId === QualityId.Auto || files.length === 0) return 0;
   let maxH = 0;
   for (let q = 0; q < Storage.QUALITY_OPTIONS.length; q++) {
     if (Storage.QUALITY_OPTIONS[q].id === savedId) { maxH = Storage.QUALITY_OPTIONS[q].maxH; break; }

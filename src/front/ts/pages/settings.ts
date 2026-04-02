@@ -4,7 +4,7 @@ import { RouteParams } from '../types/app';
 import { deviceApi } from '../api/device';
 import { DeviceSettingsResponse } from '../types/api';
 import { TvKey, platform } from '../utils/platform';
-import { storage, Storage } from '../utils/storage';
+import { storage, Storage, QualityId } from '../utils/storage';
 import { PageUtils } from '../utils/page';
 import { sidebar } from '../sidebar';
 import { SidebarPage } from './sidebar-page';
@@ -120,7 +120,7 @@ const parseSettings = (raw: Record<string, any>): SettingItem[] => {
 const buildQualitySetting = (): SettingItem => {
   let savedId = storage.getDefaultQuality();
   if (savedId === -1) {
-    savedId = platform.isLegacyTizen() ? 3 : 0;
+    savedId = QualityId.HD;
     storage.setDefaultQuality(savedId);
   }
   const opts: SettingOption[] = [];

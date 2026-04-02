@@ -2,6 +2,14 @@ import { RouteName } from '../types/app';
 
 export type ProxyMode = 'none' | 'posters' | 'posters-tv' | 'all';
 
+export const enum QualityId {
+  Auto = 0,
+  UHD = 1,
+  FullHD = 2,
+  HD = 3,
+  SD = 4,
+}
+
 export interface TitlePrefs {
   id: number;
   quality?: string;
@@ -49,11 +57,11 @@ export class Storage {
   // --- Constants ---
 
   static readonly QUALITY_OPTIONS: ReadonlyArray<QualityOption> = [
-    { id: 0, label: 'Авто (макс.)', maxH: 0 },
-    { id: 1, label: '4K (2160p)', maxH: 2160 },
-    { id: 2, label: 'Full HD (1080p)', maxH: 1080 },
-    { id: 3, label: 'HD (720p)', maxH: 720 },
-    { id: 4, label: 'SD (480p)', maxH: 480 }
+    { id: QualityId.Auto, label: 'Авто (макс.)', maxH: 0 },
+    { id: QualityId.UHD, label: '4K (2160p)', maxH: 2160 },
+    { id: QualityId.FullHD, label: 'Full HD (1080p)', maxH: 1080 },
+    { id: QualityId.HD, label: 'HD (720p)', maxH: 720 },
+    { id: QualityId.SD, label: 'SD (480p)', maxH: 480 }
   ];
 
   static readonly DEFAULT_SUB_SIZE = 46;

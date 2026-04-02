@@ -66,6 +66,7 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 
 ## Code Style
 
+- **No magic numbers** — avoid bare numeric literals for domain constants (quality IDs, key codes, etc.). Use `const enum`, named constants, or `readonly` static fields instead.
 - **No `any`** — all variables, parameters, and return types must be explicitly typed. Use `unknown` + type guards if the shape is truly unknown.
 - **Immutability everywhere** — always prefer immutable approaches: `const` for all declarations, `readonly` on interface/class properties, never mutate function arguments or existing arrays/objects. Create new collections (via `map`/`filter`/spread/LINQ) instead of mutating in-place with `for` loops. This applies to both TypeScript and C# code.
 - **Arrow functions preferred** — use `const f = () => {}` syntax whenever possible. Arrow functions are more concise and modern. Avoid `function foo() {}` declarations except for class methods. Example: prefer `export const tpl = (data: Data) => compiled(data)` over `export function tpl(data: Data) { return compiled(data); }`.
