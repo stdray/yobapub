@@ -10,16 +10,22 @@
 4. Введите IP-адрес компьютера, с которого будете устанавливать
 5. Перезагрузите телевизор
 
+**Важно:** после перезагрузки в верхней части экрана ТВ должна появиться надпись "Developer Mode". Если её нет — режим разработчика не включился. Повторите шаги выше, дальше продолжать не имеет смысла.
+
+## Если у вас уже есть Tizen Studio
+
+Если вы уже устанавливали виджеты через Tizen Studio, можно обойтись без этого скрипта:
+
+1. Скачайте `.wgt` из [Releases](https://github.com/stdray/yobapub/releases)
+2. В Tizen Studio: **File → Import → Tizen Project → From widget file** → выберите `.wgt`
+3. Подключите ТВ через **Device Manager**
+4. Запустите проект на устройстве (**Run As → Tizen Web Application**)
+
 ## Установка
 
-1. Скачайте `.wgt` файл из [Releases](https://github.com/stdray/yobapub/releases) и положите в эту папку
-2. Запустите `install.ps1`:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File install.ps1
-```
-
-Или правый клик по `install.ps1` -> "Выполнить с помощью PowerShell".
+1. Скачайте [`tizen-from-windows.zip`](https://github.com/stdray/yobapub/raw/master/installers/tizen-from-windows.zip) и распакуйте в любую папку
+2. Запустите `install.bat`
+3. Скрипт предложит скачать последнюю версию виджета автоматически (или положите `.wgt` из [Releases](https://github.com/stdray/yobapub/releases) в папку заранее)
 
 ## Что делает скрипт
 

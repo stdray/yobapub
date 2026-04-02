@@ -20,16 +20,9 @@ if (-not (Test-Path $DataPath)) { New-Item -ItemType Directory -Path $DataPath |
 "TIZEN_SDK_INSTALLED_PATH=$SdkRoot`nTIZEN_SDK_DATA_PATH=$DataPath" |
     Set-Content -Path (Join-Path $SdkRoot 'sdk.info') -Encoding ASCII
 
-# ── Find .wgt ──
-$Wgt = Get-ChildItem "$ScriptDir\*.wgt" | Select-Object -First 1
-if (-not $Wgt) {
-    Write-Host "ERROR: No .wgt file found in $ScriptDir" -ForegroundColor Red
-    Write-Host "Download from: https://github.com/stdray/yobapub/releases" -ForegroundColor Yellow
-    exit 1
-}
-Write-Host "Widget: $($Wgt.Name)" -ForegroundColor Cyan
-
-# ── Scan for TVs ──
+# ══════════════════════════════════════════
+# Step 1: Find TVs
+# ══════════════════════════════════════════
 Write-Host "`nScanning network for Tizen TVs..." -ForegroundColor Yellow
 
 $localIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
@@ -70,23 +63,35 @@ $jobs | Remove-Job -Force
 if (-not $tvIps -or @($tvIps).Count -eq 0) {
     Write-Host "`nNo Tizen TVs found on the network." -ForegroundColor Red
     Write-Host ""
-    Write-Host "TV must be in Developer Mode. See README.md for setup instructions." -ForegroundColor Yellow
+    Write-Host "TV must be in Developer Mode. See:" -ForegroundColor Yellow
+    Write-Host "  $ScriptDir\README.md" -ForegroundColor White
     Write-Host ""
-    Write-Host "When enabling Developer Mode on your TV, enter one of these IPs:" -ForegroundColor White
-    Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
+    Write-Host "When enabling Developer Mode on your TV, enter one of these IPs" -ForegroundColor Yellow
+    Write-Host "(most likely first):" -ForegroundColor Yellow
+    Write-Host ""
+    # Show IPs sorted: physical adapters first, then virtual
+    $allIps = Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
         $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
         $_.PrefixOrigin -ne 'WellKnown'
     } | ForEach-Object {
-        $ifName = (Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue).Name
-        if ($ifName) { Write-Host "  $($_.IPAddress)  ($ifName)" -ForegroundColor Cyan }
+        $adapter = Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue
+        if ($adapter) {
+            $isVirtual = $adapter.InterfaceDescription -match 'Hyper-V|Virtual|vEthernet|Loopback|WSL|Docker'
+            [PSCustomObject]@{
+                IP = $_.IPAddress
+                Name = $adapter.Name
+                Virtual = $isVirtual
+            }
+        }
+    } | Sort-Object Virtual, Name
+    foreach ($item in $allIps) {
+        $label = if ($item.Virtual) { " (virtual)" } else { " <-- most likely" }
+        $color = if ($item.Virtual) { 'DarkGray' } else { 'Cyan' }
+        Write-Host "  $($item.IP)  ($($item.Name))$label" -ForegroundColor $color
     }
     Write-Host ""
-    Write-Host "After configuring Developer Mode, reboot the TV and re-run this script." -ForegroundColor White
-    Write-Host ""
-    Write-Host "Or enter TV IP manually: " -NoNewline
-    $manualIp = Read-Host
-    if (-not $manualIp) { exit 1 }
-    $tvIps = @($manualIp)
+    Write-Host "After configuring, reboot the TV and re-run this script." -ForegroundColor White
+    exit 1
 }
 
 # ── Connect and list devices ──
@@ -138,7 +143,59 @@ if ($Selected.Status -eq 'offline') {
     exit 1
 }
 
-# ── Find or create signing profile ──
+# ══════════════════════════════════════════
+# Step 2: Find or download .wgt
+# ══════════════════════════════════════════
+$wgtFiles = @(Get-ChildItem "$ScriptDir\*.wgt" -ErrorAction SilentlyContinue)
+
+if ($wgtFiles.Count -gt 1) {
+    Write-Host "`nERROR: Found $($wgtFiles.Count) .wgt files. Keep only one:" -ForegroundColor Red
+    $wgtFiles | ForEach-Object { Write-Host "  - $($_.Name)" -ForegroundColor Yellow }
+    exit 1
+}
+
+function Download-LatestWgt {
+    Write-Host "`nFetching latest release from GitHub..." -ForegroundColor Yellow
+    try {
+        $release = Invoke-RestMethod 'https://api.github.com/repos/stdray/yobapub/releases/latest'
+        $asset = $release.assets | Where-Object { $_.name -like '*.wgt' } | Select-Object -First 1
+        if (-not $asset) {
+            Write-Host "ERROR: No .wgt in latest release." -ForegroundColor Red
+            exit 1
+        }
+        $outPath = Join-Path $ScriptDir $asset.name
+        Write-Host "Downloading $($asset.name) ($([math]::Round($asset.size/1KB)) KB)..." -ForegroundColor DarkGray
+        Invoke-WebRequest $asset.browser_download_url -OutFile $outPath
+        Write-Host "Downloaded: $($asset.name)" -ForegroundColor Green
+        return Get-Item $outPath
+    } catch {
+        Write-Host "ERROR: Failed to download: $_" -ForegroundColor Red
+        exit 1
+    }
+}
+
+if ($wgtFiles.Count -eq 0) {
+    Write-Host "`nNo .wgt file found in folder." -ForegroundColor Yellow
+    $choice = Read-Host "Download latest version from GitHub? (Y/n)"
+    if ($choice -eq 'n') {
+        Write-Host "Place a .wgt file in this folder and re-run." -ForegroundColor Yellow
+        exit 0
+    }
+    $Wgt = Download-LatestWgt
+} else {
+    $Wgt = $wgtFiles[0]
+    Write-Host "`nFound: $($Wgt.Name)" -ForegroundColor Cyan
+    $choice = Read-Host "Install this version or download latest? ([L]ocal / [D]ownload)"
+    if ($choice -eq 'D' -or $choice -eq 'd') {
+        $Wgt = Download-LatestWgt
+    }
+}
+
+Write-Host "Widget: $($Wgt.Name)" -ForegroundColor Cyan
+
+# ══════════════════════════════════════════
+# Step 3: Find or create signing profile
+# ══════════════════════════════════════════
 $ProfileDir = Join-Path $DataPath 'profile'
 $ProfilesXml = Join-Path $ProfileDir 'profiles.xml'
 
@@ -204,7 +261,6 @@ if ($FoundProfiles.Count -gt 0) {
         exit 1
     }
 
-    $FoundProfile = $ProfilesXml
     Write-Host "Profile created!" -ForegroundColor Green
     & $Tizen cli-config "default.profiles.path=$ProfilesXml" 2>&1 | Out-Null
 }
@@ -212,7 +268,9 @@ if ($FoundProfiles.Count -gt 0) {
 $activeProfile = ([xml](Get-Content $ProfilesXml)).profiles.active
 Write-Host "Signing profile: $activeProfile" -ForegroundColor DarkGray
 
-# ── Re-sign .wgt ──
+# ══════════════════════════════════════════
+# Step 4: Re-sign, install, launch
+# ══════════════════════════════════════════
 Write-Host "`nRe-signing widget..." -ForegroundColor Yellow
 
 $BuildDir = Join-Path $ScriptDir '.build'
@@ -239,7 +297,6 @@ if (-not $SignedWgt) {
     exit 1
 }
 
-# ── Install ──
 Write-Host "`nInstalling on $($Selected.Name)..." -ForegroundColor Yellow
 & $Tizen install -n $SignedWgt.FullName -s $Selected.Id
 if ($LASTEXITCODE -ne 0) {
@@ -252,11 +309,9 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# ── Launch ──
 Write-Host "`nLaunching app..." -ForegroundColor Yellow
 & $Sdb -s $Selected.Id shell 0 was_execute kBJ9Z4MzKK.yobapub 2>&1 | Out-Null
 
-# Cleanup
 Remove-Item $BuildDir -Recurse -Force
 
 Write-Host "`nDone!" -ForegroundColor Green
