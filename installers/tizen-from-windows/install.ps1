@@ -278,12 +278,15 @@ if (-not $SignedWgt) {
 Write-Host "`nInstalling on $($Selected.Name)..." -ForegroundColor Yellow
 & $Tizen install -n $SignedWgt.FullName -s $Selected.Id
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERROR: Installation failed." -ForegroundColor Red
-    Write-Host ""
-    Write-Host "If updating from a different certificate, uninstall the app from TV first" -ForegroundColor Yellow
-    Write-Host "and re-run this script." -ForegroundColor Yellow
-    Remove-Item $BuildDir -Recurse -Force
-    exit 1
+    Write-Host "Installation failed. Trying to uninstall old version and retry..." -ForegroundColor Yellow
+    & $Sdb -s $Selected.Id shell 0 vd_appuninstall kBJ9Z4MzKK.yobapub 2>&1 | Out-Null
+    Start-Sleep -Seconds 2
+    & $Tizen install -n $SignedWgt.FullName -s $Selected.Id
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: Installation failed after retry." -ForegroundColor Red
+        Remove-Item $BuildDir -Recurse -Force
+        exit 1
+    }
 }
 
 Write-Host "`nLaunching app..." -ForegroundColor Yellow
