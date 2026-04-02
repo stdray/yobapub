@@ -2,61 +2,71 @@ name: CI
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
+    tags: ['v*']
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
+  # ─── Build & Test (.NET) ───
   build:
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - run: dotnet build src/back/yobapub.sln -c Release
+      - run: dotnet test src/back/YobaPub.Proxy.Tests/YobaPub.Proxy.Tests.csproj --no-build -c Release
 
-      - name: Restore & Build
-        run: dotnet build src/back/yobapub.sln -c Release
-
-      - name: Test
-        run: dotnet test src/back/YobaPub.Proxy.Tests/YobaPub.Proxy.Tests.csproj --no-build -c Release
-
+  # ─── Docker publish + deploy (master & tags) ───
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: gittools/actions/gitversion/setup@v4
+        with:
+          versionSpec: '6.x'
+
+      - id: gitversion
+        uses: gittools/actions/gitversion/execute@v4
+
+      - name: Prepare version artifacts
+        run: |
+          gitversion /output json > version.json
+          chmod +x ./scripts/prepare-version.sh
+          ./scripts/prepare-version.sh version.json
+
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push Docker image
+      - name: Build & push Docker
         run: |
           IMAGE="ghcr.io/${{ github.repository }}"
-          SHA="${{ github.sha }}"
+          SEMVER="${{ steps.gitversion.outputs.semVer }}"
+          SHORT_SHA="${{ steps.gitversion.outputs.shortSha }}"
           docker build \
-            --build-arg APP_VERSION="${SHA::7}" \
-            -t "$IMAGE:${SHA::7}" \
+            --build-arg GITVERSION_SEMVER="$SEMVER" \
+            --build-arg GITVERSION_SHA="${{ steps.gitversion.outputs.sha }}" \
+            --build-arg GITVERSION_SHORT_SHA="$SHORT_SHA" \
+            --build-arg GITVERSION_COMMIT_DATE="${{ steps.gitversion.outputs.commitDate }}" \
+            --build-arg GITVERSION_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t "$IMAGE:$SEMVER" \
+            -t "$IMAGE:sha-$SHORT_SHA" \
             -t "$IMAGE:latest" \
             .
-          docker push "$IMAGE:${SHA::7}"
-          docker push "$IMAGE:latest"
+          docker push "$IMAGE" --all-tags
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -68,9 +78,7 @@ jobs:
             IMAGE="ghcr.io/${{ github.repository }}:latest"
             CONTAINER_NAME="yobapub-proxy"
             PASSWORD="${{ secrets.DEPLOY_PASSWORD }}"
-            run_sudo() {
-              printf '%s\n' "$PASSWORD" | sudo -S -p '' "$@"
-            }
+            run_sudo() { printf '%s\n' "$PASSWORD" | sudo -S -p '' "$@"; }
             run_sudo docker pull "$IMAGE"
             run_sudo docker stop "$CONTAINER_NAME" || true
             run_sudo docker rm "$CONTAINER_NAME" || true
@@ -84,3 +92,102 @@ jobs:
               -e Admin__Password="${{ secrets.ADMIN_PASSWORD }}" \
               "$IMAGE"
             run_sudo docker system prune -a -f
+
+  # ─── Release: APK + Tizen + GitHub Release (tags only) ───
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gittools/actions/gitversion/setup@v4
+        with:
+          versionSpec: '6.x'
+
+      - id: gitversion
+        uses: gittools/actions/gitversion/execute@v4
+
+      - name: Prepare version artifacts
+        run: |
+          gitversion /output json > version.json
+          chmod +x ./scripts/prepare-version.sh
+          ./scripts/prepare-version.sh version.json
+          echo "SEMVER=${{ steps.gitversion.outputs.semVer }}" >> $GITHUB_ENV
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── APK ──
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
+
+      - name: Build APK
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/src/apk:/build" \
+            -v "/tmp/release.jks:/tmp/release.jks:ro" \
+            -e ANDROID_KEYSTORE_PATH=/tmp/release.jks \
+            -e ANDROID_KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -e ANDROID_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -e ANDROID_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            -w /build \
+            "ghcr.io/${{ github.repository }}-build-env:latest" \
+            ./gradlew assembleRelease
+
+      - name: Rename APK
+        run: |
+          mv src/apk/app/build/outputs/apk/release/app-release.apk \
+             "yobapub-androidtv-$SEMVER.apk"
+
+      # ── Tizen (cert generated on the fly) ──
+      - name: Package Tizen widget
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/src/tizen-widget:/build" \
+            -w /build \
+            "ghcr.io/${{ github.repository }}-build-env:latest" \
+            bash -c '
+              AUTHOR_P12="/home/builder/tizen-studio-data/keystore/author/author.p12"
+              DIST_P12="/opt/tizen-studio/tools/certificate-generator/certificates/distributor/tizen-distributor-signer.p12"
+              DIST_CA="/opt/tizen-studio/tools/certificate-generator/certificates/distributor/tizen-distributor-ca.cer"
+
+              tizen certificate -a yobapub -p yobapub123 -f author
+
+              mkdir -p /tmp/tizen-profile
+              cat > /tmp/tizen-profile/profiles.xml <<XMLEOF
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<profiles active="yobapub" version="3.1">
+<profile name="yobapub">
+<profileitem ca="" distributor="0" key="$AUTHOR_P12" password="yobapub123" rootca=""/>
+<profileitem ca="$DIST_CA" distributor="1" key="$DIST_P12" password="tizenpkcs12passfordsigner" rootca=""/>
+<profileitem ca="" distributor="2" key="" password="" rootca=""/>
+</profile>
+</profiles>
+XMLEOF
+
+              tizen cli-config "default.profiles.path=/tmp/tizen-profile/profiles.xml"
+              rm -rf build
+              cp -r src build
+              tizen package -t wgt -s yobapub -- build
+              mv build/*.wgt .
+            '
+
+      - name: Rename Tizen widget
+        run: |
+          mv src/tizen-widget/*.wgt "yobapub-tizen-$SEMVER.wgt"
+
+      # ── GitHub Release ──
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "v${{ env.SEMVER }}"
+          generate_release_notes: true
+          files: |
+            yobapub-androidtv-${{ env.SEMVER }}.apk
+            yobapub-tizen-${{ env.SEMVER }}.wgt

@@ -15,6 +15,22 @@ function getAppVersion() {
   }
 }
 
+function getVersionInfo() {
+  var semVer = process.env.GITVERSION_SEMVER;
+  if (semVer) {
+    return {
+      version: semVer,
+      sha: process.env.GITVERSION_SHA || '',
+      shortSha: process.env.GITVERSION_SHORT_SHA || '',
+      buildDate: process.env.GITVERSION_BUILD_DATE || '',
+    };
+  }
+  return {
+    version: getAppVersion(),
+    sha: '', shortSha: '', buildDate: '',
+  };
+}
+
 module.exports = function (_env, argv) {
   var isProd = argv.mode === 'production';
 
@@ -75,7 +91,10 @@ module.exports = function (_env, argv) {
     },
     plugins: [
       new webpack.DefinePlugin({
-        __APP_VERSION__: JSON.stringify(getAppVersion())
+        __APP_VERSION__: JSON.stringify(getVersionInfo().version),
+        __BUILD_SHA__: JSON.stringify(getVersionInfo().sha),
+        __BUILD_SHORT_SHA__: JSON.stringify(getVersionInfo().shortSha),
+        __BUILD_DATE__: JSON.stringify(getVersionInfo().buildDate),
       }),
       new HtmlWebpackPlugin({
         template: './index.html',

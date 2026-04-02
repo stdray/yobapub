@@ -264,7 +264,10 @@ class SettingsPage extends SidebarPage {
         stepper: this.allSettings[i].type === 'stepper'
       });
     }
-    this.$root.html(tplPage({ items: html, version: __APP_VERSION__ }));
+    const version = __BUILD_SHORT_SHA__
+      ? __APP_VERSION__ + ' (' + __BUILD_SHORT_SHA__ + ')'
+      : __APP_VERSION__;
+    this.$root.html(tplPage({ items: html, version }));
   }
 
   private renderOptions(): void {

@@ -47,6 +47,15 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 
+app.MapGet("/v1/about", () =>
+{
+    var path = Path.Combine(AppContext.BaseDirectory, "version.json");
+    if (!File.Exists(path))
+        return Results.Json(new { semVer = "dev" });
+    var json = File.ReadAllText(path);
+    return Results.Content(json, "application/json");
+});
+
 app.MapGet("/api/proxy-config", (ProxyConfig cfg) => Results.Json(new { cfg.ProxyAll, cfg.Upstream }));
 
 app.MapGet("/api/vip-check", (string login, VipLoginStore vipStore) =>

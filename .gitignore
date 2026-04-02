@@ -50,15 +50,21 @@ npm-debug.log*
 *.snupkg
 project.lock.json
 TestResults/
+src/back/YobaPub.Proxy/version.json
 
 # Android build output and cache
 src/apk/.gradle/
 src/apk/build/
 src/apk/app/build/
 local.properties
+version.properties
 
 # Misc
 old
 err/
 .claude
 *.tsv
+
+# Local keys/certs documentation (not for repo)
+docs/local-keys.md
+keys/
