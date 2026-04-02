@@ -12,7 +12,8 @@ export abstract class SidebarPage implements Page {
   }
 
   mount(params: RouteParams): void {
-    sidebar.setUnfocusHandler(() => this.onUnfocus());
+    sidebar.setFocusHandler(() => this.$root.addClass('sidebar-active'));
+    sidebar.setUnfocusHandler(() => { this.$root.removeClass('sidebar-active'); this.onUnfocus(); });
     this.keys.bind(sidebar.wrapKeys((e) => this.handleKey(e)));
     this.onMount(params);
   }
@@ -20,6 +21,7 @@ export abstract class SidebarPage implements Page {
   unmount(): void {
     this.keys.unbind();
     PageUtils.clearPage(this.$root);
+    sidebar.setFocusHandler(null);
     sidebar.setUnfocusHandler(null);
     this.onUnmount();
   }
