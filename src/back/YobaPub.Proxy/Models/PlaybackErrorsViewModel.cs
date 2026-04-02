@@ -15,6 +15,7 @@ public class DeviceErrorInfo
     public int Count { get; init; }
     public DateTimeOffset LastSeen { get; init; }
     public required string LastError { get; init; }
+    public required string LastIp { get; init; }
 }
 
 public class PlaybackErrorsViewModel

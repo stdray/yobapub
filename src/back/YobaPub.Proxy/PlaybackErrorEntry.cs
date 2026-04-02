@@ -13,4 +13,5 @@ public class PlaybackErrorEntry
     public string UserAgent { get; set; } = "";
     public string ErrorDetails { get; set; } = "";
     public string Url { get; set; } = "";
+    public string ClientIp { get; set; } = "";
 }

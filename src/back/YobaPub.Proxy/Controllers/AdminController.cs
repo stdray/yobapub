@@ -30,9 +30,9 @@ public class AdminController(LogStore store, PlaybackErrorStore errorStore) : Co
     {
         var entries = store.QueryAll(query);
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Time\tDevice\tLevel\tCategory\tMessage");
+        sb.AppendLine("Time\tDevice\tIP\tLevel\tCategory\tMessage");
         foreach (var e in entries)
-            sb.AppendLine($"{e.ServerTs.ToLocalTime():yyyy-MM-dd HH:mm:ss}\t{e.DeviceId}\t{e.Level}\t{e.Category}\t{e.Message}");
+            sb.AppendLine($"{e.ServerTs.ToLocalTime():yyyy-MM-dd HH:mm:ss}\t{e.DeviceId}\t{e.ClientIp}\t{e.Level}\t{e.Category}\t{e.Message}");
         var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
         var filename = $"logs_{DateTime.Now:yyyyMMdd_HHmmss}.tsv";
         return File(bytes, "text/tab-separated-values", filename);

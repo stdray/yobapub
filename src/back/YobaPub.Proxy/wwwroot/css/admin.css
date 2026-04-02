@@ -82,6 +82,7 @@ tr.V td { color: #555; }
 
 .ts { white-space: nowrap; color: #777; width: 80px; }
 .dev { color: #6af; width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ip { color: #7c7; width: 120px; white-space: nowrap; }
 .lvl { width: 24px; text-align: center; }
 .cat { width: 100px; color: #aaf; white-space: nowrap; }
 .msg { word-break: break-word; }

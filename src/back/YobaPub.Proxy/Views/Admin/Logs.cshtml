@@ -41,6 +41,7 @@
     <tr>
       <th class="ts">Time</th>
       <th class="dev">Device</th>
+      <th class="ip">IP</th>
       <th class="lvl">L</th>
       <th class="cat">Category</th>
       <th class="msg">Message</th>
@@ -49,7 +50,7 @@
   <tbody>
     @if (Model.Entries.Length == 0)
     {
-      <tr><td colspan="5" class="empty">Записей нет</td></tr>
+      <tr><td colspan="6" class="empty">Записей нет</td></tr>
     }
     @foreach (var e in Model.Entries)
     {
@@ -57,6 +58,7 @@
       <tr class="@cls">
         <td class="ts">@e.ServerTs.ToLocalTime().ToString("HH:mm:ss")</td>
         <td class="dev" title="@e.DeviceId">@(e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId)</td>
+        <td class="ip">@e.ClientIp</td>
         <td class="lvl">@(e.Level.Length > 0 ? e.Level[0] : '-')</td>
         <td class="cat">@e.Category</td>
         <td class="msg">@e.Message</td>

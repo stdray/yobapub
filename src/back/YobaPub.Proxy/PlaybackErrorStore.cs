@@ -57,7 +57,8 @@ public class PlaybackErrorStore : IDisposable
                             UserAgent = latest.UserAgent,
                             Count = dg.Count(),
                             LastSeen = dg.Max(x => x.ServerTs),
-                            LastError = latest.ErrorDetails
+                            LastError = latest.ErrorDetails,
+                            LastIp = latest.ClientIp
                         };
                     })
                     .OrderByDescending(x => x.LastSeen)

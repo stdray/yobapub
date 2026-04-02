@@ -76,6 +76,7 @@ app.MapPost("/api/log", async (HttpContext ctx, LogStore store, DebugSettingsSto
             Category = root.TryGetProperty("category", out var cat) ? cat.GetString() ?? "" : "",
             Message = root.TryGetProperty("message", out var msg) ? msg.GetString() ?? "" : "",
             DeviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
+            ClientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
             Props = root.TryGetProperty("props", out var props) ? props.GetRawText() : "{}"
         };
         store.Add(entry);
@@ -105,7 +106,8 @@ app.MapPost("/api/playback-error", async (HttpContext ctx, PlaybackErrorStore st
             DeviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
             UserAgent = root.TryGetProperty("userAgent", out var ua) ? ua.GetString() ?? "" : "",
             ErrorDetails = root.TryGetProperty("errorDetails", out var details) ? details.GetString() ?? "" : "",
-            Url = url.Length > 500 ? url[..500] : url
+            Url = url.Length > 500 ? url[..500] : url,
+            ClientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? ""
         };
         store.Add(entry);
     }

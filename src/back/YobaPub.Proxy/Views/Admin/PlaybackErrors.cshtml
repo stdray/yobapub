@@ -35,6 +35,7 @@ else
               <th>Кол-во</th>
               <th>Посл. время</th>
               <th>Посл. ошибка</th>
+              <th>IP</th>
             </tr>
           </thead>
           <tbody>
@@ -46,6 +47,7 @@ else
                 <td>@dev.Count</td>
                 <td class="ts">@dev.LastSeen.ToLocalTime().ToString("dd.MM HH:mm")</td>
                 <td class="msg">@dev.LastError</td>
+                <td class="ip">@dev.LastIp</td>
               </tr>
             }
           </tbody>

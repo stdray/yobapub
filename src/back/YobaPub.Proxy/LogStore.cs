@@ -15,6 +15,7 @@ public class LogEntry
     public string Category { get; set; } = "";
     public string Message { get; set; } = "";
     public string DeviceId { get; set; } = "";
+    public string ClientIp { get; set; } = "";
     public string Props { get; set; } = "{}";
 }
 
