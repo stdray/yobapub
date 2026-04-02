@@ -36,24 +36,9 @@
 5. Переподписывает `.wgt` вашим сертификатом
 6. Устанавливает и запускает на выбранном ТВ
 
-## Создание сертификата (первый запуск)
+## Сертификат
 
-При первом запуске на новом компьютере откроется Certificate Manager.
-
-1. Нажмите **[+]** для создания нового профиля
-2. Выберите **Samsung** (не Tizen!)
-3. Выберите **TV**
-4. Придумайте имя профиля (любое)
-5. **Author Certificate** -> **Create a new author certificate**
-   - Заполните имя и пароль
-   - Войдите в **Samsung Account** (создайте на [account.samsung.com](https://account.samsung.com) если нет)
-6. **Distributor Certificate** -> **Create a new distributor certificate**
-   - Privilege level: **Partner**
-   - В списке DUID выберите ваш телевизор (он должен быть подключен)
-7. Нажмите **Finish**
-7. Закройте Certificate Manager
-
-Скрипт автоматически подхватит созданный профиль и продолжит установку.
+Создаётся автоматически при первом запуске. Сохраняется в папке `sdk-data\`. Не требуется Samsung Account или Tizen Studio.
 
 ## Обновление
 
@@ -73,9 +58,10 @@
 
 ```
 tizen-from-windows/
+  install.bat         -- запуск установки
   install.ps1         -- скрипт установки
   README.md           -- эта инструкция
-  *.wgt               -- виджет (скачать из Releases)
-  sdk/                -- Tizen SDK (JDK + CLI + Certificate Manager)
-  sdk-data/           -- данные и сертификаты (создается автоматически)
+  *.wgt               -- виджет (скачивается автоматически или из Releases)
+  sdk/                -- Tizen SDK (JDK + CLI + sdb)
+  sdk-data/           -- сертификаты (создается автоматически)
 ```
