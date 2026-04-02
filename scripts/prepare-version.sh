@@ -33,8 +33,8 @@ GITVERSION_BUILD_DATE=$BUILD_DATE
 EOF
 echo "Frontend: src/front/.env"
 
-# ── 3. Tizen: update version in config.xml ──
-sed -i "s/version=\"[^\"]*\"/version=\"$MAJOR.$MINOR.$PATCH\"/" \
+# ── 3. Tizen: update widget version in config.xml (not XML declaration) ──
+sed -i "s/\(<widget.*\)version=\"[^\"]*\"/\1version=\"$MAJOR.$MINOR.$PATCH\"/" \
   src/tizen-widget/src/config.xml
 echo "Tizen: config.xml version=$MAJOR.$MINOR.$PATCH"
 
