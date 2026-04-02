@@ -41,7 +41,7 @@ jobs:
 
       - name: Prepare version artifacts
         run: |
-          gitversion /output json > version.json
+          dotnet-gitversion /output json > version.json
           chmod +x ./scripts/prepare-version.sh
           ./scripts/prepare-version.sh version.json
 
@@ -112,7 +112,7 @@ jobs:
 
       - name: Prepare version artifacts
         run: |
-          gitversion /output json > version.json
+          dotnet-gitversion /output json > version.json
           chmod +x ./scripts/prepare-version.sh
           ./scripts/prepare-version.sh version.json
           echo "SEMVER=${{ steps.gitversion.outputs.semVer }}" >> $GITHUB_ENV
