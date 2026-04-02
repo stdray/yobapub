@@ -11,64 +11,28 @@ if (-not (Test-Path $Adb)) {
 # ══════════════════════════════════════════
 # Step 1: Find Android TV devices
 # ══════════════════════════════════════════
-Write-Host "`nScanning network for Android TV devices..." -ForegroundColor Yellow
+Write-Host "`nSearching for Android TV devices..." -ForegroundColor Yellow
 
-$localIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
-    $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
-    $_.IPAddress -notlike '172.1?.*' -and $_.IPAddress -notlike '172.2?.*' -and
-    $_.IPAddress -notlike '172.3?.*' -and $_.PrefixOrigin -ne 'WellKnown'
-} | Sort-Object -Property InterfaceIndex | Select-Object -First 1).IPAddress
-
-if (-not $localIp) {
-    Write-Host "ERROR: Could not determine local IP." -ForegroundColor Red
-    exit 1
-}
-
-$subnet = ($localIp -split '\.')[0..2] -join '.'
-Write-Host "Subnet: $subnet.0/24 (from $localIp)" -ForegroundColor DarkGray
-
-# Scan port 5555 (default ADB over network)
-$tasks = @{}
-1..254 | ForEach-Object {
-    $ip = "$subnet.$_"
-    $c = [System.Net.Sockets.TcpClient]::new()
-    $tasks[$ip] = @{ Client = $c; Task = $c.ConnectAsync($ip, 5555) }
-}
-Start-Sleep -Seconds 2
-
-$foundEndpoints = @()
-foreach ($ip in $tasks.Keys) {
-    $t = $tasks[$ip]
-    try {
-        if ($t.Task.IsCompleted -and -not $t.Task.IsFaulted) {
-            $foundEndpoints += "${ip}:5555"
-        }
-    } catch {}
-    $t.Client.Dispose()
-}
-
-# Also check already-connected devices
+# Check already-connected devices
 & $Adb start-server 2>&1 | Out-Null
+$foundEndpoints = @()
 $existingDevices = & $Adb devices 2>&1 | Where-Object { $_ -match '^\S+\s+device$' }
 foreach ($line in $existingDevices) {
     if ($line -match '^(\S+)\s+device$') {
-        $ep = $Matches[1]
-        if ($foundEndpoints -notcontains $ep) {
-            $foundEndpoints += $ep
-        }
+        $foundEndpoints += $Matches[1]
     }
 }
 
 if ($foundEndpoints.Count -eq 0) {
-    Write-Host "`nNo Android TV devices found." -ForegroundColor Red
+    Write-Host "`nNo connected devices found." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Enable wireless debugging on your Android TV:" -ForegroundColor Yellow
+    Write-Host "Enable wireless debugging on your Android TV:" -ForegroundColor White
     Write-Host "  1. Settings > Device Preferences > About > tap 'Build' 7 times" -ForegroundColor White
     Write-Host "  2. Settings > Device Preferences > Developer Options" -ForegroundColor White
     Write-Host "  3. Enable 'Network debugging' (or 'ADB debugging')" -ForegroundColor White
     Write-Host "  4. Note the IP address and port shown on screen" -ForegroundColor White
     Write-Host ""
-    Write-Host "Or enter device address manually (IP:PORT): " -NoNewline
+    Write-Host "Enter device address (IP:PORT): " -NoNewline
     $manual = Read-Host
     if (-not $manual) { exit 1 }
     $foundEndpoints = @($manual)
