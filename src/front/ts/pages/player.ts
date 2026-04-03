@@ -100,6 +100,7 @@ class PlayerController {
 
   // Flags
   private appendErrorCount = 0;
+  private hadBufferFullError = false;
   private playbackStarted = false;
   private markedWatched = false;
   private wasWatched = false;
@@ -568,13 +569,20 @@ class PlayerController {
           fragSn: data.frag ? data.frag.sn : null,
           fragStart: data.frag ? data.frag.start : null,
         });
+        if (data.details === 'bufferFullError') {
+          this.hadBufferFullError = true;
+          plog.warn('hls bufferFullError, flagged for immediate recovery on next append error');
+        }
         if (data.details === 'bufferAppendingError') {
           this.appendErrorCount++;
-          if (this.appendErrorCount >= 2) {
-            plog.warn('hls recoverMediaError after repeated bufferAppendingError (count={count})', { count: this.appendErrorCount });
+          if (this.appendErrorCount >= 2 || this.hadBufferFullError) {
+            plog.warn('hls recoverMediaError after bufferAppendingError (count={count}, hadBufferFull={hadBufferFull})', {
+              count: this.appendErrorCount, hadBufferFull: this.hadBufferFullError,
+            });
             hls.recoverMediaError();
             if (this.videoEl) this.videoEl.play();
             this.appendErrorCount = 0;
+            this.hadBufferFullError = false;
           } else {
             plog.warn('hls bufferAppendingError (count={count}, waiting for hls.js retry)', { count: this.appendErrorCount });
           }
@@ -742,6 +750,7 @@ class PlayerController {
     });
     this.videoEl.addEventListener('playing', () => {
       this.appendErrorCount = 0;
+      this.hadBufferFullError = false;
       plog.info('video playing ct={ct} readyState={rs} buffered={br}', {
         ct: this.videoEl ? this.videoEl.currentTime : -1,
         rs: this.videoEl ? this.videoEl.readyState : -1,
@@ -774,6 +783,14 @@ class PlayerController {
         ac: curLevel ? curLevel.audioCodec || null : null,
         hlsBitrate: curLevel ? curLevel.bitrate : null,
       });
+      if ((this.appendErrorCount > 0 || this.hadBufferFullError) && this.hlsInstance) {
+        plog.warn('video error during buffer recovery, attempting recoverMediaError instead of destroying');
+        this.hlsInstance.recoverMediaError();
+        if (v) v.play();
+        this.appendErrorCount = 0;
+        this.hadBufferFullError = false;
+        return;
+      }
       if (v) this.showPlaybackError(v.error, sourceUrl);
     });
 

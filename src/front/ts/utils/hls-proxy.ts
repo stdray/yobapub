@@ -5,20 +5,17 @@ import { Logger } from './log';
 interface HlsBufferLimits {
   readonly maxBufferLength: number;
   readonly maxMaxBufferLength: number;
-  readonly maxBufferSize: number;
 }
 
 export const getBufferLimits = (tizenVersion: number): HlsBufferLimits => {
   if (tizenVersion > 0 && tizenVersion < 3) {
-    // Tizen 2.3: very limited memory, keep buffer small
-    return { maxBufferLength: 10, maxMaxBufferLength: 30, maxBufferSize: 13 * 1024 * 1024 };
+    return { maxBufferLength: 10, maxMaxBufferLength: 30 };
   }
   if (tizenVersion >= 3) {
-    // Tizen 3.0+
-    return { maxBufferLength: 15, maxMaxBufferLength: 45, maxBufferSize: 20 * 1024 * 1024 };
+    return { maxBufferLength: 10, maxMaxBufferLength: 30 };
   }
   // Non-Tizen (browser, Android): reasonable defaults, not hls.js's 600s
-  return { maxBufferLength: 30, maxMaxBufferLength: 90, maxBufferSize: 40 * 1024 * 1024 };
+  return { maxBufferLength: 30, maxMaxBufferLength: 90 };
 };
 
 export const buildBaseHlsConfig = (): Record<string, number> => {
@@ -29,7 +26,6 @@ export const buildBaseHlsConfig = (): Record<string, number> => {
     levelLoadingMaxRetry: 2,
     maxBufferLength: limits.maxBufferLength,
     maxMaxBufferLength: limits.maxMaxBufferLength,
-    maxBufferSize: limits.maxBufferSize,
   };
 };
 
