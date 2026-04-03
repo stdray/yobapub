@@ -16,6 +16,7 @@ public class LogEntry
     public string Message { get; set; } = "";
     public string DeviceId { get; set; } = "";
     public string ClientIp { get; set; } = "";
+    public string TraceId { get; set; } = "";
     public string Props { get; set; } = "{}";
 }
 
@@ -33,6 +34,7 @@ public class LogStore : IDisposable
         _col = _db.GetCollection<LogEntry>("logs");
         _col.EnsureIndex(x => x.ServerTs);
         _col.EnsureIndex(x => x.DeviceId);
+        _col.EnsureIndex(x => x.TraceId);
     }
 
     public void Add(LogEntry entry)
@@ -53,17 +55,35 @@ public class LogStore : IDisposable
     public LogEntry[] GetAll() =>
         _col.Query().OrderBy(x => x.ServerTs).ToArray();
 
+    private static IEnumerable<LogEntry> ApplyFilters(IEnumerable<LogEntry> rows, LogsQuery q)
+    {
+        if (!string.IsNullOrEmpty(q.Level))
+            rows = rows.Where(x => x.Level == q.Level);
+        if (!string.IsNullOrEmpty(q.Device))
+            rows = rows.Where(x => x.DeviceId.StartsWith(q.Device, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(q.TraceId))
+            rows = rows.Where(x => x.TraceId.Equals(q.TraceId, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(q.Search))
+        {
+            var s = q.Search;
+            rows = rows.Where(x =>
+                x.Message.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                x.Category.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                x.DeviceId.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                x.ClientIp.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                x.TraceId.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                x.Level.Contains(s, StringComparison.OrdinalIgnoreCase));
+        }
+        return rows;
+    }
+
     public (LogEntry[] Entries, int Total) Query(LogsQuery q)
     {
         var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
         var page     = Math.Max(1, q.Page);
 
-        IEnumerable<LogEntry> rows = _col.Query().OrderByDescending(x => x.ServerTs).ToList();
-
-        if (!string.IsNullOrEmpty(q.Level))
-            rows = rows.Where(x => x.Level == q.Level);
-        if (!string.IsNullOrEmpty(q.Device))
-            rows = rows.Where(x => x.DeviceId.StartsWith(q.Device, StringComparison.OrdinalIgnoreCase));
+        var rows = ApplyFilters(
+            _col.Query().OrderByDescending(x => x.ServerTs).ToList(), q);
 
         var list    = rows.ToList();
         var total   = list.Count;
@@ -71,15 +91,9 @@ public class LogStore : IDisposable
         return (entries, total);
     }
 
-    public LogEntry[] QueryAll(LogsQuery q)
-    {
-        IEnumerable<LogEntry> rows = _col.Query().OrderByDescending(x => x.ServerTs).ToList();
-        if (!string.IsNullOrEmpty(q.Level))
-            rows = rows.Where(x => x.Level == q.Level);
-        if (!string.IsNullOrEmpty(q.Device))
-            rows = rows.Where(x => x.DeviceId.StartsWith(q.Device, StringComparison.OrdinalIgnoreCase));
-        return rows.ToArray();
-    }
+    public LogEntry[] QueryAll(LogsQuery q) =>
+        ApplyFilters(
+            _col.Query().OrderByDescending(x => x.ServerTs).ToList(), q).ToArray();
 
     public int DeleteOlderThan(DateTimeOffset cutoff) =>
         _col.DeleteMany(x => x.ServerTs < cutoff);

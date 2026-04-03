@@ -4,6 +4,8 @@ public class LogsQuery
 {
     public string? Level { get; init; }
     public string? Device { get; init; }
+    public string? TraceId { get; init; }
+    public string? Search { get; init; }
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 100;
 }

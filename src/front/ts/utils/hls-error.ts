@@ -1,4 +1,5 @@
 import { Logger } from './log';
+import { platform } from './platform';
 
 export interface HlsErrorData {
   fatal: boolean;
@@ -45,7 +46,11 @@ export const showHlsError = (
   const message = getErrorMessage(data.type, data.details);
   const debug = formatHlsErrorDebug(data);
 
-  log.error('playbackError {message} {domain} {debug}', { message, domain, debug });
+  const devInfo = platform.getDeviceInfo();
+  log.error('playbackError {message} {domain} {debug}', {
+    message, domain, debug,
+    ua: navigator.userAgent, hw: devInfo.hardware, sw: devInfo.software,
+  });
 
   $root.html(
     '<div class="' + cssPrefix + '">' +

@@ -26,16 +26,24 @@ public class AdminController(LogStore store, PlaybackErrorStore errorStore) : Co
     }
 
     [HttpGet("logs/download")]
-    public IActionResult DownloadLogs(LogsQuery query)
+    public IActionResult DownloadLogs(LogsQuery query, int? limit)
     {
         var entries = store.QueryAll(query);
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Time\tDevice\tIP\tLevel\tCategory\tMessage");
-        foreach (var e in entries)
-            sb.AppendLine($"{e.ServerTs.ToLocalTime():yyyy-MM-dd HH:mm:ss}\t{e.DeviceId}\t{e.ClientIp}\t{e.Level}\t{e.Category}\t{e.Message}");
-        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        if (limit is > 0)
+            entries = entries.Take(limit.Value).ToArray();
+        var tsv = FormatTsv(entries);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(tsv);
         var filename = $"logs_{DateTime.Now:yyyyMMdd_HHmmss}.tsv";
         return File(bytes, "text/tab-separated-values", filename);
+    }
+
+    [HttpGet("logs/tsv")]
+    public IActionResult LogsTsv(LogsQuery query, int? limit)
+    {
+        var entries = store.QueryAll(query);
+        if (limit is > 0)
+            entries = entries.Take(limit.Value).ToArray();
+        return Content(FormatTsv(entries), "text/plain; charset=utf-8");
     }
 
     [HttpPost("logs/clear")]
@@ -61,5 +69,14 @@ public class AdminController(LogStore store, PlaybackErrorStore errorStore) : Co
     {
         errorStore.DeleteAll();
         return RedirectToAction(nameof(PlaybackErrors));
+    }
+
+    private static string FormatTsv(LogEntry[] entries)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Time\tDevice\tTraceId\tIP\tLevel\tCategory\tMessage");
+        foreach (var e in entries)
+            sb.AppendLine($"{e.ServerTs.ToLocalTime():yyyy-MM-dd HH:mm:ss}\t{e.DeviceId}\t{e.TraceId}\t{e.ClientIp}\t{e.Level}\t{e.Category}\t{e.Message}");
+        return sb.ToString();
     }
 }

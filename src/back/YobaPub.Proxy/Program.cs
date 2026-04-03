@@ -49,7 +49,22 @@ var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseMiddleware<UniversalProxyMiddleware>();
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var path = ctx.File.Name;
+        if (path == "index.html")
+        {
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.CacheControl] = "no-cache, no-store";
+        }
+        else if (path.Contains('.') && (path.EndsWith(".js") || path.EndsWith(".css")))
+        {
+            // Hashed filenames (app.abc12345.js) — cache aggressively
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.CacheControl] = "public, max-age=31536000, immutable";
+        }
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
@@ -85,6 +100,7 @@ app.MapPost("/api/log", async (HttpContext ctx, LogStore store, DebugSettingsSto
             Message = root.TryGetProperty("message", out var msg) ? msg.GetString() ?? "" : "",
             DeviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
             ClientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
+            TraceId = root.TryGetProperty("traceId", out var trace) ? trace.GetString() ?? "" : "",
             Props = root.TryGetProperty("props", out var props) ? props.GetRawText() : "{}"
         };
         store.Add(entry);

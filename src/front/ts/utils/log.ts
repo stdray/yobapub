@@ -15,26 +15,29 @@ const renderTemplate = (template: string, props: Record<string, unknown>): strin
     return v === undefined ? '{' + key + '}' : String(v);
   });
 
-const sendToBackend = (level: Level, message: string, props: Record<string, unknown>): void => {
+const sendToBackend = (level: Level, message: string, props: Record<string, unknown>, traceId?: string): void => {
   try {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/log', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.send(JSON.stringify({
+    const body: Record<string, unknown> = {
       level,
       category: typeof props['category'] === 'string' ? props['category'] : '',
       message,
       props,
       deviceId: storage.getDeviceId(),
       clientTs: Date.now()
-    }));
+    };
+    if (traceId) body['traceId'] = traceId;
+    xhr.send(JSON.stringify(body));
   } catch (_) { /* fire-and-forget */ }
 };
 
-const emit = (level: Level, template: string, props: Record<string, unknown>): void => {
+const emit = (level: Level, template: string, props: Record<string, unknown>, traceId?: string): void => {
   const message = renderTemplate(template, props);
-  sendToBackend(level, message, props);
-  const console_msg = '[' + relTs() + '][' + level[0] + '] ' + message;
+  sendToBackend(level, message, props, traceId);
+  const traceTag = traceId ? '[' + traceId + ']' : '';
+  const console_msg = '[' + relTs() + '][' + level[0] + ']' + traceTag + ' ' + message;
   switch (level) {
     case 'Warning': console.warn(console_msg, props); break;
     case 'Error':   console.error(console_msg, props); break;
@@ -42,22 +45,36 @@ const emit = (level: Level, template: string, props: Record<string, unknown>): v
   }
 };
 
+const generateTraceId = (): string => {
+  const chars = '0123456789abcdef';
+  let result = '';
+  for (let i = 0; i < 4; i++) result += chars[Math.floor(Math.random() * 16)];
+  return result;
+};
+
 export class Logger {
+  private traceId?: string;
+
   constructor(private readonly category: string) {}
 
-  info(template: string, props?: Record<string, unknown>): void {
-    emit('Information', template, { category: this.category, ...props });
-  }
+  setTraceId = (id: string): void => { this.traceId = id; };
+  newTraceId = (): string => { this.traceId = generateTraceId(); return this.traceId; };
+  getTraceId = (): string | undefined => this.traceId;
+  clearTraceId = (): void => { this.traceId = undefined; };
 
-  debug(template: string, props?: Record<string, unknown>): void {
-    emit('Verbose', template, { category: this.category, ...props });
-  }
+  info = (template: string, props?: Record<string, unknown>): void => {
+    emit('Information', template, { category: this.category, ...props }, this.traceId);
+  };
 
-  warn(template: string, props?: Record<string, unknown>): void {
-    emit('Warning', template, { category: this.category, ...props });
-  }
+  debug = (template: string, props?: Record<string, unknown>): void => {
+    emit('Verbose', template, { category: this.category, ...props }, this.traceId);
+  };
 
-  error(template: string, props?: Record<string, unknown>): void {
-    emit('Error', template, { category: this.category, ...props });
-  }
+  warn = (template: string, props?: Record<string, unknown>): void => {
+    emit('Warning', template, { category: this.category, ...props }, this.traceId);
+  };
+
+  error = (template: string, props?: Record<string, unknown>): void => {
+    emit('Error', template, { category: this.category, ...props }, this.traceId);
+  };
 }

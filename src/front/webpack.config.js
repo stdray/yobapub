@@ -38,7 +38,7 @@ module.exports = function (_env, argv) {
     entry: './ts/main.ts',
     output: {
       path: path.resolve(__dirname, isProd ? 'dist/release' : 'dist/dev'),
-      filename: 'app.js',
+      filename: 'app.[contenthash:8].js',
       clean: true
     },
     target: ['web', 'es5'],

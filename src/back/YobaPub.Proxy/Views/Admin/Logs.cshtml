@@ -3,6 +3,7 @@
     ViewData["Title"] = "YobaPub Logs";
     var q = Model.Query;
     var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
+    var filterQs = $"level={Uri.EscapeDataString(q.Level ?? "")}&device={Uri.EscapeDataString(q.Device ?? "")}&traceId={Uri.EscapeDataString(q.TraceId ?? "")}&search={Uri.EscapeDataString(q.Search ?? "")}";
 }
 <header>
   <h1>YobaPub Logs</h1>
@@ -14,8 +15,11 @@
         <option value="@lvl" selected="@(q.Level == lvl ? "selected" : null)">@lvl</option>
       }
     </select>
-    <input type="text" name="device" value="@q.Device" placeholder="Device prefix…"
+    <input type="text" name="device" value="@q.Device" placeholder="Device prefix..."
+           style="width:120px" onchange="this.form.submit()">
+    <input type="text" name="search" value="@q.Search" placeholder="Поиск..."
            style="width:160px" onchange="this.form.submit()">
+    <input type="hidden" name="traceId" value="@q.TraceId">
     <select name="pageSize" onchange="this.form.submit()">
       @foreach (var ps in new[] { 50, 100, 200, 500 })
       {
@@ -23,14 +27,38 @@
       }
     </select>
     <input type="hidden" name="page" value="1">
+    @if (!string.IsNullOrEmpty(q.TraceId))
+    {
+      <span class="active-filter">trace: @q.TraceId
+        <a href="@Url.Action("Logs", new { level = q.Level, device = q.Device, search = q.Search, pageSize })"
+           title="Сбросить фильтр по trace">&#x2715;</a>
+      </span>
+    }
   </form>
   <label><input type="checkbox" id="autoRefresh" checked> Auto 10s</label>
   <span id="status">@Model.Total записей</span>
-  <a asp-action="DownloadLogs" asp-route-level="@q.Level" asp-route-device="@q.Device">Выгрузить</a>
+  <div class="dropdown">
+    <button type="button" class="dropdown-toggle">Выгрузить &#x25BE;</button>
+    <div class="dropdown-menu">
+      <a href="/admin/logs/download?@(filterQs)&limit=15">Последние 15</a>
+      <a href="/admin/logs/download?@(filterQs)&limit=50">Последние 50</a>
+      <a href="/admin/logs/download?@(filterQs)">Загрузить все</a>
+    </div>
+  </div>
+  <div class="dropdown">
+    <button type="button" class="dropdown-toggle">Копировать &#x25BE;</button>
+    <div class="dropdown-menu">
+      <a href="#" onclick="copyLogs(15);return false">Последние 15</a>
+      <a href="#" onclick="copyLogs(50);return false">Последние 50</a>
+      <a href="#" onclick="copyLogs(0);return false">Копировать все</a>
+    </div>
+  </div>
   <form asp-action="ClearLogs" method="post" style="margin:0"
         onsubmit="return confirm('Удалить все логи?')">
     <input type="hidden" name="level" value="@q.Level">
     <input type="hidden" name="device" value="@q.Device">
+    <input type="hidden" name="traceId" value="@q.TraceId">
+    <input type="hidden" name="search" value="@q.Search">
     <input type="hidden" name="page" value="@q.Page">
     <input type="hidden" name="pageSize" value="@pageSize">
     <button type="submit" class="danger">Очистить</button>
@@ -41,6 +69,7 @@
     <tr>
       <th class="ts">Time</th>
       <th class="dev">Device</th>
+      <th class="trace">Trace</th>
       <th class="ip">IP</th>
       <th class="lvl">L</th>
       <th class="cat">Category</th>
@@ -50,14 +79,22 @@
   <tbody>
     @if (Model.Entries.Length == 0)
     {
-      <tr><td colspan="6" class="empty">Записей нет</td></tr>
+      <tr><td colspan="7" class="empty">Записей нет</td></tr>
     }
     @foreach (var e in Model.Entries)
     {
       var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
+      var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
       <tr class="@cls">
         <td class="ts">@e.ServerTs.ToLocalTime().ToString("HH:mm:ss")</td>
-        <td class="dev" title="@e.DeviceId">@(e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId)</td>
+        <td class="dev" title="@e.DeviceId">@devPrefix</td>
+        <td class="trace">
+          @if (!string.IsNullOrEmpty(e.TraceId))
+          {
+            <a class="trace-btn" href="@Url.Action("Logs", new { level = q.Level, device = devPrefix, search = q.Search, traceId = e.TraceId, pageSize })"
+               title="Фильтр по device + trace">@e.TraceId</a>
+          }
+        </td>
         <td class="ip">@e.ClientIp</td>
         <td class="lvl">@(e.Level.Length > 0 ? e.Level[0] : '-')</td>
         <td class="cat">@e.Category</td>
@@ -72,16 +109,53 @@
     @if (q.Page > 1)
     {
       <a asp-action="Logs" asp-route-level="@q.Level" asp-route-device="@q.Device"
-         asp-route-pageSize="@pageSize" asp-route-page="@(q.Page - 1)">← Назад</a>
+         asp-route-traceId="@q.TraceId" asp-route-search="@q.Search"
+         asp-route-pageSize="@pageSize" asp-route-page="@(q.Page - 1)">&#x2190; Назад</a>
     }
     <span>стр. @q.Page / @Model.TotalPages</span>
     @if (q.Page < Model.TotalPages)
     {
       <a asp-action="Logs" asp-route-level="@q.Level" asp-route-device="@q.Device"
-         asp-route-pageSize="@pageSize" asp-route-page="@(q.Page + 1)">Вперёд →</a>
+         asp-route-traceId="@q.TraceId" asp-route-search="@q.Search"
+         asp-route-pageSize="@pageSize" asp-route-page="@(q.Page + 1)">Вперёд &#x2192;</a>
     }
   </nav>
 }
 <script>
 setInterval(function() { if (document.getElementById('autoRefresh').checked) location.reload(); }, 10000);
+document.addEventListener('click', function(e) {
+  var open = document.querySelector('.dropdown.open');
+  if (open && !open.contains(e.target)) open.classList.remove('open');
+});
+document.querySelectorAll('.dropdown-toggle').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var dd = btn.parentElement;
+    var wasOpen = dd.classList.contains('open');
+    var prev = document.querySelector('.dropdown.open');
+    if (prev) prev.classList.remove('open');
+    if (!wasOpen) dd.classList.add('open');
+  });
+});
+function copyLogs(limit) {
+  var url = '/admin/logs/tsv?@Html.Raw(filterQs)' + (limit ? '&limit=' + limit : '');
+  fetch(url).then(function(r) { return r.text(); }).then(function(text) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    var s = document.getElementById('status');
+    var prev = s.textContent;
+    s.textContent = 'Скопировано!';
+    setTimeout(function() { s.textContent = prev; }, 2000);
+  });
+  var open = document.querySelector('.dropdown.open');
+  if (open) open.classList.remove('open');
+}
 </script>

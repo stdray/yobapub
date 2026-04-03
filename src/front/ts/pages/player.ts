@@ -492,6 +492,7 @@ class PlayerController {
     this.media.hlsUrl = url;
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
     this.playSourceDebug = 'url=' + url.substring(0, 120);
+    plog.newTraceId();
     const cfg = this.buildHlsConfig();
     logPlaybackStart(plog, url, { startPosition: cfg.startPosition || 0 });
     const hls = new Hls(cfg);
@@ -655,9 +656,11 @@ class PlayerController {
     const hlsAny = this.hlsInstance as unknown as { readonly currentLevel?: number; readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number; readonly videoCodec?: string; readonly audioCodec?: string }> } | null;
     const curLevel = hlsAny && hlsAny.currentLevel !== undefined && hlsAny.currentLevel >= 0 && hlsAny.levels
       ? hlsAny.levels[hlsAny.currentLevel] : undefined;
+    const devInfo = platform.getDeviceInfo();
     plog.error('playbackError {code} {msg} {detail} {domain} hlsLevel={hlsLevel} hlsRes={hlsRes} videoCodec={vc} audioCodec={ac}', {
       code, msg, detail: detail || null, domain,
       url: url.substring(0, 120), ua: navigator.userAgent,
+      hw: devInfo.hardware, sw: devInfo.software,
       hlsLevel: hlsAny ? hlsAny.currentLevel : null,
       hlsRes: curLevel ? curLevel.width + 'x' + curLevel.height : null,
       vc: curLevel ? curLevel.videoCodec || null : null,

@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import { Page, RouteParams } from '../types/app';
 import { router } from '../router';
-import { TvKey } from '../utils/platform';
+import { TvKey, platform } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
 import { buildBaseHlsConfig, logPlaybackStart } from '../utils/hls-proxy';
@@ -59,9 +59,13 @@ const render = (title: string): void => {
     video.addEventListener('ended', () => plog.debug('video: ended'));
     video.addEventListener('error', (e) => {
       const err = video?.error;
+      const devInfo = platform.getDeviceInfo();
       plog.error('video: error', {
         code: err?.code,
-        message: err?.message
+        message: err?.message,
+        ua: navigator.userAgent,
+        hw: devInfo.hardware,
+        sw: devInfo.software,
       });
     });
     video.addEventListener('stalled', () => plog.debug('video: stalled'));
@@ -108,6 +112,7 @@ const startPlayback = (streamUrl: string): void => {
     }
 
     hls = new HlsCtor(hlsConfig);
+    plog.newTraceId();
     logPlaybackStart(plog, streamUrl);
 
     // Register all events before loadSource/attachMedia
