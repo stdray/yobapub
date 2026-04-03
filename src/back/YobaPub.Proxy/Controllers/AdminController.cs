@@ -74,9 +74,12 @@ public class AdminController(LogStore store, PlaybackErrorStore errorStore) : Co
     private static string FormatTsv(LogEntry[] entries)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Time\tDevice\tTraceId\tIP\tLevel\tCategory\tMessage");
+        sb.AppendLine("Time\tDevice\tTraceId\tIP\tLevel\tCategory\tMessage\tStackTrace");
         foreach (var e in entries)
-            sb.AppendLine($"{e.ServerTs.ToLocalTime():yyyy-MM-dd HH:mm:ss}\t{e.DeviceId}\t{e.TraceId}\t{e.ClientIp}\t{e.Level}\t{e.Category}\t{e.Message}");
+        {
+            var st = e.StackTrace.Replace("\r", "").Replace("\n", "\\n").Replace("\t", "\\t");
+            sb.AppendLine($"{e.ServerTs.ToLocalTime():yyyy-MM-dd HH:mm:ss}\t{e.DeviceId}\t{e.TraceId}\t{e.ClientIp}\t{e.Level}\t{e.Category}\t{e.Message}\t{st}");
+        }
         return sb.ToString();
     }
 }

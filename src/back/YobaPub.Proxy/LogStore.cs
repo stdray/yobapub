@@ -17,6 +17,7 @@ public class LogEntry
     public string DeviceId { get; set; } = "";
     public string ClientIp { get; set; } = "";
     public string TraceId { get; set; } = "";
+    public string StackTrace { get; set; } = "";
     public string Props { get; set; } = "{}";
 }
 

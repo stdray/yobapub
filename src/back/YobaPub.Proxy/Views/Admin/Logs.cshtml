@@ -74,17 +74,19 @@
       <th class="lvl">L</th>
       <th class="cat">Category</th>
       <th class="msg">Message</th>
+      <th class="act"></th>
     </tr>
   </thead>
   <tbody>
     @if (Model.Entries.Length == 0)
     {
-      <tr><td colspan="7" class="empty">Записей нет</td></tr>
+      <tr><td colspan="8" class="empty">Записей нет</td></tr>
     }
     @foreach (var e in Model.Entries)
     {
       var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
       var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
+      var hasStack = !string.IsNullOrEmpty(e.StackTrace);
       <tr class="@cls">
         <td class="ts">@e.ServerTs.ToLocalTime().ToString("HH:mm:ss")</td>
         <td class="dev" title="@e.DeviceId">@devPrefix</td>
@@ -98,7 +100,15 @@
         <td class="ip">@e.ClientIp</td>
         <td class="lvl">@(e.Level.Length > 0 ? e.Level[0] : '-')</td>
         <td class="cat">@e.Category</td>
-        <td class="msg">@e.Message</td>
+        <td class="msg">
+          @e.Message
+          @if (hasStack)
+          {
+            <a href="#" class="stack-toggle" onclick="this.nextElementSibling.classList.toggle('hidden');return false">stack</a>
+            <pre class="stack-trace hidden">@e.StackTrace</pre>
+          }
+        </td>
+        <td class="act"><button class="copy-row-btn" type="button" title="Копировать">&#x2398;</button></td>
       </tr>
     }
   </tbody>
@@ -140,16 +150,7 @@ document.querySelectorAll('.dropdown-toggle').forEach(function(btn) {
 function copyLogs(limit) {
   var url = '/admin/logs/tsv?@Html.Raw(filterQs)' + (limit ? '&limit=' + limit : '');
   fetch(url).then(function(r) { return r.text(); }).then(function(text) {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-    } else {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
+    copyToClipboard(text);
     var s = document.getElementById('status');
     var prev = s.textContent;
     s.textContent = 'Скопировано!';
@@ -158,4 +159,32 @@ function copyLogs(limit) {
   var open = document.querySelector('.dropdown.open');
   if (open) open.classList.remove('open');
 }
+function copyToClipboard(text) {
+  if (navigator.clipboard) { navigator.clipboard.writeText(text); return; }
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.copy-row-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var tr = btn.closest('tr');
+    var cells = tr.querySelectorAll('td');
+    var parts = [];
+    for (var i = 0; i < cells.length - 1; i++) {
+      if (cells[i].classList.contains('msg')) {
+        var stack = cells[i].querySelector('.stack-trace');
+        parts.push(cells[i].childNodes[0].textContent.trim());
+        if (stack) parts.push('\n' + stack.textContent.trim());
+      } else {
+        parts.push(cells[i].textContent.trim());
+      }
+    }
+    copyToClipboard(parts.join('\t'));
+    btn.textContent = '\u2713';
+    setTimeout(function() { btn.innerHTML = '\u2398'; }, 1500);
+  });
+});
 </script>

@@ -36,13 +36,14 @@ file sealed class LiteDbLogger(string category, LogStore store, DebugSettingsSto
 
         store.Add(new LogEntry
         {
-            ServerTs  = DateTimeOffset.UtcNow,
-            Level     = level,
-            Category  = category,
-            Message   = message,
-            DeviceId  = "server",
-            ClientIp  = "",
-            TraceId   = "",
+            ServerTs   = DateTimeOffset.UtcNow,
+            Level      = level,
+            Category   = category,
+            Message    = message,
+            DeviceId   = "server",
+            ClientIp   = "",
+            TraceId    = "",
+            StackTrace = exception?.ToString() ?? "",
         });
     }
 }

@@ -92,6 +92,25 @@ tr.V td { color: #555; }
 }
 .trace-btn:hover { background: #2a4048; }
 .msg { word-break: break-word; }
+.act { width: 28px; text-align: center; }
+.copy-row-btn {
+  background: none; color: #666; border: none; cursor: pointer;
+  font-size: 14px; padding: 0 4px; line-height: 1;
+}
+.copy-row-btn:hover { color: #ccc; }
+
+.stack-toggle {
+  color: #f66; text-decoration: none; font-size: 11px;
+  margin-left: 6px; border: 1px solid #633; padding: 0 4px;
+  border-radius: 3px;
+}
+.stack-toggle:hover { background: #311; }
+.stack-trace {
+  margin: 4px 0 0; padding: 6px 8px; background: #111; border: 1px solid #333;
+  color: #e88; font-size: 11px; white-space: pre-wrap; word-break: break-all;
+  max-height: 300px; overflow: auto;
+}
+.hidden { display: none; }
 
 .active-filter {
   color: #fa0; background: #332800; padding: 2px 8px;
