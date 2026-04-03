@@ -88,19 +88,7 @@ class LogCopy {
 /* ── Level filter ────────────────────────────────── */
 
 class LevelFilter {
-  static isOpen() {
-    const dd = document.getElementById('lvl-dropdown');
-    return dd && dd.classList.contains('lvl-dropdown--open');
-  }
-
-  static toggle() {
-    document.getElementById('lvl-dropdown').classList.toggle('lvl-dropdown--open');
-  }
-
-  static applyAndClose() {
-    if (!LevelFilter.isOpen()) return;
-    document.getElementById('lvl-dropdown').classList.remove('lvl-dropdown--open');
-    dd.style.display = 'none';
+  static apply() {
     const checked = Array.from(document.querySelectorAll('.lvl-cb'))
       .filter((c) => c.checked)
       .map((c) => c.value);
@@ -112,8 +100,17 @@ class LevelFilter {
   }
 
   static handleClick(e) {
-    if (e.target.closest('#lvl-toggle')) { LevelFilter.toggle(); return true; }
-    if (!e.target.closest('.lvl')) { LevelFilter.applyAndClose(); }
+    if (e.target.closest('#lvl-toggle')) {
+      document.getElementById('lvl-dropdown').classList.toggle('lvl-dropdown--open');
+      return true;
+    }
+    if (e.target.closest('.lvl-cb')) {
+      LevelFilter.apply();
+      return true;
+    }
+    if (!e.target.closest('.lvl')) {
+      document.getElementById('lvl-dropdown')?.classList.remove('lvl-dropdown--open');
+    }
     return false;
   }
 }
