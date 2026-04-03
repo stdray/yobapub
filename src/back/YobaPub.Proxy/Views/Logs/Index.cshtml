@@ -4,11 +4,24 @@
     var q = Model.Query;
     var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
     var filterQs = $"level={Uri.EscapeDataString(q.Level ?? "")}&device={Uri.EscapeDataString(q.Device ?? "")}&traceId={Uri.EscapeDataString(q.TraceId ?? "")}&search={Uri.EscapeDataString(q.Search ?? "")}";
+    var currentQs = $"{filterQs}&pageSize={pageSize}&page={q.Page}";
 }
+<div id="page-content"
+     hx-get="/admin/logs?@currentQs"
+     hx-select="#page-content"
+     hx-target="this"
+     hx-swap="outerHTML"
+     hx-trigger="every 10s [document.getElementById('autoRefresh').checked]">
 <header>
   <h1>YobaPub Logs</h1>
-  <form method="get" asp-action="Index" style="display:contents">
-    <select name="level" onchange="this.form.submit()">
+  <form hx-get="/admin/logs"
+        hx-target="#page-content"
+        hx-select="#page-content"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+        hx-trigger="change"
+        style="display:contents">
+    <select name="level">
       <option value="">Все уровни</option>
       @foreach (var lvl in new[] { "Error", "Warning", "Information", "Verbose" })
       {
@@ -16,11 +29,11 @@
       }
     </select>
     <input type="text" name="device" value="@q.Device" placeholder="Device prefix..."
-           style="width:120px" onchange="this.form.submit()">
+           style="width:120px" hx-trigger="change, keyup[key=='Enter']">
     <input type="text" name="search" value="@q.Search" placeholder="Поиск..."
-           style="width:160px" onchange="this.form.submit()">
+           style="width:160px" hx-trigger="change, keyup[key=='Enter']">
     <input type="hidden" name="traceId" value="@q.TraceId">
-    <select name="pageSize" onchange="this.form.submit()">
+    <select name="pageSize">
       @foreach (var ps in new[] { 50, 100, 200, 500 })
       {
         <option value="@ps" selected="@(pageSize == ps ? "selected" : null)">@ps / стр.</option>
@@ -35,7 +48,7 @@
       </span>
     }
   </form>
-  <label><input type="checkbox" id="autoRefresh" checked> Auto 10s</label>
+  <label><input type="checkbox" id="autoRefresh" checked hx-preserve="true"> Auto 10s</label>
   <span id="status">@Model.Total записей</span>
   <div class="dropdown">
     <button type="button" class="dropdown-toggle">Выгрузить &#x25BE;</button>
@@ -53,8 +66,12 @@
       <a href="#" onclick="copyLogs(0);return false">Копировать все</a>
     </div>
   </div>
-  <form asp-action="Clear" method="post" style="margin:0"
-        onsubmit="return confirm('Удалить все логи?')">
+  <form hx-post="/admin/logs/clear"
+        hx-target="#page-content"
+        hx-select="#page-content"
+        hx-swap="outerHTML"
+        hx-confirm="Удалить все логи?"
+        style="margin:0">
     <input type="hidden" name="level" value="@q.Level">
     <input type="hidden" name="device" value="@q.Device">
     <input type="hidden" name="traceId" value="@q.TraceId">
@@ -125,27 +142,50 @@
     }
   </nav>
 }
+</div>
 <script>
-function pad(n) { return n < 10 ? '0'+n : ''+n; }
-function fmtTime(iso) { var d = new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
-function fmtFull(iso) { var d = new Date(iso); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+fmtTime(iso); }
-document.querySelectorAll('[data-utc]').forEach(function(el) { el.textContent = fmtTime(el.getAttribute('data-utc')); });
-setInterval(function() { if (document.getElementById('autoRefresh').checked) location.reload(); }, 10000);
+var pad = function(n) { return n < 10 ? '0'+n : ''+n; };
+var fmtTime = function(iso) { var d = new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); };
+var fmtFull = function(iso) { var d = new Date(iso); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+fmtTime(iso); };
+var formatTimes = function() {
+  document.querySelectorAll('[data-utc]').forEach(function(el) { el.textContent = fmtTime(el.getAttribute('data-utc')); });
+};
+formatTimes();
+document.addEventListener('htmx:afterSwap', formatTimes);
 document.addEventListener('click', function(e) {
   var open = document.querySelector('.dropdown.open');
   if (open && !open.contains(e.target)) open.classList.remove('open');
 });
-document.querySelectorAll('.dropdown-toggle').forEach(function(btn) {
-  btn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    var dd = btn.parentElement;
-    var wasOpen = dd.classList.contains('open');
-    var prev = document.querySelector('.dropdown.open');
-    if (prev) prev.classList.remove('open');
-    if (!wasOpen) dd.classList.add('open');
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.dropdown-toggle');
+  if (!btn) return;
+  e.stopPropagation();
+  var dd = btn.parentElement;
+  var wasOpen = dd.classList.contains('open');
+  var prev = document.querySelector('.dropdown.open');
+  if (prev) prev.classList.remove('open');
+  if (!wasOpen) dd.classList.add('open');
+});
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.copy-row-btn');
+  if (!btn) return;
+  var id = btn.getAttribute('data-id');
+  fetch('/admin/logs/' + id + '/text').then(function(r) { return r.text(); }).then(function(text) {
+    copyToClipboard(text);
+    btn.textContent = '\u2713';
+    setTimeout(function() { btn.innerHTML = '\u2398'; }, 1500);
   });
 });
-function copyLogs(limit) {
+var copyToClipboard = function(text) {
+  if (navigator.clipboard) { navigator.clipboard.writeText(text); return; }
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+};
+var copyLogs = function(limit) {
   var url = '/admin/logs/tsv?@Html.Raw(filterQs)' + (limit ? '&limit=' + limit : '');
   fetch(url).then(function(r) { return r.text(); }).then(function(text) {
     copyToClipboard(text);
@@ -156,24 +196,5 @@ function copyLogs(limit) {
   });
   var open = document.querySelector('.dropdown.open');
   if (open) open.classList.remove('open');
-}
-function copyToClipboard(text) {
-  if (navigator.clipboard) { navigator.clipboard.writeText(text); return; }
-  var ta = document.createElement('textarea');
-  ta.value = text;
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand('copy');
-  document.body.removeChild(ta);
-}
-document.querySelectorAll('.copy-row-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var id = btn.getAttribute('data-id');
-    fetch('/admin/logs/' + id + '/text').then(function(r) { return r.text(); }).then(function(text) {
-      copyToClipboard(text);
-      btn.textContent = '\u2713';
-      setTimeout(function() { btn.innerHTML = '\u2398'; }, 1500);
-    });
-  });
-});
+};
 </script>

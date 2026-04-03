@@ -5,6 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg">
     <title>@ViewData["Title"]</title>
     <link rel="stylesheet" href="~/css/admin.css">
+    <script src="~/js/htmx.min.js"></script>
 </head>
 <body class="@ViewData["BodyClass"]">
 @if (User.Identity?.IsAuthenticated == true && ViewData["BodyClass"] as string != "login")
@@ -20,5 +21,14 @@
 </nav>
 }
 @RenderBody()
+<div id="conn-error" class="conn-error" style="display:none">Сервер недоступен</div>
+<script>
+document.addEventListener('htmx:sendError', function() {
+  document.getElementById('conn-error').style.display = '';
+});
+document.addEventListener('htmx:afterRequest', function(e) {
+  if (e.detail.successful) document.getElementById('conn-error').style.display = 'none';
+});
+</script>
 </body>
 </html>

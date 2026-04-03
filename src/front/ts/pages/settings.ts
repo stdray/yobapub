@@ -132,8 +132,8 @@ const buildQualitySetting = (): SettingItem => {
 
 const buildVersionSetting = (): SettingItem => {
   const version = __BUILD_SHORT_SHA__
-    ? __APP_VERSION__ + ' (' + __BUILD_SHORT_SHA__ + ')'
-    : __APP_VERSION__;
+    ? __APP_VERSION__ + ' (' + __BUILD_SHORT_SHA__ + ', ' + __BUILD_DATE__ + ')'
+    : __APP_VERSION__ + ' (' + __BUILD_DATE__ + ')';
   return { key: '_version', label: 'Версия', type: 'readonly', value: version };
 };
 

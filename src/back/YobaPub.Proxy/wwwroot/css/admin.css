@@ -178,3 +178,16 @@ tr.V td { color: #555; }
 .domain-group table { margin: 0 0 8px 20px; width: calc(100% - 20px); }
 .domain-group th { background: #1a1a1a; }
 .ua { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Connection error indicator ─────────────────── */
+.conn-error {
+  position: fixed; bottom: 16px; right: 16px; z-index: 100;
+  background: #622; color: #faa; padding: 8px 16px;
+  border: 1px solid #833; font-size: 12px;
+}
+
+/* ── Sub-header (used for status + actions below sticky header) */
+.sub-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 14px;
+}

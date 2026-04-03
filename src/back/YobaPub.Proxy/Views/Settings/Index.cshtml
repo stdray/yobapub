@@ -5,7 +5,7 @@
 <header>
   <h1>Настройки</h1>
 </header>
-<div style="padding:16px">
+<div id="page-content" style="padding:16px">
   <table>
     <thead>
       <tr>
@@ -28,7 +28,11 @@
           }
         </td>
         <td>
-          <form asp-action="ToggleDebug" method="post" style="margin:0">
+          <form hx-post="/admin/settings/debug"
+                hx-target="#page-content"
+                hx-select="#page-content"
+                hx-swap="outerHTML"
+                style="margin:0">
             <button type="submit">@(Model.DebugEnabled ? "Выключить" : "Включить")</button>
           </form>
         </td>
