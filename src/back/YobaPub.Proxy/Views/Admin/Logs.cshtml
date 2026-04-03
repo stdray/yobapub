@@ -86,7 +86,6 @@
     {
       var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
       var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
-      var hasStack = !string.IsNullOrEmpty(e.StackTrace);
       <tr class="@cls">
         <td class="ts">@e.ServerTs.ToLocalTime().ToString("HH:mm:ss")</td>
         <td class="dev" title="@e.DeviceId">@devPrefix</td>
@@ -100,15 +99,11 @@
         <td class="ip">@e.ClientIp</td>
         <td class="lvl">@(e.Level.Length > 0 ? e.Level[0] : '-')</td>
         <td class="cat">@e.Category</td>
-        <td class="msg">
-          @e.Message
-          @if (hasStack)
-          {
-            <a href="#" class="stack-toggle" onclick="this.nextElementSibling.classList.toggle('hidden');return false">stack</a>
-            <pre class="stack-trace hidden">@e.StackTrace</pre>
-          }
+        <td class="msg">@e.Message</td>
+        <td class="act">
+          <a class="event-link" href="/admin/logs/@e.Id" title="Детали события">&#x25B6;</a>
+          <button class="copy-row-btn" type="button" title="Копировать">&#x2398;</button>
         </td>
-        <td class="act"><button class="copy-row-btn" type="button" title="Копировать">&#x2398;</button></td>
       </tr>
     }
   </tbody>
@@ -171,17 +166,9 @@ function copyToClipboard(text) {
 document.querySelectorAll('.copy-row-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
     var tr = btn.closest('tr');
-    var cells = tr.querySelectorAll('td');
+    var cells = tr.querySelectorAll('td:not(.act)');
     var parts = [];
-    for (var i = 0; i < cells.length - 1; i++) {
-      if (cells[i].classList.contains('msg')) {
-        var stack = cells[i].querySelector('.stack-trace');
-        parts.push(cells[i].childNodes[0].textContent.trim());
-        if (stack) parts.push('\n' + stack.textContent.trim());
-      } else {
-        parts.push(cells[i].textContent.trim());
-      }
-    }
+    cells.forEach(function(c) { parts.push(c.textContent.trim()); });
     copyToClipboard(parts.join('\t'));
     btn.textContent = '\u2713';
     setTimeout(function() { btn.innerHTML = '\u2398'; }, 1500);

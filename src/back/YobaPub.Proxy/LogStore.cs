@@ -63,17 +63,17 @@ public class LogStore : IDisposable
         if (!string.IsNullOrEmpty(q.Device))
             rows = rows.Where(x => x.DeviceId.StartsWith(q.Device, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrEmpty(q.TraceId))
-            rows = rows.Where(x => x.TraceId.Equals(q.TraceId, StringComparison.OrdinalIgnoreCase));
+            rows = rows.Where(x => q.TraceId.Equals(x.TraceId, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrEmpty(q.Search))
         {
             var s = q.Search;
             rows = rows.Where(x =>
-                x.Message.Contains(s, StringComparison.OrdinalIgnoreCase) ||
-                x.Category.Contains(s, StringComparison.OrdinalIgnoreCase) ||
-                x.DeviceId.Contains(s, StringComparison.OrdinalIgnoreCase) ||
-                x.ClientIp.Contains(s, StringComparison.OrdinalIgnoreCase) ||
-                x.TraceId.Contains(s, StringComparison.OrdinalIgnoreCase) ||
-                x.Level.Contains(s, StringComparison.OrdinalIgnoreCase));
+                (x.Message ?? "").Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                (x.Category ?? "").Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                (x.DeviceId ?? "").Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                (x.ClientIp ?? "").Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                (x.TraceId ?? "").Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                (x.Level ?? "").Contains(s, StringComparison.OrdinalIgnoreCase));
         }
         return rows;
     }
@@ -90,6 +90,12 @@ public class LogStore : IDisposable
         var total   = list.Count;
         var entries = list.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
         return (entries, total);
+    }
+
+    public LogEntry? FindById(string id)
+    {
+        try { return _col.FindById(new ObjectId(id)); }
+        catch { return null; }
     }
 
     public LogEntry[] QueryAll(LogsQuery q) =>

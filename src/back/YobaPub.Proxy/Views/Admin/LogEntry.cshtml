@@ -1,0 +1,60 @@
+@model LogEntry
+@{
+    ViewData["Title"] = "Log Entry";
+    var lvl = Model.Level.Length > 0 ? Model.Level[0].ToString() : "-";
+    var devPrefix = Model.DeviceId.Length >= 8 ? Model.DeviceId[..8] : Model.DeviceId;
+}
+<div class="log-detail">
+  <div class="log-detail__header">
+    <a href="/admin/logs" class="back-link">&#x2190; Логи</a>
+    <h1>Событие @Model.Id</h1>
+    <button type="button" class="copy-all-btn" onclick="copyEntry()">Копировать</button>
+  </div>
+  <table class="log-detail__table">
+    <tr><th>Time</th><td>@Model.ServerTs.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td></tr>
+    <tr><th>Device</th><td title="@Model.DeviceId">@devPrefix</td></tr>
+    @if (!string.IsNullOrEmpty(Model.TraceId))
+    {
+      <tr><th>TraceId</th><td>@Model.TraceId</td></tr>
+    }
+    <tr><th>IP</th><td>@Model.ClientIp</td></tr>
+    <tr><th>Level</th><td>@Model.Level</td></tr>
+    <tr><th>Category</th><td>@Model.Category</td></tr>
+    <tr><th>Message</th><td class="msg">@Model.Message</td></tr>
+    @if (!string.IsNullOrEmpty(Model.Props) && Model.Props != "{}")
+    {
+      <tr><th>Props</th><td><pre class="log-detail__pre">@Model.Props</pre></td></tr>
+    }
+    @if (!string.IsNullOrEmpty(Model.StackTrace))
+    {
+      <tr><th>StackTrace</th><td><pre class="log-detail__pre log-detail__stack">@Model.StackTrace</pre></td></tr>
+    }
+  </table>
+</div>
+<script>
+function copyEntry() {
+  var parts = [
+    'Time: @Model.ServerTs.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")',
+    'Device: @Model.DeviceId',
+    @if (!string.IsNullOrEmpty(Model.TraceId)) { <text>'TraceId: @Model.TraceId',</text> }
+    'IP: @Model.ClientIp',
+    'Level: @Model.Level',
+    'Category: @Model.Category',
+    'Message: @Html.Raw(Model.Message.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", ""))',
+    @if (!string.IsNullOrEmpty(Model.Props) && Model.Props != "{}") { <text>'Props: @Html.Raw(Model.Props.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", ""))',</text> }
+    @if (!string.IsNullOrEmpty(Model.StackTrace)) { <text>'StackTrace:\n@Html.Raw(Model.StackTrace.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", ""))',</text> }
+  ];
+  var text = parts.join('\n');
+  if (navigator.clipboard) { navigator.clipboard.writeText(text); }
+  else {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  var btn = document.querySelector('.copy-all-btn');
+  btn.textContent = 'Скопировано!';
+  setTimeout(function() { btn.textContent = 'Копировать'; }, 2000);
+}
+</script>

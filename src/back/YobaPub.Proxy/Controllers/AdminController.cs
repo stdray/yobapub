@@ -25,6 +25,14 @@ public class AdminController(LogStore store, PlaybackErrorStore errorStore) : Co
         });
     }
 
+    [HttpGet("logs/{id}")]
+    public IActionResult LogEntry(string id)
+    {
+        var entry = store.FindById(id);
+        if (entry == null) return NotFound();
+        return View(entry);
+    }
+
     [HttpGet("logs/download")]
     public IActionResult DownloadLogs(LogsQuery query, int? limit)
     {

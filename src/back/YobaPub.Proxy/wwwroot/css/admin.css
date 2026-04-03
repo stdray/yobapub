@@ -98,19 +98,36 @@ tr.V td { color: #555; }
   font-size: 14px; padding: 0 4px; line-height: 1;
 }
 .copy-row-btn:hover { color: #ccc; }
+.event-link {
+  color: #555; text-decoration: none; font-size: 11px; margin-right: 4px;
+}
+.event-link:hover { color: #6af; }
 
-.stack-toggle {
-  color: #f66; text-decoration: none; font-size: 11px;
-  margin-left: 6px; border: 1px solid #633; padding: 0 4px;
-  border-radius: 3px;
+/* ── Log detail page ─────────────────────────────── */
+.log-detail { padding: 14px; }
+.log-detail__header {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 16px;
 }
-.stack-toggle:hover { background: #311; }
-.stack-trace {
-  margin: 4px 0 0; padding: 6px 8px; background: #111; border: 1px solid #333;
-  color: #e88; font-size: 11px; white-space: pre-wrap; word-break: break-all;
-  max-height: 300px; overflow: auto;
+.log-detail__header h1 { font-size: 15px; }
+.back-link { color: #6af; text-decoration: none; }
+.back-link:hover { text-decoration: underline; }
+.copy-all-btn {
+  margin-left: auto; background: #333; color: #ccc;
+  border: 1px solid #444; padding: 4px 12px; cursor: pointer; font: inherit;
 }
-.hidden { display: none; }
+.copy-all-btn:hover { background: #444; }
+.log-detail__table { border-collapse: collapse; width: 100%; }
+.log-detail__table th {
+  text-align: right; vertical-align: top; padding: 6px 12px 6px 0;
+  color: #888; width: 100px; white-space: nowrap;
+}
+.log-detail__table td { padding: 6px 0; word-break: break-word; }
+.log-detail__pre {
+  margin: 4px 0; padding: 8px 10px; background: #111; border: 1px solid #333;
+  font-size: 12px; white-space: pre-wrap; word-break: break-all;
+  max-height: 500px; overflow: auto;
+}
+.log-detail__stack { color: #e88; }
 
 .active-filter {
   color: #fa0; background: #332800; padding: 2px 8px;
