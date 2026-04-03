@@ -80,7 +80,9 @@ tr.E td { background: #2a1010; }
 tr.W td { background: #2a2010; }
 tr.V td { color: #555; }
 
-.ts { white-space: nowrap; color: #777; width: 80px; }
+.ts { white-space: nowrap; width: 80px; }
+.ts a { color: #777; text-decoration: none; }
+.ts a:hover { color: #6af; }
 .dev { color: #6af; width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ip { color: #7c7; width: 120px; white-space: nowrap; }
 .lvl { width: 24px; text-align: center; }
@@ -98,11 +100,6 @@ tr.V td { color: #555; }
   font-size: 14px; padding: 0 4px; line-height: 1;
 }
 .copy-row-btn:hover { color: #ccc; }
-.event-link {
-  color: #555; text-decoration: none; font-size: 11px; margin-right: 4px;
-}
-.event-link:hover { color: #6af; }
-
 /* ── Log detail page ─────────────────────────────── */
 .log-detail { padding: 14px; }
 .log-detail__header {

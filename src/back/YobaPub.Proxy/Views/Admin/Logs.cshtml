@@ -87,7 +87,7 @@
       var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
       var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
       <tr class="@cls">
-        <td class="ts">@e.ServerTs.ToLocalTime().ToString("HH:mm:ss")</td>
+        <td class="ts"><a href="/admin/logs/@e.Id" title="Детали события">@e.ServerTs.ToLocalTime().ToString("HH:mm:ss")</a></td>
         <td class="dev" title="@e.DeviceId">@devPrefix</td>
         <td class="trace">
           @if (!string.IsNullOrEmpty(e.TraceId))
@@ -101,7 +101,6 @@
         <td class="cat">@e.Category</td>
         <td class="msg">@e.Message</td>
         <td class="act">
-          <a class="event-link" href="/admin/logs/@e.Id" title="Детали события">&#x25B6;</a>
           <button class="copy-row-btn" type="button" title="Копировать">&#x2398;</button>
         </td>
       </tr>

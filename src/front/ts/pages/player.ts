@@ -553,8 +553,7 @@ class PlayerController {
           fragStart: data.frag ? data.frag.start : null,
         });
         if (data.details === 'bufferAppendingError') {
-          plog.warn('hls recoverMediaError after bufferAppendingError');
-          hls.recoverMediaError();
+          plog.warn('hls bufferAppendingError (skipping recovery, hls.js retries internally)');
         }
         return;
       }
