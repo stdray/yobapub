@@ -37,7 +37,7 @@
             <span class="domain-name">@d.Domain</span>
             <span class="domain-count">@d.TotalErrors ош.</span>
             <span class="domain-devices">@d.Devices.Length устр.</span>
-            <span class="domain-ts">@d.LastSeen.ToLocalTime().ToString("dd.MM HH:mm")</span>
+            <span class="domain-ts">@d.LastSeen.FormatShort(UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset)</span>
           </summary>
           <table>
             <thead>
@@ -57,7 +57,7 @@
                   <td class="dev" title="@dev.DeviceId">@(dev.DeviceId.Length >= 8 ? dev.DeviceId[..8] : dev.DeviceId)</td>
                   <td class="ua">@dev.UserAgent</td>
                   <td>@dev.Count</td>
-                  <td class="ts">@dev.LastSeen.ToLocalTime().ToString("dd.MM HH:mm")</td>
+                  <td class="ts">@dev.LastSeen.FormatShort(UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset)</td>
                   <td class="msg">@dev.LastError</td>
                   <td class="ip">@dev.LastIp</td>
                 </tr>

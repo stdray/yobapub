@@ -78,18 +78,31 @@ public class LogStore : IDisposable
         return rows;
     }
 
-    public (LogEntry[] Entries, int Total) Query(LogsQuery q)
+    public string NewCursorId() => ObjectId.NewObjectId().ToString();
+
+    public (LogEntry[] Entries, bool HasMore, int Total) QueryWithCursor(LogsQuery q)
     {
         var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
-        var page     = Math.Max(1, q.Page);
+        var all = ApplyFilters(_col.Query().OrderByDescending(x => x.ServerTs).ToList(), q).ToList();
+        var total = all.Count;
 
-        var rows = ApplyFilters(
-            _col.Query().OrderByDescending(x => x.ServerTs).ToList(), q);
+        if (!string.IsNullOrEmpty(q.After))
+        {
+            var cursor = new ObjectId(q.After);
+            var newer = all.Where(x => x.Id.CompareTo(cursor) > 0).ToArray();
+            return (newer, false, total);
+        }
 
-        var list    = rows.ToList();
-        var total   = list.Count;
-        var entries = list.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
-        return (entries, total);
+        IEnumerable<LogEntry> rows = all;
+        if (!string.IsNullOrEmpty(q.Before))
+        {
+            var cursor = new ObjectId(q.Before);
+            rows = rows.Where(x => x.Id.CompareTo(cursor) < 0);
+        }
+
+        var taken = rows.Take(pageSize + 1).ToArray();
+        var hasMore = taken.Length > pageSize;
+        return (taken.Take(pageSize).ToArray(), hasMore, total);
     }
 
     public LogEntry? FindById(string id)

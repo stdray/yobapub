@@ -11,15 +11,34 @@ public class LogsController(LogStore store) : Controller
     [HttpGet("")]
     public IActionResult Index(LogsQuery query)
     {
-        var pageSize = Math.Clamp(query.PageSize > 0 ? query.PageSize : 100, 1, 500);
-        var (entries, total) = store.Query(query);
+        var (entries, hasMore, total) = store.QueryWithCursor(query);
         return View(new LogsViewModel
         {
-            Entries    = entries,
-            Query      = query,
-            Total      = total,
-            TotalPages = (int)Math.Ceiling((double)total / pageSize)
+            Entries = entries,
+            Query   = query,
+            Total   = total,
+            HasMore = hasMore,
+            TopId   = entries.Length > 0 ? entries[0].Id.ToString() : store.NewCursorId(),
+            LastId  = entries.Length > 0 ? entries[^1].Id.ToString() : null
         });
+    }
+
+    [HttpGet("more")]
+    public IActionResult More(LogsQuery query)
+    {
+        var (entries, hasMore, _) = store.QueryWithCursor(query);
+        var model = new LogsViewModel
+        {
+            Entries = entries,
+            Query   = query,
+            Total   = 0,
+            HasMore = hasMore,
+            TopId   = entries.Length > 0 ? entries[0].Id.ToString() : query.After,
+            LastId  = entries.Length > 0 ? entries[^1].Id.ToString() : null
+        };
+        return query.After != null
+            ? PartialView("_Refresh", model)
+            : PartialView("_Rows", model);
     }
 
     [HttpGet("{id}")]

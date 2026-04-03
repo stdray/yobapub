@@ -17,6 +17,7 @@ builder.Services.AddSingleton<PlaybackErrorStore>();
 builder.Services.AddSingleton<MainDb>();
 builder.Services.AddSingleton<VipLoginStore>();
 builder.Services.AddSingleton<DebugSettingsStore>();
+builder.Services.AddSingleton<UserSettingsStore>();
 builder.Services.AddHostedService<LogRetentionService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>

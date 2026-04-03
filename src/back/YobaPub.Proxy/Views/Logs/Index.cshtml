@@ -4,14 +4,9 @@
     var q = Model.Query;
     var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
     var filterQs = $"level={Uri.EscapeDataString(q.Level ?? "")}&device={Uri.EscapeDataString(q.Device ?? "")}&traceId={Uri.EscapeDataString(q.TraceId ?? "")}&search={Uri.EscapeDataString(q.Search ?? "")}";
-    var currentQs = $"{filterQs}&pageSize={pageSize}&page={q.Page}";
+    var currentQs = $"{filterQs}&pageSize={pageSize}";
 }
-<div id="page-content"
-     hx-get="/admin/logs?@currentQs"
-     hx-select="#page-content"
-     hx-target="this"
-     hx-swap="outerHTML"
-     hx-trigger="every 10s [document.getElementById('autoRefresh').checked]">
+<div id="page-content">
 <header>
   <h1>YobaPub Logs</h1>
   <form hx-get="/admin/logs"
@@ -39,7 +34,6 @@
         <option value="@ps" selected="@(pageSize == ps ? "selected" : null)">@ps / стр.</option>
       }
     </select>
-    <input type="hidden" name="page" value="1">
     @if (!string.IsNullOrEmpty(q.TraceId))
     {
       <span class="active-filter">trace: @q.TraceId
@@ -76,7 +70,6 @@
     <input type="hidden" name="device" value="@q.Device">
     <input type="hidden" name="traceId" value="@q.TraceId">
     <input type="hidden" name="search" value="@q.Search">
-    <input type="hidden" name="page" value="@q.Page">
     <input type="hidden" name="pageSize" value="@pageSize">
     <button type="submit" class="danger">Очистить</button>
   </form>
@@ -95,63 +88,22 @@
     </tr>
   </thead>
   <tbody>
+    <tr id="top-sentinel"
+        hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&after=@Model.TopId"
+        hx-trigger="every 10s [document.getElementById('autoRefresh').checked]"
+        hx-swap="outerHTML"
+        hx-target="this"
+        style="display:none">
+    </tr>
     @if (Model.Entries.Length == 0)
     {
-      <tr><td colspan="8" class="empty">Записей нет</td></tr>
+      <tr id="empty-row"><td colspan="8" class="empty">Записей нет</td></tr>
     }
-    @foreach (var e in Model.Entries)
-    {
-      var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
-      var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
-      <tr class="@cls">
-        <td class="ts"><a href="/admin/logs/@e.Id" data-utc="@e.ServerTs.UtcDateTime.ToString("o")"></a></td>
-        <td class="dev" title="@e.DeviceId">@devPrefix</td>
-        <td class="trace">
-          @if (!string.IsNullOrEmpty(e.TraceId))
-          {
-            <a class="trace-btn" href="@Url.Action("Index", new { level = q.Level, device = devPrefix, search = q.Search, traceId = e.TraceId, pageSize })"
-               title="Фильтр по device + trace">@e.TraceId</a>
-          }
-        </td>
-        <td class="ip">@e.ClientIp</td>
-        <td class="lvl">@(e.Level.Length > 0 ? e.Level[0] : '-')</td>
-        <td class="cat">@e.Category</td>
-        <td class="msg">@e.Message</td>
-        <td class="act">
-          <button class="copy-row-btn" type="button" title="Копировать" data-id="@e.Id">&#x2398;</button>
-        </td>
-      </tr>
-    }
+    @await Html.PartialAsync("_Rows", Model)
   </tbody>
 </table>
-@if (Model.TotalPages > 1)
-{
-  <nav class="pager">
-    @if (q.Page > 1)
-    {
-      <a asp-action="Index" asp-route-level="@q.Level" asp-route-device="@q.Device"
-         asp-route-traceId="@q.TraceId" asp-route-search="@q.Search"
-         asp-route-pageSize="@pageSize" asp-route-page="@(q.Page - 1)">&#x2190; Назад</a>
-    }
-    <span>стр. @q.Page / @Model.TotalPages</span>
-    @if (q.Page < Model.TotalPages)
-    {
-      <a asp-action="Index" asp-route-level="@q.Level" asp-route-device="@q.Device"
-         asp-route-traceId="@q.TraceId" asp-route-search="@q.Search"
-         asp-route-pageSize="@pageSize" asp-route-page="@(q.Page + 1)">Вперёд &#x2192;</a>
-    }
-  </nav>
-}
 </div>
 <script>
-var pad = function(n) { return n < 10 ? '0'+n : ''+n; };
-var fmtTime = function(iso) { var d = new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); };
-var fmtFull = function(iso) { var d = new Date(iso); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+fmtTime(iso); };
-var formatTimes = function() {
-  document.querySelectorAll('[data-utc]').forEach(function(el) { el.textContent = fmtTime(el.getAttribute('data-utc')); });
-};
-formatTimes();
-document.addEventListener('htmx:afterSwap', formatTimes);
 document.addEventListener('click', function(e) {
   var open = document.querySelector('.dropdown.open');
   if (open && !open.contains(e.target)) open.classList.remove('open');

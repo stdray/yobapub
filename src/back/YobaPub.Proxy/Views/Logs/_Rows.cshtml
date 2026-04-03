@@ -1,0 +1,38 @@
+@model LogsViewModel
+@{
+    var q = Model.Query;
+    var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
+    var filterQs = $"level={Uri.EscapeDataString(q.Level ?? "")}&device={Uri.EscapeDataString(q.Device ?? "")}&traceId={Uri.EscapeDataString(q.TraceId ?? "")}&search={Uri.EscapeDataString(q.Search ?? "")}";
+}
+@foreach (var e in Model.Entries)
+{
+    var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
+    var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
+    <tr class="@cls">
+        <td class="ts"><a href="/admin/logs/@e.Id">@e.ServerTs.FormatTime(UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset)</a></td>
+        <td class="dev" title="@e.DeviceId">@devPrefix</td>
+        <td class="trace">
+            @if (!string.IsNullOrEmpty(e.TraceId))
+            {
+                <a class="trace-btn" href="@Url.Action("Index", new { level = q.Level, device = devPrefix, search = q.Search, traceId = e.TraceId, pageSize })"
+                   title="Фильтр по device + trace">@e.TraceId</a>
+            }
+        </td>
+        <td class="ip">@e.ClientIp</td>
+        <td class="lvl">@(e.Level.Length > 0 ? e.Level[0] : '-')</td>
+        <td class="cat">@e.Category</td>
+        <td class="msg">@e.Message</td>
+        <td class="act">
+            <button class="copy-row-btn" type="button" title="Копировать" data-id="@e.Id">&#x2398;</button>
+        </td>
+    </tr>
+}
+@if (Model.HasMore && Model.LastId != null)
+{
+    <tr hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&before=@Model.LastId"
+        hx-trigger="intersect once"
+        hx-swap="outerHTML"
+        hx-target="this">
+        <td colspan="8" style="text-align:center;color:#555;padding:6px">↓</td>
+    </tr>
+}

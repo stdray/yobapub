@@ -37,6 +37,21 @@
           </form>
         </td>
       </tr>
+      <tr>
+        <td>Часовой пояс</td>
+        <td>UTC@(Model.UserSettings.TimeZoneOffsetHours >= 0 ? "+" : "")@Model.UserSettings.TimeZoneOffsetHours</td>
+        <td>
+          <form hx-post="/admin/settings/timezone"
+                hx-target="#page-content"
+                hx-select="#page-content"
+                hx-swap="outerHTML"
+                style="margin:0;display:flex;gap:4px">
+            <input type="number" name="offset" value="@Model.UserSettings.TimeZoneOffsetHours"
+                   min="-12" max="14" step="0.5" style="width:70px">
+            <button type="submit">Сохранить</button>
+          </form>
+        </td>
+      </tr>
     </tbody>
   </table>
 </div>

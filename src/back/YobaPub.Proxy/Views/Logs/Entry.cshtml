@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "Log Entry";
     var devPrefix = Model.DeviceId.Length >= 8 ? Model.DeviceId[..8] : Model.DeviceId;
-    var utcIso = Model.ServerTs.UtcDateTime.ToString("o");
+    var tz = UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset;
 }
 <div class="log-detail">
   <div class="log-detail__header">
@@ -11,7 +11,7 @@
     <button type="button" class="copy-all-btn" onclick="copyEntry()">Копировать</button>
   </div>
   <table class="log-detail__table">
-    <tr><th>Time</th><td><span data-utc="@utcIso"></span></td></tr>
+    <tr><th>Time</th><td>@Model.ServerTs.FormatFull(tz)</td></tr>
     <tr><th>Device</th><td title="@Model.DeviceId">@devPrefix</td></tr>
     @if (!string.IsNullOrEmpty(Model.TraceId))
     {
@@ -32,9 +32,6 @@
   </table>
 </div>
 <script>
-function pad(n) { return n < 10 ? '0'+n : ''+n; }
-function fmtFull(iso) { var d = new Date(iso); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
-document.querySelectorAll('[data-utc]').forEach(function(el) { el.textContent = fmtFull(el.getAttribute('data-utc')); });
 function copyEntry() {
   fetch('/admin/logs/@Model.Id/text').then(function(r) { return r.text(); }).then(function(text) {
     if (navigator.clipboard) { navigator.clipboard.writeText(text); }
