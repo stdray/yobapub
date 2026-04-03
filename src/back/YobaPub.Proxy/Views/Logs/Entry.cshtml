@@ -4,11 +4,11 @@
     var devPrefix = Model.DeviceId.Length >= 8 ? Model.DeviceId[..8] : Model.DeviceId;
     var tz = UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset;
 }
-<div class="log-detail">
+<div class="log-detail" id="entry-data" data-entry-id="@Model.Id">
   <div class="log-detail__header">
     <a href="/admin/logs" class="back-link">&#x2190; Логи</a>
     <h1>Событие @Model.Id</h1>
-    <button type="button" class="copy-all-btn" onclick="copyEntry()">Копировать</button>
+    <button type="button" class="copy-all-btn">Копировать</button>
   </div>
   <table class="log-detail__table">
     <tr><th>Time</th><td>@Model.ServerTs.FormatFull(tz)</td></tr>
@@ -31,20 +31,3 @@
     }
   </table>
 </div>
-<script>
-function copyEntry() {
-  fetch('/admin/logs/@Model.Id/text').then(function(r) { return r.text(); }).then(function(text) {
-    if (navigator.clipboard) { navigator.clipboard.writeText(text); }
-    else {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta); ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-    var btn = document.querySelector('.copy-all-btn');
-    btn.textContent = 'Скопировано!';
-    setTimeout(function() { btn.textContent = 'Копировать'; }, 2000);
-  });
-}
-</script>

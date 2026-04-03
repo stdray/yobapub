@@ -7,23 +7,22 @@
   <h1>VIP логины</h1>
   <span id="status">@Model.Logins.Count логинов</span>
 </header>
-<div style="padding:16px">
-  <form hx-post="/admin/vip/add"
+<div class="page-pad">
+  <form class="vip-add-form"
+        hx-post="/admin/vip/add"
         hx-target="#page-content"
         hx-select="#page-content"
-        hx-swap="outerHTML"
-        style="display:flex;gap:8px;margin-bottom:16px">
-    <input type="text" name="login" placeholder="Логин" required
-           style="padding:6px 10px;border:1px solid #555;background:#1e1e1e;color:#eee;border-radius:4px;width:250px">
+        hx-swap="outerHTML">
+    <input type="text" name="login" placeholder="Логин" required class="vip-login-input">
     <button type="submit">Добавить</button>
   </form>
   @if (!string.IsNullOrEmpty(Model.Error))
   {
-    <div style="color:#e74c3c;margin-bottom:12px">@Model.Error</div>
+    <div class="vip-error">@Model.Error</div>
   }
   @if (Model.Logins.Count == 0)
   {
-    <div class="empty" style="padding:40px">Нет VIP логинов</div>
+    <div class="empty empty-lg">Нет VIP логинов</div>
   }
   else
   {
@@ -42,14 +41,14 @@
             <td>@entry.Login</td>
             <td class="ts">@entry.AddedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
             <td>
-              <form hx-post="/admin/vip/delete"
+              <form class="form-inline"
+                    hx-post="/admin/vip/delete"
                     hx-target="#page-content"
                     hx-select="#page-content"
                     hx-swap="outerHTML"
-                    hx-confirm="Удалить логин @entry.Login?"
-                    style="margin:0">
+                    hx-confirm="Удалить логин @entry.Login?">
                 <input type="hidden" name="login" value="@entry.Login">
-                <button type="submit" class="danger" style="padding:2px 8px;font-size:12px">✕</button>
+                <button type="submit" class="danger vip-delete-btn">&#x2715;</button>
               </form>
             </td>
           </tr>

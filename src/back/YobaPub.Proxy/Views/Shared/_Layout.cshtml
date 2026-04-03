@@ -6,7 +6,8 @@
     <title>@ViewData["Title"]</title>
     <link rel="stylesheet" href="~/css/admin.css">
     <script src="~/js/htmx.min.js"></script>
-    <script src="~/js/alpine.min.js" defer></script>
+    <script src="~/js/admin.js" defer></script>
+
 </head>
 <body class="@ViewData["BodyClass"]">
 @if (User.Identity?.IsAuthenticated == true && ViewData["BodyClass"] as string != "login")
@@ -16,20 +17,12 @@
     <a href="/admin/playback-errors" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "PlaybackErrors" ? "active" : "")">Ошибки CDN</a>
     <a href="/admin/vip" class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Vip" ? "active" : "")">VIP</a>
     <a href="/admin/settings" class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Settings" ? "active" : "")">Настройки</a>
-    <form asp-controller="Auth" asp-action="Logout" method="post" style="margin:0;margin-left:auto">
+    <form asp-controller="Auth" asp-action="Logout" method="post" class="form-inline">
         <button type="submit" class="danger">Выйти</button>
     </form>
 </nav>
 }
 @RenderBody()
-<div id="conn-error" class="conn-error" style="display:none">Сервер недоступен</div>
-<script>
-document.addEventListener('htmx:sendError', function() {
-  document.getElementById('conn-error').style.display = '';
-});
-document.addEventListener('htmx:afterRequest', function(e) {
-  if (e.detail.successful) document.getElementById('conn-error').style.display = 'none';
-});
-</script>
+<div id="conn-error" class="conn-error hidden">Сервер недоступен</div>
 </body>
 </html>

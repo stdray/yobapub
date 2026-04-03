@@ -205,3 +205,49 @@ tr.row-old td { animation: row-old 4s ease-out; }
   display: flex; align-items: center; gap: 12px;
   padding: 8px 14px;
 }
+
+/* ── Utility classes ─────────────────────────────── */
+.hidden { display: none; }
+.form-inline { margin: 0; }
+.form-row { margin: 0; display: flex; gap: 4px; }
+.page-pad { padding: 16px; }
+
+/* ── Log filter form ─────────────────────────────── */
+.filter-form { display: contents; }
+.search-input { width: 160px; }
+
+/* ── Level filter dropdown ───────────────────────── */
+.lvl-head { cursor: pointer; user-select: none; }
+.lvl-active { color: #6af; }
+.lvl-dropdown {
+  display: none; position: absolute; top: 100%; left: 0;
+  background: #222; border: 1px solid #444; padding: 4px 0;
+  z-index: 50; white-space: nowrap; font-weight: normal; min-width: 130px;
+}
+.lvl-dropdown label {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; cursor: pointer;
+}
+.lvl-dropdown span { font-size: 12px; }
+
+/* ── Load-more sentinel ──────────────────────────── */
+.load-more { text-align: center; color: #555; padding: 6px; }
+
+/* ── Admin nav logout ────────────────────────────── */
+.admin-nav form { margin: 0; margin-left: auto; }
+
+/* ── Settings page ───────────────────────────────── */
+.settings-input-sm { width: 80px; }
+.settings-input-xs { width: 70px; }
+.status-on { color: #2ecc71; }
+.status-off { color: #e74c3c; }
+
+/* ── VIP page ────────────────────────────────────── */
+.vip-add-form { display: flex; gap: 8px; margin-bottom: 16px; }
+.vip-login-input {
+  padding: 6px 10px; border: 1px solid #555;
+  background: #1e1e1e; color: #eee; border-radius: 4px; width: 250px;
+}
+.vip-error { color: #e74c3c; margin-bottom: 12px; }
+.vip-delete-btn { padding: 2px 8px; font-size: 12px; }
+.empty-lg { padding: 40px; }

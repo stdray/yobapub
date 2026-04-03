@@ -13,16 +13,15 @@
 }
 @if (isRefresh && Model.Entries.Length > 0)
 {
-    <tr id="empty-row" style="display:none" hx-swap-oob="outerHTML"></tr>
+    <tr id="empty-row" class="hidden" hx-swap-oob="outerHTML"></tr>
 }
 @if (isRefresh)
 {
-    <tr id="top-sentinel"
+    <tr id="top-sentinel" class="hidden"
         hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&after=@Model.TopId"
         hx-trigger="every 10s [document.getElementById('autoRefresh').checked]"
         hx-swap="outerHTML"
-        hx-target="this"
-        style="display:none">
+        hx-target="this">
     </tr>
 }
 @foreach (var e in Model.Entries)
@@ -44,11 +43,9 @@
         @{ var cat = e.Category ?? ""; }
         <td class="cat" title="@cat">@cat.ShortName()</td>
         <td class="msg">@e.Message</td>
-        <td class="act" x-data="{ done: false }">
+        <td class="act">
             <button class="copy-row-btn" type="button" title="Копировать"
-                    x-text="done ? '\u2713' : '\u2398'"
-                    @@click="fetch('/admin/logs/@e.Id/text').then(r=>r.text()).then(t=>{copyToClipboard(t);done=true;setTimeout(()=>done=false,1500)})">
-            </button>
+                    data-copy-url="/admin/logs/@e.Id/text">&#x2398;</button>
         </td>
     </tr>
 }
@@ -58,6 +55,6 @@
         hx-trigger="intersect once"
         hx-swap="outerHTML"
         hx-target="this">
-        <td colspan="8" style="text-align:center;color:#555;padding:6px">↓</td>
+        <td colspan="8" class="load-more">&#x2193;</td>
     </tr>
 }

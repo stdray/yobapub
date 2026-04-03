@@ -5,7 +5,7 @@
 <header>
   <h1>Настройки</h1>
 </header>
-<div id="page-content" style="padding:16px">
+<div id="page-content" class="page-pad">
   <table>
     <thead>
       <tr>
@@ -20,19 +20,19 @@
         <td>
           @if (Model.DebugEnabled)
           {
-            <span style="color:#2ecc71">Включена</span>
+            <span class="status-on">Включена</span>
           }
           else
           {
-            <span style="color:#e74c3c">Выключена</span>
+            <span class="status-off">Выключена</span>
           }
         </td>
         <td>
-          <form hx-post="/admin/settings/debug"
+          <form class="form-inline"
+                hx-post="/admin/settings/debug"
                 hx-target="#page-content"
                 hx-select="#page-content"
-                hx-swap="outerHTML"
-                style="margin:0">
+                hx-swap="outerHTML">
             <button type="submit">@(Model.DebugEnabled ? "Выключить" : "Включить")</button>
           </form>
         </td>
@@ -41,12 +41,13 @@
         <td>Макс. записей в логе</td>
         <td>@Model.MaxLogEntries</td>
         <td>
-          <form hx-post="/admin/settings/max-log-entries"
+          <form class="form-row"
+                hx-post="/admin/settings/max-log-entries"
                 hx-target="#page-content"
                 hx-select="#page-content"
-                hx-swap="outerHTML"
-                style="margin:0;display:flex;gap:4px">
-            <input type="number" name="max" value="@Model.MaxLogEntries" min="100" step="100" style="width:80px">
+                hx-swap="outerHTML">
+            <input type="number" name="max" value="@Model.MaxLogEntries" min="100" step="100"
+                   class="settings-input-sm">
             <button type="submit">Сохранить</button>
           </form>
         </td>
@@ -55,13 +56,13 @@
         <td>Часовой пояс</td>
         <td>UTC@(Model.UserSettings.TimeZoneOffsetHours >= 0 ? "+" : "")@Model.UserSettings.TimeZoneOffsetHours</td>
         <td>
-          <form hx-post="/admin/settings/timezone"
+          <form class="form-row"
+                hx-post="/admin/settings/timezone"
                 hx-target="#page-content"
                 hx-select="#page-content"
-                hx-swap="outerHTML"
-                style="margin:0;display:flex;gap:4px">
+                hx-swap="outerHTML">
             <input type="number" name="offset" value="@Model.UserSettings.TimeZoneOffsetHours"
-                   min="-12" max="14" step="0.5" style="width:70px">
+                   min="-12" max="14" step="0.5" class="settings-input-xs">
             <button type="submit">Сохранить</button>
           </form>
         </td>

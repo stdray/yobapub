@@ -14,18 +14,18 @@
      hx-trigger="every 10s [document.getElementById('autoRefresh').checked]">
   <div class="sub-header">
     <span id="status">@Model.TotalEntries записей, @Model.Domains.Length доменов</span>
-    <form hx-post="/admin/playback-errors/clear"
+    <form class="form-inline"
+          hx-post="/admin/playback-errors/clear"
           hx-target="#page-content"
           hx-select="#page-content"
           hx-swap="outerHTML"
-          hx-confirm="Удалить все записи?"
-          style="margin:0">
+          hx-confirm="Удалить все записи?">
       <button type="submit" class="danger">Очистить</button>
     </form>
   </div>
   @if (Model.Domains.Length == 0)
   {
-    <div class="empty" style="padding:40px">Ошибок нет</div>
+    <div class="empty empty-lg">Ошибок нет</div>
   }
   else
   {
