@@ -809,6 +809,7 @@ video::cue {
 
 /* Settings page */
 .settings-page {
+  position: relative;
   padding: 60px 120px;
 }
 .settings-page__title {
@@ -923,10 +924,11 @@ video::cue {
 }
 
 .settings-page__version {
-  margin-top: 30px;
-  font-size: 20px;
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  font-size: 28px;
   color: #555;
-  text-align: right;
 }
 
 /* --- Bookmarks --- */
