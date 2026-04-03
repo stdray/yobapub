@@ -15,6 +15,16 @@
 {
     <tr id="empty-row" style="display:none" hx-swap-oob="outerHTML"></tr>
 }
+@if (isRefresh)
+{
+    <tr id="top-sentinel"
+        hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&after=@Model.TopId"
+        hx-trigger="every 10s [document.getElementById('autoRefresh').checked]"
+        hx-swap="outerHTML"
+        hx-target="this"
+        style="display:none">
+    </tr>
+}
 @foreach (var e in Model.Entries)
 {
     var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
@@ -42,17 +52,7 @@
         </td>
     </tr>
 }
-@if (isRefresh)
-{
-    <tr id="top-sentinel"
-        hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&after=@Model.TopId"
-        hx-trigger="every 10s [document.getElementById('autoRefresh').checked]"
-        hx-swap="outerHTML"
-        hx-target="this"
-        style="display:none">
-    </tr>
-}
-else if (Model.HasMore && Model.LastId != null)
+@if (!isRefresh && Model.HasMore && Model.LastId != null)
 {
     <tr hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&before=@Model.LastId"
         hx-trigger="intersect once"

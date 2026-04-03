@@ -81,16 +81,15 @@ tr.W td { background: #2a2010; }
 tr.V td { color: #555; }
 
 @keyframes row-new {
-  0%   { box-shadow: inset 0 0 0 1px #4d0; }
-  60%  { box-shadow: inset 0 0 0 1px #2a6010; }
-  100% { box-shadow: none; }
+  0%   { background-image: linear-gradient(90deg, rgba(255,200,0,0.25), transparent 70%); }
+  100% { background-image: linear-gradient(90deg, rgba(255,200,0,0) , transparent 70%); }
 }
 @keyframes row-old {
-  from { opacity: 0.25; }
-  to   { opacity: 1; }
+  0%   { background-image: linear-gradient(90deg, rgba(180,180,180,0.15), transparent 70%); }
+  100% { background-image: linear-gradient(90deg, rgba(180,180,180,0)  , transparent 70%); }
 }
-tr.row-new { animation: row-new 6s ease-out; }
-tr.row-old td { animation: row-old 2s ease-out; }
+tr.row-new td { animation: row-new 6s ease-out; }
+tr.row-old td { animation: row-old 4s ease-out; }
 
 .ts { white-space: nowrap; width: 80px; }
 .ts a { color: #777; text-decoration: none; }
