@@ -551,6 +551,10 @@ class PlayerController {
           fragSn: data.frag ? data.frag.sn : null,
           fragStart: data.frag ? data.frag.start : null,
         });
+        if (data.details === 'bufferAppendingError') {
+          plog.warn('hls recoverMediaError after bufferAppendingError');
+          hls.recoverMediaError();
+        }
         return;
       }
       const hlsFatalLvl = (hls as unknown as { readonly currentLevel?: number }).currentLevel;
