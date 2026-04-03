@@ -140,9 +140,7 @@ const scrollToFocused = ($list: JQuery): void => {
 };
 
 export interface PanelCallbacks {
-  onShowBar: () => void;
-  onHideBar: () => void;
-  onClearBarTimer: () => void;
+  onShowInfo: () => void;
   onApplyAudio: (idx: number) => void;
   onApplySub: (menuIdx: number) => void;
   onApplyQuality: (idx: number) => void;
@@ -150,7 +148,7 @@ export interface PanelCallbacks {
   getData: () => PanelData;
 }
 
-const PANEL_IDLE_MS = 40000;
+const PANEL_IDLE_MS = 4000;
 let panelIdleTimer: number | null = null;
 
 const resetPanelIdle = ($root: JQuery, state: PanelState, cbs: PanelCallbacks): void => {
@@ -172,7 +170,6 @@ const forceClosePanel = ($root: JQuery, state: PanelState, cbs: PanelCallbacks):
   $root.find('.ppanel__list').removeClass('active').addClass('hidden');
   $root.find('.ppanel__buttons').removeClass('active');
   $root.find('.player__panel').addClass('hidden');
-  cbs.onShowBar();
 };
 
 export const openPanel = ($root: JQuery, state: PanelState, cbs: PanelCallbacks): void => {
@@ -182,8 +179,7 @@ export const openPanel = ($root: JQuery, state: PanelState, cbs: PanelCallbacks)
   const data = cbs.getData();
   state.btnIndex = 0;
   while (state.btnIndex < PANEL_SECTIONS.length - 1 && !isSectionEnabled(data, state.btnIndex)) state.btnIndex++;
-  cbs.onClearBarTimer();
-  cbs.onHideBar();
+  cbs.onShowInfo();
   $root.find('.player__panel').removeClass('hidden');
   updatePanelButtons($root, state, cbs.getData());
   setTimeout(() => {
@@ -203,7 +199,6 @@ export const closePanel = ($root: JQuery, state: PanelState, cbs: PanelCallbacks
   setTimeout(() => {
     state.open = false;
     $root.find('.player__panel').addClass('hidden');
-    cbs.onShowBar();
   }, 200);
 };
 

@@ -683,10 +683,11 @@ html, body {
   white-space: nowrap;
 }
 
-/* Settings panel (top) */
+/* Settings panel (bottom) */
 .player__panel {
   position: absolute;
   top: 0;
+  bottom: 0;
   left: 0;
   width: 100%;
   z-index: 10;
@@ -707,14 +708,14 @@ html, body {
 
 .ppanel__buttons {
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 50%;
-  transform: translateX(-50%) translateY(-105%);
+  transform: translateX(-50%) translateY(105%);
   display: flex;
   gap: 20px;
   padding: 30px;
   background: rgba(0,0,0,0.9);
-  border-radius: 0 0 10px 10px;
+  border-radius: 10px 10px 0 0;
 }
 
 .ppanel__buttons.active {
@@ -746,16 +747,16 @@ html, body {
 
 .ppanel__list {
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 50%;
-  transform: translateX(-50%) translateY(-105%);
+  transform: translateX(-50%) translateY(105%);
   width: 500px;
   max-height: 600px;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   background: rgba(0,0,0,0.9);
-  border-radius: 0 0 10px 10px;
+  border-radius: 10px 10px 0 0;
   padding: 20px 0;
 }
 

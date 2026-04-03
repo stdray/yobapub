@@ -108,9 +108,7 @@ class PlayerController {
 
   // Panel callbacks
   private readonly panelCallbacks: PanelCallbacks = {
-    onShowBar: () => { this.showBar(); },
-    onHideBar: () => { this.hideBar(); },
-    onClearBarTimer: () => { this.clearBarTimer(); },
+    onShowInfo: () => { showInfo(this.$root, this.getInfoState()); },
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
     onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
     onApplyQuality: (idx) => { if (idx !== this.state.quality) this.continueWith({ quality: idx }); },
@@ -932,9 +930,9 @@ class PlayerController {
         this.navigateTrack(-1); break;
 
       case TvKey.Up:
-        panelOpen_(this.$root, this.panel, this.panelCallbacks); break;
-      case TvKey.Down:
         this.showBar(); break;
+      case TvKey.Down:
+        panelOpen_(this.$root, this.panel, this.panelCallbacks); break;
 
       case TvKey.Green:
         changeSubSize(1, (text) => this.showToast(text)); break;
