@@ -46,8 +46,7 @@ const LABELS: Record<string, string> = {
 
 const tplPageCompiled = doT.template(`
   <div class="settings-page">
-    <div class="settings-page__version">{{=it.version}}</div>
-    <div class="settings-page__title">Настройки</div>
+    <div class="settings-page__title">Настройки ({{=it.version}})</div>
     <div class="settings-page__list">{{=it.items}}</div>
   </div>
 `);

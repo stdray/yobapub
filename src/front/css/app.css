@@ -923,14 +923,6 @@ video::cue {
   color: #e94560;
 }
 
-.settings-page__version {
-  position: absolute;
-  top: 20px;
-  right: 30px;
-  font-size: 28px;
-  color: #555;
-}
-
 /* --- Bookmarks --- */
 .folder-list {
   display: flex;
