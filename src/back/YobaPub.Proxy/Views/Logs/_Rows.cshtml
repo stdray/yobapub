@@ -2,7 +2,12 @@
 @{
     var q = Model.Query;
     var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
-    var filterQs = $"level={Uri.EscapeDataString(q.Level ?? "")}&device={Uri.EscapeDataString(q.Device ?? "")}&traceId={Uri.EscapeDataString(q.TraceId ?? "")}&search={Uri.EscapeDataString(q.Search ?? "")}";
+    var levelParts = (q.Level ?? []).Select(l => $"level={Uri.EscapeDataString(l)}");
+    var filterQs = string.Join("&", levelParts.Concat(new[] {
+        $"device={Uri.EscapeDataString(q.Device ?? "")}",
+        $"traceId={Uri.EscapeDataString(q.TraceId ?? "")}",
+        $"search={Uri.EscapeDataString(q.Search ?? "")}"
+    }));
     var isRefresh = q.After != null;
     var rowClass  = isRefresh ? "row-new" : q.Before != null ? "row-old" : "";
 }
@@ -25,6 +30,7 @@
             }
         </td>
         <td class="ip">@e.ClientIp</td>
+        <td class="lvl lvl-@e.Level">@e.Level.LevelAbbr()</td>
         @{ var cat = e.Category ?? ""; }
         <td class="cat" title="@cat">@cat.ShortName()</td>
         <td class="msg">@e.Message</td>
@@ -49,6 +55,6 @@ else if (Model.HasMore && Model.LastId != null)
         hx-trigger="intersect once"
         hx-swap="outerHTML"
         hx-target="this">
-        <td colspan="7" style="text-align:center;color:#555;padding:6px">↓</td>
+        <td colspan="8" style="text-align:center;color:#555;padding:6px">↓</td>
     </tr>
 }

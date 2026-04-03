@@ -2,7 +2,7 @@ namespace YobaPub.Proxy.Models;
 
 public class LogsQuery
 {
-    public string? Level { get; init; }
+    public string[] Level { get; init; } = [];
     public string? Device { get; init; }
     public string? TraceId { get; init; }
     public string? Search { get; init; }
