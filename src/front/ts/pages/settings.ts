@@ -46,12 +46,12 @@ const LABELS: Record<string, string> = {
 
 const tplPageCompiled = doT.template(`
   <div class="settings-page">
-    <div class="settings-page__title">Настройки ({{=it.version}})</div>
+    <div class="settings-page__title">Настройки</div>
     <div class="settings-page__list">{{=it.items}}</div>
   </div>
 `);
 
-const tplPage = (data: { readonly items: string; readonly version: string }): string =>
+const tplPage = (data: { readonly items: string }): string =>
   tplPageCompiled(data);
 
 const tplSettingItemCompiled = doT.template(`
@@ -130,6 +130,13 @@ const buildQualitySetting = (): SettingItem => {
   return { key: '_defaultQuality', label: 'Качество по умолчанию', type: 'list', value: null, options: opts };
 };
 
+const buildVersionSetting = (): SettingItem => {
+  const version = __BUILD_SHORT_SHA__
+    ? __APP_VERSION__ + ' (' + __BUILD_SHORT_SHA__ + ')'
+    : __APP_VERSION__;
+  return { key: '_version', label: 'Версия', type: 'readonly', value: version };
+};
+
 const buildSubSizeSetting = (): SettingItem => ({
   key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: storage.getSubSize()
 });
@@ -157,6 +164,7 @@ const buildProxyModeSetting = (isVip: boolean): SettingItem => {
 };
 
 const getDisplayValue = (item: SettingItem): string => {
+  if (item.type === 'readonly') return String(item.value ?? '');
   if (item.type === 'stepper') {
     const v = item.value as number;
     let lbl = v + 'px';
@@ -208,6 +216,7 @@ class SettingsPage extends SidebarPage {
         this.allSettings.unshift(buildSubSizeSetting());
         this.allSettings.unshift(buildQualitySetting());
         this.allSettings.unshift(buildStartPageSetting());
+        this.allSettings.push(buildVersionSetting());
         this.render();
       },
       () => {
@@ -245,9 +254,10 @@ class SettingsPage extends SidebarPage {
       case TvKey.Right:
         if (item && item.type === 'stepper') { this.stepSubSize(1); e.preventDefault(); }
         else if (item && item.type === 'list') { this.cycleListOption(1); e.preventDefault(); }
+        else if (item && item.type === 'readonly') { e.preventDefault(); }
         break;
       case TvKey.Enter:
-        if (item && item.type === 'stepper') { e.preventDefault(); break; }
+        if (item && (item.type === 'stepper' || item.type === 'readonly')) { e.preventDefault(); break; }
         this.openOptions(); e.preventDefault(); break;
     }
   }
@@ -263,10 +273,7 @@ class SettingsPage extends SidebarPage {
         stepper: this.allSettings[i].type === 'stepper'
       });
     }
-    const version = __BUILD_SHORT_SHA__
-      ? __APP_VERSION__ + ' (' + __BUILD_SHORT_SHA__ + ')'
-      : __APP_VERSION__;
-    this.$root.html(tplPage({ items: html, version }));
+    this.$root.html(tplPage({ items: html }));
   }
 
   private renderOptions(): void {
