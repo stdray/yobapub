@@ -36,29 +36,18 @@ function pad(n) { return n < 10 ? '0'+n : ''+n; }
 function fmtFull(iso) { var d = new Date(iso); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
 document.querySelectorAll('[data-utc]').forEach(function(el) { el.textContent = fmtFull(el.getAttribute('data-utc')); });
 function copyEntry() {
-  var timeEl = document.querySelector('[data-utc]');
-  var parts = [
-    'Time: ' + (timeEl ? timeEl.textContent : ''),
-    'Device: @Model.DeviceId',
-    @if (!string.IsNullOrEmpty(Model.TraceId)) { <text>'TraceId: @Model.TraceId',</text> }
-    'IP: @Model.ClientIp',
-    'Level: @Model.Level',
-    'Category: @Model.Category',
-    'Message: @Html.Raw(Model.Message.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", ""))',
-    @if (!string.IsNullOrEmpty(Model.Props) && Model.Props != "{}") { <text>'Props: @Html.Raw(Model.Props.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", ""))',</text> }
-    @if (!string.IsNullOrEmpty(Model.StackTrace)) { <text>'StackTrace:\n@Html.Raw(Model.StackTrace.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", ""))',</text> }
-  ];
-  var text = parts.join('\n');
-  if (navigator.clipboard) { navigator.clipboard.writeText(text); }
-  else {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta); ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-  }
-  var btn = document.querySelector('.copy-all-btn');
-  btn.textContent = 'Скопировано!';
-  setTimeout(function() { btn.textContent = 'Копировать'; }, 2000);
+  fetch('/admin/logs/@Model.Id/text').then(function(r) { return r.text(); }).then(function(text) {
+    if (navigator.clipboard) { navigator.clipboard.writeText(text); }
+    else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    var btn = document.querySelector('.copy-all-btn');
+    btn.textContent = 'Скопировано!';
+    setTimeout(function() { btn.textContent = 'Копировать'; }, 2000);
+  });
 }
 </script>

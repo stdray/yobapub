@@ -139,6 +139,21 @@ class PlayerController {
     return parts.join(',');
   }
 
+  private nudgePastBufferGap(): void {
+    const v = this.videoEl;
+    if (!v || v.buffered.length === 0) return;
+    const ct = v.currentTime;
+    for (let i = 0; i < v.buffered.length; i++) {
+      const start = v.buffered.start(i);
+      if (start > ct && start - ct < 2) {
+        plog.warn('nudgePastBufferGap ct={ct} -> {target}', { ct, target: start + 0.1 });
+        v.currentTime = start + 0.1;
+        return;
+      }
+    }
+    plog.warn('nudgePastBufferGap ct={ct} no suitable range found, buffered={br}', { ct, br: this.formatBuffered(v) });
+  }
+
   private continueWith(overrides: Partial<PlayState>): void {
     this.continuePlaying({
       quality: overrides.quality ?? this.state.quality,
@@ -554,6 +569,9 @@ class PlayerController {
         });
         if (data.details === 'bufferAppendingError') {
           plog.warn('hls bufferAppendingError (skipping recovery, hls.js retries internally)');
+        }
+        if (data.details === 'bufferStalledError') {
+          this.nudgePastBufferGap();
         }
         return;
       }

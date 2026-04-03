@@ -14,14 +14,14 @@ export const getBufferLimits = (tizenVersion: number): HlsBufferLimits => {
   }
   if (tizenVersion >= 3 && tizenVersion < 5) {
     // Tizen 3.0–4.0: moderate memory
-    return { maxBufferLength: 15, maxMaxBufferLength: 60 };
+    return { maxBufferLength: 15, maxMaxBufferLength: 45 };
   }
   if (tizenVersion >= 5) {
     // Tizen 5.0+: more capable but SourceBuffer has hard memory limits
-    return { maxBufferLength: 15, maxMaxBufferLength: 30 };
+    return { maxBufferLength: 15, maxMaxBufferLength: 45 };
   }
   // Non-Tizen (browser, Android): reasonable defaults, not hls.js's 600s
-  return { maxBufferLength: 30, maxMaxBufferLength: 120 };
+  return { maxBufferLength: 30, maxMaxBufferLength: 90 };
 };
 
 export const buildBaseHlsConfig = (): Record<string, number> => {

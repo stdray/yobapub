@@ -101,7 +101,7 @@
         <td class="cat">@e.Category</td>
         <td class="msg">@e.Message</td>
         <td class="act">
-          <button class="copy-row-btn" type="button" title="Копировать">&#x2398;</button>
+          <button class="copy-row-btn" type="button" title="Копировать" data-id="@e.Id">&#x2398;</button>
         </td>
       </tr>
     }
@@ -168,13 +168,12 @@ function copyToClipboard(text) {
 }
 document.querySelectorAll('.copy-row-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
-    var tr = btn.closest('tr');
-    var cells = tr.querySelectorAll('td:not(.act)');
-    var parts = [];
-    cells.forEach(function(c) { parts.push(c.textContent.trim()); });
-    copyToClipboard(parts.join('\t'));
-    btn.textContent = '\u2713';
-    setTimeout(function() { btn.innerHTML = '\u2398'; }, 1500);
+    var id = btn.getAttribute('data-id');
+    fetch('/admin/logs/' + id + '/text').then(function(r) { return r.text(); }).then(function(text) {
+      copyToClipboard(text);
+      btn.textContent = '\u2713';
+      setTimeout(function() { btn.innerHTML = '\u2398'; }, 1500);
+    });
   });
 });
 </script>

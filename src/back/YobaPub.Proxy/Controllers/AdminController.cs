@@ -33,6 +33,14 @@ public class AdminController(LogStore store, PlaybackErrorStore errorStore) : Co
         return View(entry);
     }
 
+    [HttpGet("logs/{id}/text")]
+    public IActionResult LogEntryText(string id)
+    {
+        var entry = store.FindById(id);
+        if (entry == null) return NotFound();
+        return Content(FormatEntry(entry), "text/plain; charset=utf-8");
+    }
+
     [HttpGet("logs/download")]
     public IActionResult DownloadLogs(LogsQuery query, int? limit)
     {
@@ -85,9 +93,24 @@ public class AdminController(LogStore store, PlaybackErrorStore errorStore) : Co
         sb.AppendLine("Time\tDevice\tTraceId\tIP\tLevel\tCategory\tMessage\tStackTrace");
         foreach (var e in entries)
         {
-            var st = e.StackTrace.Replace("\r", "").Replace("\n", "\\n").Replace("\t", "\\t");
-            sb.AppendLine($"{e.ServerTs.ToLocalTime():yyyy-MM-dd HH:mm:ss}\t{e.DeviceId}\t{e.TraceId}\t{e.ClientIp}\t{e.Level}\t{e.Category}\t{e.Message}\t{st}");
+            var st = (e.StackTrace ?? "").Replace("\r", "").Replace("\n", "\\n").Replace("\t", "\\t");
+            sb.AppendLine($"{e.ServerTs.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}\t{e.DeviceId}\t{e.TraceId ?? ""}\t{e.ClientIp}\t{e.Level}\t{e.Category}\t{e.Message}\t{st}");
         }
+        return sb.ToString();
+    }
+
+    private static string FormatEntry(LogEntry e)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Time: {e.ServerTs.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}");
+        sb.AppendLine($"Device: {e.DeviceId}");
+        if (!string.IsNullOrEmpty(e.TraceId)) sb.AppendLine($"TraceId: {e.TraceId}");
+        sb.AppendLine($"IP: {e.ClientIp}");
+        sb.AppendLine($"Level: {e.Level}");
+        sb.AppendLine($"Category: {e.Category}");
+        sb.AppendLine($"Message: {e.Message}");
+        if (!string.IsNullOrEmpty(e.Props) && e.Props != "{}") sb.AppendLine($"Props: {e.Props}");
+        if (!string.IsNullOrEmpty(e.StackTrace)) sb.AppendLine($"StackTrace:\n{e.StackTrace}");
         return sb.ToString();
     }
 }
