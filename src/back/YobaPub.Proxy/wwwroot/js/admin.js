@@ -88,14 +88,18 @@ class LogCopy {
 /* ── Level filter ────────────────────────────────── */
 
 class LevelFilter {
-  static toggle() {
+  static isOpen() {
     const dd = document.getElementById('lvl-dropdown');
-    dd.style.display = dd.style.display === 'none' ? '' : 'none';
+    return dd && dd.classList.contains('lvl-dropdown--open');
+  }
+
+  static toggle() {
+    document.getElementById('lvl-dropdown').classList.toggle('lvl-dropdown--open');
   }
 
   static applyAndClose() {
-    const dd = document.getElementById('lvl-dropdown');
-    if (!dd || dd.style.display === 'none') return;
+    if (!LevelFilter.isOpen()) return;
+    document.getElementById('lvl-dropdown').classList.remove('lvl-dropdown--open');
     dd.style.display = 'none';
     const checked = Array.from(document.querySelectorAll('.lvl-cb'))
       .filter((c) => c.checked)

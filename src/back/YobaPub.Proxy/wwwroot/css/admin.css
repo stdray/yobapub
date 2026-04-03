@@ -220,7 +220,7 @@ tr.row-old td { animation: row-old 4s ease-out; }
 .lvl-head { cursor: pointer; user-select: none; }
 .lvl-active { color: #6af; }
 .lvl-dropdown {
-  display: none; position: absolute; top: 100%; left: 0;
+  display: none !important; position: absolute; top: 100%; left: 0;
   background: #222; border: 1px solid #444; padding: 4px 0;
   z-index: 50; white-space: nowrap; font-weight: normal; min-width: 130px;
 }
@@ -229,6 +229,7 @@ tr.row-old td { animation: row-old 4s ease-out; }
   padding: 4px 10px; cursor: pointer;
 }
 .lvl-dropdown span { font-size: 12px; }
+.lvl-dropdown--open { display: block !important; }
 
 /* ── Load-more sentinel ──────────────────────────── */
 .load-more { text-align: center; color: #555; padding: 6px; }
