@@ -80,6 +80,17 @@ tr.E td { background: #2a1010; }
 tr.W td { background: #2a2010; }
 tr.V td { color: #555; }
 
+@keyframes row-new {
+  from { background: #1e3320; }
+  to   { background: transparent; }
+}
+@keyframes row-old {
+  from { opacity: 0.3; }
+  to   { opacity: 1; }
+}
+tr.row-new td { animation: row-new 3s ease-out; }
+tr.row-old td { animation: row-old 1s ease-out; }
+
 .ts { white-space: nowrap; width: 80px; }
 .ts a { color: #777; text-decoration: none; }
 .ts a:hover { color: #aaa; }

@@ -4,6 +4,7 @@
     var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
     var filterQs = $"level={Uri.EscapeDataString(q.Level ?? "")}&device={Uri.EscapeDataString(q.Device ?? "")}&traceId={Uri.EscapeDataString(q.TraceId ?? "")}&search={Uri.EscapeDataString(q.Search ?? "")}";
     var isRefresh = q.After != null;
+    var rowClass  = isRefresh ? "row-new" : q.Before != null ? "row-old" : "";
 }
 @if (isRefresh && Model.Entries.Length > 0)
 {
@@ -13,7 +14,7 @@
 {
     var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
     var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
-    <tr class="@cls">
+    <tr class="@cls @rowClass">
         <td class="ts"><a href="/admin/logs/@e.Id">@e.ServerTs.FormatTime(UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset)</a></td>
         <td class="dev" title="@e.DeviceId">@devPrefix</td>
         <td class="trace">
