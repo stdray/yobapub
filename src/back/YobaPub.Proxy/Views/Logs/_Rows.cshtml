@@ -3,6 +3,11 @@
     var q = Model.Query;
     var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
     var filterQs = $"level={Uri.EscapeDataString(q.Level ?? "")}&device={Uri.EscapeDataString(q.Device ?? "")}&traceId={Uri.EscapeDataString(q.TraceId ?? "")}&search={Uri.EscapeDataString(q.Search ?? "")}";
+    var isRefresh = q.After != null;
+}
+@if (isRefresh && Model.Entries.Length > 0)
+{
+    <tr id="empty-row" style="display:none" hx-swap-oob="outerHTML"></tr>
 }
 @foreach (var e in Model.Entries)
 {
@@ -20,14 +25,25 @@
         </td>
         <td class="ip">@e.ClientIp</td>
         <td class="lvl">@(e.Level.Length > 0 ? e.Level[0] : '-')</td>
-        <td class="cat">@e.Category</td>
+        @{ var cat = e.Category ?? ""; }
+        <td class="cat" title="@cat">@cat.ShortName()</td>
         <td class="msg">@e.Message</td>
         <td class="act">
             <button class="copy-row-btn" type="button" title="Копировать" data-id="@e.Id">&#x2398;</button>
         </td>
     </tr>
 }
-@if (Model.HasMore && Model.LastId != null)
+@if (isRefresh)
+{
+    <tr id="top-sentinel"
+        hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&after=@Model.TopId"
+        hx-trigger="every 10s [document.getElementById('autoRefresh').checked]"
+        hx-swap="outerHTML"
+        hx-target="this"
+        style="display:none">
+    </tr>
+}
+else if (Model.HasMore && Model.LastId != null)
 {
     <tr hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&before=@Model.LastId"
         hx-trigger="intersect once"

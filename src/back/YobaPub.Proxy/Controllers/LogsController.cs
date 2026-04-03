@@ -36,9 +36,7 @@ public class LogsController(LogStore store) : Controller
             TopId   = entries.Length > 0 ? entries[0].Id.ToString() : query.After,
             LastId  = entries.Length > 0 ? entries[^1].Id.ToString() : null
         };
-        return query.After != null
-            ? PartialView("_Refresh", model)
-            : PartialView("_Rows", model);
+        return PartialView("_Rows", model);
     }
 
     [HttpGet("{id}")]
