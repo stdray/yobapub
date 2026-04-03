@@ -10,7 +10,7 @@
 @if (User.Identity?.IsAuthenticated == true && ViewData["BodyClass"] as string != "login")
 {
 <nav class="admin-nav">
-    <a href="/admin/logs" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Logs" ? "active" : "")">Логи</a>
+    <a href="/admin/logs" class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">Логи</a>
     <a href="/admin/playback-errors" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "PlaybackErrors" ? "active" : "")">Ошибки CDN</a>
     <a href="/admin/vip" class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Vip" ? "active" : "")">VIP</a>
     <a href="/admin/settings" class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Settings" ? "active" : "")">Настройки</a>

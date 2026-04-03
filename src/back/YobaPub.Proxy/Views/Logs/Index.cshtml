@@ -7,7 +7,7 @@
 }
 <header>
   <h1>YobaPub Logs</h1>
-  <form method="get" asp-action="Logs" style="display:contents">
+  <form method="get" asp-action="Index" style="display:contents">
     <select name="level" onchange="this.form.submit()">
       <option value="">Все уровни</option>
       @foreach (var lvl in new[] { "Error", "Warning", "Information", "Verbose" })
@@ -30,7 +30,7 @@
     @if (!string.IsNullOrEmpty(q.TraceId))
     {
       <span class="active-filter">trace: @q.TraceId
-        <a href="@Url.Action("Logs", new { level = q.Level, device = q.Device, search = q.Search, pageSize })"
+        <a href="@Url.Action("Index", new { level = q.Level, device = q.Device, search = q.Search, pageSize })"
            title="Сбросить фильтр по trace">&#x2715;</a>
       </span>
     }
@@ -53,7 +53,7 @@
       <a href="#" onclick="copyLogs(0);return false">Копировать все</a>
     </div>
   </div>
-  <form asp-action="ClearLogs" method="post" style="margin:0"
+  <form asp-action="Clear" method="post" style="margin:0"
         onsubmit="return confirm('Удалить все логи?')">
     <input type="hidden" name="level" value="@q.Level">
     <input type="hidden" name="device" value="@q.Device">
@@ -92,7 +92,7 @@
         <td class="trace">
           @if (!string.IsNullOrEmpty(e.TraceId))
           {
-            <a class="trace-btn" href="@Url.Action("Logs", new { level = q.Level, device = devPrefix, search = q.Search, traceId = e.TraceId, pageSize })"
+            <a class="trace-btn" href="@Url.Action("Index", new { level = q.Level, device = devPrefix, search = q.Search, traceId = e.TraceId, pageSize })"
                title="Фильтр по device + trace">@e.TraceId</a>
           }
         </td>
@@ -112,14 +112,14 @@
   <nav class="pager">
     @if (q.Page > 1)
     {
-      <a asp-action="Logs" asp-route-level="@q.Level" asp-route-device="@q.Device"
+      <a asp-action="Index" asp-route-level="@q.Level" asp-route-device="@q.Device"
          asp-route-traceId="@q.TraceId" asp-route-search="@q.Search"
          asp-route-pageSize="@pageSize" asp-route-page="@(q.Page - 1)">&#x2190; Назад</a>
     }
     <span>стр. @q.Page / @Model.TotalPages</span>
     @if (q.Page < Model.TotalPages)
     {
-      <a asp-action="Logs" asp-route-level="@q.Level" asp-route-device="@q.Device"
+      <a asp-action="Index" asp-route-level="@q.Level" asp-route-device="@q.Device"
          asp-route-traceId="@q.TraceId" asp-route-search="@q.Search"
          asp-route-pageSize="@pageSize" asp-route-page="@(q.Page + 1)">Вперёд &#x2192;</a>
     }
