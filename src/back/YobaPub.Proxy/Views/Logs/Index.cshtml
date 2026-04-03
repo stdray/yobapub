@@ -102,8 +102,8 @@
               this.open = false;
             }
           }"
-          style="position:relative;cursor:pointer;user-select:none">
-        <span @@click="open = !open" :style="selected.length ? 'color:#6af' : ''">L</span>
+          style="cursor:pointer;user-select:none">
+        <span @@click="open = !open" :style="selected.length ? 'color:#6af' : ''">Lvl</span>
         <div x-show="open" @@click.outside="apply()"
              style="position:absolute;top:100%;left:0;background:#222;border:1px solid #444;padding:4px 0;z-index:50;white-space:nowrap;font-weight:normal;min-width:130px">
           <template x-for="lvl in levels" :key="lvl">
