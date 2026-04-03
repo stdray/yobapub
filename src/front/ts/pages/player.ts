@@ -99,6 +99,7 @@ class PlayerController {
   private osdTimer: number | null = null;
 
   // Flags
+  private appendErrorCount = 0;
   private playbackStarted = false;
   private markedWatched = false;
   private wasWatched = false;
@@ -568,9 +569,15 @@ class PlayerController {
           fragStart: data.frag ? data.frag.start : null,
         });
         if (data.details === 'bufferAppendingError') {
-          plog.warn('hls recoverMediaError after bufferAppendingError');
-          hls.recoverMediaError();
-          if (this.videoEl) this.videoEl.play();
+          this.appendErrorCount++;
+          if (this.appendErrorCount >= 2) {
+            plog.warn('hls recoverMediaError after repeated bufferAppendingError (count={count})', { count: this.appendErrorCount });
+            hls.recoverMediaError();
+            if (this.videoEl) this.videoEl.play();
+            this.appendErrorCount = 0;
+          } else {
+            plog.warn('hls bufferAppendingError (count={count}, waiting for hls.js retry)', { count: this.appendErrorCount });
+          }
         }
         if (data.details === 'bufferStalledError') {
           this.nudgePastBufferGap();
@@ -734,6 +741,7 @@ class PlayerController {
       this.hideSpinner();
     });
     this.videoEl.addEventListener('playing', () => {
+      this.appendErrorCount = 0;
       plog.info('video playing ct={ct} readyState={rs} buffered={br}', {
         ct: this.videoEl ? this.videoEl.currentTime : -1,
         rs: this.videoEl ? this.videoEl.readyState : -1,
