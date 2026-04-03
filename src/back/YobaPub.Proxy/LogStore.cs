@@ -25,11 +25,12 @@ public class LogStore : IDisposable
 {
     private readonly LiteDatabase _db;
     private readonly ILiteCollection<LogEntry> _col;
-    private const int Max = 2000;
+    private readonly DebugSettingsStore _settings;
 
-    public LogStore(IOptions<AdminOptions> options)
+    public LogStore(IOptions<AdminOptions> options, DebugSettingsStore settings)
     {
         var dbPath = options.Value.LogsDbPath;
+        _settings = settings;
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
         _db = new LiteDatabase(dbPath);
         _col = _db.GetCollection<LogEntry>("logs");
@@ -42,11 +43,12 @@ public class LogStore : IDisposable
     {
         _col.Insert(entry);
         var count = _col.Count();
-        if (count > Max)
+        var max = _settings.MaxLogEntries;
+        if (count > max)
         {
             var oldest = _col.Query()
                 .OrderBy(x => x.ServerTs)
-                .Limit(count - Max)
+                .Limit(count - max)
                 .ToList()
                 .ConvertAll(x => x.Id);
             _col.DeleteMany(x => oldest.Contains(x.Id));
@@ -80,17 +82,15 @@ public class LogStore : IDisposable
 
     public string NewCursorId() => ObjectId.NewObjectId().ToString();
 
-    public (LogEntry[] Entries, bool HasMore, int Total) QueryWithCursor(LogsQuery q)
+    public (LogEntry[] Entries, bool HasMore) QueryWithCursor(LogsQuery q)
     {
         var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
-        var all = ApplyFilters(_col.Query().OrderByDescending(x => x.ServerTs).ToList(), q).ToList();
-        var total = all.Count;
+        var all = ApplyFilters(_col.Query().OrderByDescending(x => x.ServerTs).ToList(), q);
 
         if (!string.IsNullOrEmpty(q.After))
         {
             var cursor = new ObjectId(q.After);
-            var newer = all.Where(x => x.Id.CompareTo(cursor) > 0).ToArray();
-            return (newer, false, total);
+            return (all.Where(x => x.Id.CompareTo(cursor) > 0).ToArray(), false);
         }
 
         IEnumerable<LogEntry> rows = all;
@@ -102,7 +102,7 @@ public class LogStore : IDisposable
 
         var taken = rows.Take(pageSize + 1).ToArray();
         var hasMore = taken.Length > pageSize;
-        return (taken.Take(pageSize).ToArray(), hasMore, total);
+        return (taken.Take(pageSize).ToArray(), hasMore);
     }
 
     public LogEntry? FindById(string id)

@@ -11,12 +11,11 @@ public class LogsController(LogStore store) : Controller
     [HttpGet("")]
     public IActionResult Index(LogsQuery query)
     {
-        var (entries, hasMore, total) = store.QueryWithCursor(query);
+        var (entries, hasMore) = store.QueryWithCursor(query);
         return View(new LogsViewModel
         {
             Entries = entries,
             Query   = query,
-            Total   = total,
             HasMore = hasMore,
             TopId   = entries.Length > 0 ? entries[0].Id.ToString() : store.NewCursorId(),
             LastId  = entries.Length > 0 ? entries[^1].Id.ToString() : null
@@ -26,12 +25,11 @@ public class LogsController(LogStore store) : Controller
     [HttpGet("more")]
     public IActionResult More(LogsQuery query)
     {
-        var (entries, hasMore, _) = store.QueryWithCursor(query);
+        var (entries, hasMore) = store.QueryWithCursor(query);
         var model = new LogsViewModel
         {
             Entries = entries,
             Query   = query,
-            Total   = 0,
             HasMore = hasMore,
             TopId   = entries.Length > 0 ? entries[0].Id.ToString() : query.After,
             LastId  = entries.Length > 0 ? entries[^1].Id.ToString() : null

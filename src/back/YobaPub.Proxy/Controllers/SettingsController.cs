@@ -14,14 +14,22 @@ public class SettingsController(DebugSettingsStore debugSettings, UserSettingsSt
     public IActionResult Index() =>
         View(new SettingsViewModel
         {
-            DebugEnabled = debugSettings.IsEnabled,
-            UserSettings = userSettings.Get(Login)
+            DebugEnabled    = debugSettings.IsEnabled,
+            UserSettings    = userSettings.Get(Login),
+            MaxLogEntries   = debugSettings.MaxLogEntries
         });
 
     [HttpPost("debug")]
     public IActionResult ToggleDebug()
     {
         debugSettings.SetEnabled(!debugSettings.IsEnabled);
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("max-log-entries")]
+    public IActionResult SetMaxLogEntries(int max)
+    {
+        debugSettings.SetMaxLogEntries(Math.Max(100, max));
         return RedirectToAction(nameof(Index));
     }
 

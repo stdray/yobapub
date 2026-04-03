@@ -38,6 +38,20 @@
         </td>
       </tr>
       <tr>
+        <td>Макс. записей в логе</td>
+        <td>@Model.MaxLogEntries</td>
+        <td>
+          <form hx-post="/admin/settings/max-log-entries"
+                hx-target="#page-content"
+                hx-select="#page-content"
+                hx-swap="outerHTML"
+                style="margin:0;display:flex;gap:4px">
+            <input type="number" name="max" value="@Model.MaxLogEntries" min="100" step="100" style="width:80px">
+            <button type="submit">Сохранить</button>
+          </form>
+        </td>
+      </tr>
+      <tr>
         <td>Часовой пояс</td>
         <td>UTC@(Model.UserSettings.TimeZoneOffsetHours >= 0 ? "+" : "")@Model.UserSettings.TimeZoneOffsetHours</td>
         <td>

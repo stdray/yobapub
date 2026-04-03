@@ -15,7 +15,6 @@ public class LogsViewModel
 {
     public required LogEntry[] Entries { get; init; }
     public required LogsQuery Query { get; init; }
-    public int Total { get; init; }
     public bool HasMore { get; init; }
     public string? TopId { get; init; }
     public string? LastId { get; init; }
