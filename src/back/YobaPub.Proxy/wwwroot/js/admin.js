@@ -114,10 +114,17 @@ class LevelFilter {
   }
 }
 
-/* ── Connection indicator ────────────────────────── */
+/* ── Htmx hooks ──────────────────────────────────── */
 
-class ConnError {
+class HtmxHooks {
   static init() {
+    document.addEventListener('htmx:configRequest', (e) => {
+      const params = e.detail.parameters;
+      Object.keys(params).forEach((k) => {
+        const v = params[k];
+        if (v === '' || (Array.isArray(v) && v.length === 0)) delete params[k];
+      });
+    });
     document.addEventListener('htmx:sendError', () => {
       document.getElementById('conn-error').style.display = '';
     });
@@ -137,4 +144,4 @@ document.addEventListener('click', (e) => {
   LevelFilter.handleClick(e);
 });
 
-ConnError.init();
+HtmxHooks.init();
