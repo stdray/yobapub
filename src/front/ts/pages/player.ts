@@ -141,19 +141,20 @@ class PlayerController {
     return parts.join(',');
   }
 
-  private nudgePastBufferGap(): void {
+  private nudgePastBufferGap(): boolean {
     const v = this.videoEl;
-    if (!v || v.buffered.length === 0) return;
+    if (!v || v.buffered.length === 0) return false;
     const ct = v.currentTime;
     for (let i = 0; i < v.buffered.length; i++) {
       const start = v.buffered.start(i);
       if (start > ct && start - ct < 2) {
         plog.warn('nudgePastBufferGap ct={ct} -> {target}', { ct, target: start + 0.1 });
         v.currentTime = start + 0.1;
-        return;
+        return true;
       }
     }
     plog.warn('nudgePastBufferGap ct={ct} no suitable range found, buffered={br}', { ct, br: this.formatBuffered(v) });
+    return false;
   }
 
   private continueWith(overrides: Partial<PlayState>): void {
@@ -588,7 +589,13 @@ class PlayerController {
           }
         }
         if (data.details === 'bufferStalledError') {
-          this.nudgePastBufferGap();
+          if (!this.nudgePastBufferGap() && this.hadBufferFullError) {
+            plog.warn('hls recoverMediaError after bufferStalledError (hadBufferFull=true, nudge failed)');
+            hls.recoverMediaError();
+            if (this.videoEl) this.videoEl.play();
+            this.hadBufferFullError = false;
+            this.appendErrorCount = 0;
+          }
         }
         return;
       }
