@@ -97,7 +97,6 @@ tr.row-old td { animation: row-old 1s ease-out; }
 .ts a:visited { color: #777; }
 .dev { color: #6af; width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ip { color: #7c7; width: 120px; white-space: nowrap; }
-.lvl { width: 24px; text-align: center; }
 .cat { width: 100px; color: #aaf; white-space: nowrap; }
 .trace { width: 50px; white-space: nowrap; }
 .trace-btn {

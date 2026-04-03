@@ -81,7 +81,6 @@
       <th class="dev">Device</th>
       <th class="trace">Trace</th>
       <th class="ip">IP</th>
-      <th class="lvl">L</th>
       <th class="cat">Category</th>
       <th class="msg">Message</th>
       <th class="act"></th>
@@ -97,7 +96,7 @@
     </tr>
     @if (Model.Entries.Length == 0)
     {
-      <tr id="empty-row"><td colspan="8" class="empty">Записей нет</td></tr>
+      <tr id="empty-row"><td colspan="7" class="empty">Записей нет</td></tr>
     }
     @await Html.PartialAsync("_Rows", Model)
   </tbody>

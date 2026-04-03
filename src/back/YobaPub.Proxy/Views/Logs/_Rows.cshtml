@@ -25,7 +25,6 @@
             }
         </td>
         <td class="ip">@e.ClientIp</td>
-        <td class="lvl">@(e.Level.Length > 0 ? e.Level[0] : '-')</td>
         @{ var cat = e.Category ?? ""; }
         <td class="cat" title="@cat">@cat.ShortName()</td>
         <td class="msg">@e.Message</td>
@@ -50,6 +49,6 @@ else if (Model.HasMore && Model.LastId != null)
         hx-trigger="intersect once"
         hx-swap="outerHTML"
         hx-target="this">
-        <td colspan="8" style="text-align:center;color:#555;padding:6px">↓</td>
+        <td colspan="7" style="text-align:center;color:#555;padding:6px">↓</td>
     </tr>
 }
