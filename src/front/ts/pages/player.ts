@@ -568,7 +568,9 @@ class PlayerController {
           fragStart: data.frag ? data.frag.start : null,
         });
         if (data.details === 'bufferAppendingError') {
-          plog.warn('hls bufferAppendingError (skipping recovery, hls.js retries internally)');
+          plog.warn('hls recoverMediaError after bufferAppendingError');
+          hls.recoverMediaError();
+          if (this.videoEl) this.videoEl.play();
         }
         if (data.details === 'bufferStalledError') {
           this.nudgePastBufferGap();
