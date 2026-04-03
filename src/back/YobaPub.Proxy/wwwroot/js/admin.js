@@ -104,12 +104,11 @@ class LevelFilter {
       document.getElementById('lvl-dropdown').classList.toggle('lvl-dropdown--open');
       return true;
     }
-    if (e.target.closest('.lvl-cb')) {
+    if (e.target.closest('.lvl')) return false;
+    const dd = document.getElementById('lvl-dropdown');
+    if (dd?.classList.contains('lvl-dropdown--open')) {
+      dd.classList.remove('lvl-dropdown--open');
       LevelFilter.apply();
-      return true;
-    }
-    if (!e.target.closest('.lvl')) {
-      document.getElementById('lvl-dropdown')?.classList.remove('lvl-dropdown--open');
     }
     return false;
   }
