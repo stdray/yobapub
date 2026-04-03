@@ -2,7 +2,7 @@
 @{
     var q = Model.Query;
     var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
-    var levelParts = (q.Level ?? []).Select(l => $"level={Uri.EscapeDataString(l)}");
+    var levelParts = (q.Level ?? []).Where(l => !string.IsNullOrEmpty(l)).Select(l => $"level={Uri.EscapeDataString(l)}");
     var filterQs = string.Join("&", levelParts.Concat(new[] {
         $"device={Uri.EscapeDataString(q.Device ?? "")}",
         $"traceId={Uri.EscapeDataString(q.TraceId ?? "")}",
@@ -34,8 +34,11 @@
         @{ var cat = e.Category ?? ""; }
         <td class="cat" title="@cat">@cat.ShortName()</td>
         <td class="msg">@e.Message</td>
-        <td class="act">
-            <button class="copy-row-btn" type="button" title="Копировать" data-id="@e.Id">&#x2398;</button>
+        <td class="act" x-data="{ done: false }">
+            <button class="copy-row-btn" type="button" title="Копировать"
+                    x-text="done ? '\u2713' : '\u2398'"
+                    @@click="fetch('/admin/logs/@e.Id/text').then(r=>r.text()).then(t=>{copyToClipboard(t);done=true;setTimeout(()=>done=false,1500)})">
+            </button>
         </td>
     </tr>
 }

@@ -4,7 +4,7 @@
     ViewData["Title"] = "YobaPub Logs";
     var q = Model.Query;
     var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
-    var levelParts = (q.Level ?? []).Select(l => $"level={Uri.EscapeDataString(l)}");
+    var levelParts = (q.Level ?? []).Where(l => !string.IsNullOrEmpty(l)).Select(l => $"level={Uri.EscapeDataString(l)}");
     var filterQs = string.Join("&", levelParts.Concat(new[] {
         $"device={Uri.EscapeDataString(q.Device ?? "")}",
         $"traceId={Uri.EscapeDataString(q.TraceId ?? "")}",
@@ -50,20 +50,20 @@
   </form>
   <label><input type="checkbox" id="autoRefresh" checked hx-preserve="true"> Auto 10s</label>
   <span id="status"></span>
-  <div class="dropdown">
-    <button type="button" class="dropdown-toggle">Выгрузить &#x25BE;</button>
-    <div class="dropdown-menu">
+  <div class="dropdown" x-data="{ open: false }">
+    <button type="button" class="dropdown-toggle" @@click="open = !open">Выгрузить &#x25BE;</button>
+    <div class="dropdown-menu" x-show="open" @@click.outside="open=false" @@click="open=false">
       <a href="/admin/logs/download?@(filterQs)&limit=15">Последние 15</a>
       <a href="/admin/logs/download?@(filterQs)&limit=50">Последние 50</a>
       <a href="/admin/logs/download?@(filterQs)">Загрузить все</a>
     </div>
   </div>
-  <div class="dropdown">
-    <button type="button" class="dropdown-toggle">Копировать &#x25BE;</button>
-    <div class="dropdown-menu">
-      <a href="#" onclick="copyLogs(15);return false">Последние 15</a>
-      <a href="#" onclick="copyLogs(50);return false">Последние 50</a>
-      <a href="#" onclick="copyLogs(0);return false">Копировать все</a>
+  <div class="dropdown" x-data="{ open: false }">
+    <button type="button" class="dropdown-toggle" @@click="open = !open">Копировать &#x25BE;</button>
+    <div class="dropdown-menu" x-show="open" @@click.outside="open=false">
+      <a href="#" @@click.prevent="copyLogs(15); open=false">Последние 15</a>
+      <a href="#" @@click.prevent="copyLogs(50); open=false">Последние 50</a>
+      <a href="#" @@click.prevent="copyLogs(0); open=false">Копировать все</a>
     </div>
   </div>
   <form hx-post="/admin/logs/clear"
@@ -105,7 +105,7 @@
           style="position:relative;cursor:pointer;user-select:none">
         <span @@click="open = !open" :style="selected.length ? 'color:#6af' : ''">L</span>
         <div x-show="open" @@click.outside="apply()"
-             style="position:absolute;top:100%;left:50%;transform:translateX(-50%);background:#222;border:1px solid #444;padding:4px 0;z-index:50;white-space:nowrap;font-weight:normal;min-width:130px">
+             style="position:absolute;top:100%;left:0;background:#222;border:1px solid #444;padding:4px 0;z-index:50;white-space:nowrap;font-weight:normal;min-width:130px">
           <template x-for="lvl in levels" :key="lvl">
             <label style="display:flex;align-items:center;gap:6px;padding:4px 10px;cursor:pointer">
               <input type="checkbox" :value="lvl" x-model="selected">
@@ -136,38 +136,11 @@
 </table>
 </div>
 <script>
-document.addEventListener('click', function(e) {
-  var open = document.querySelector('.dropdown.open');
-  if (open && !open.contains(e.target)) open.classList.remove('open');
-});
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('.dropdown-toggle');
-  if (!btn) return;
-  e.stopPropagation();
-  var dd = btn.parentElement;
-  var wasOpen = dd.classList.contains('open');
-  var prev = document.querySelector('.dropdown.open');
-  if (prev) prev.classList.remove('open');
-  if (!wasOpen) dd.classList.add('open');
-});
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('.copy-row-btn');
-  if (!btn) return;
-  var id = btn.getAttribute('data-id');
-  fetch('/admin/logs/' + id + '/text').then(function(r) { return r.text(); }).then(function(text) {
-    copyToClipboard(text);
-    btn.textContent = '\u2713';
-    setTimeout(function() { btn.innerHTML = '\u2398'; }, 1500);
-  });
-});
 var copyToClipboard = function(text) {
   if (navigator.clipboard) { navigator.clipboard.writeText(text); return; }
   var ta = document.createElement('textarea');
-  ta.value = text;
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand('copy');
-  document.body.removeChild(ta);
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  document.execCommand('copy'); document.body.removeChild(ta);
 };
 var copyLogs = function(limit) {
   var url = '/admin/logs/tsv?@Html.Raw(filterQs)' + (limit ? '&limit=' + limit : '');
@@ -178,7 +151,5 @@ var copyLogs = function(limit) {
     s.textContent = 'Скопировано!';
     setTimeout(function() { s.textContent = prev; }, 2000);
   });
-  var open = document.querySelector('.dropdown.open');
-  if (open) open.classList.remove('open');
 };
 </script>
