@@ -46,6 +46,11 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
 
 var app = builder.Build();
 
+app.Services.GetRequiredService<ILoggerFactory>()
+    .AddProvider(new LiteDbLoggerProvider(
+        app.Services.GetRequiredService<LogStore>(),
+        app.Services.GetRequiredService<DebugSettingsStore>()));
+
 app.UseForwardedHeaders();
 app.UseMiddleware<UniversalProxyMiddleware>();
 app.UseDefaultFiles();

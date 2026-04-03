@@ -87,10 +87,10 @@ tr.V td { color: #555; }
 .cat { width: 100px; color: #aaf; white-space: nowrap; }
 .trace { width: 50px; white-space: nowrap; }
 .trace-btn {
-  color: #fa0; text-decoration: none; background: #332800;
+  color: #4de; text-decoration: none; background: #1a2e33;
   padding: 1px 5px; border-radius: 3px; font-size: 12px;
 }
-.trace-btn:hover { background: #553a00; }
+.trace-btn:hover { background: #2a4048; }
 .msg { word-break: break-word; }
 
 .active-filter {
