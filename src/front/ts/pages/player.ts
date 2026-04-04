@@ -833,10 +833,10 @@ class PlayerController {
 
   private logPlaybackQuality(): void {
     const q = this.info.getDroppedFrames();
-    if (!q || q.totalVideoFrames === 0) return;
-    const pct = (q.droppedVideoFrames / q.totalVideoFrames * 100).toFixed(1);
+    if (!q || q.total === 0) return;
+    const pct = (q.dropped / q.total * 100).toFixed(1);
     plog.info('playbackQuality total={total} dropped={dropped} ({pct}%)', {
-      total: q.totalVideoFrames, dropped: q.droppedVideoFrames, pct,
+      total: q.total, dropped: q.dropped, pct,
     });
   }
 

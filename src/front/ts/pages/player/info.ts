@@ -2,11 +2,6 @@ import $ from 'jquery';
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
 import Hls from 'hls.js';
 
-interface VideoPlaybackQuality {
-  readonly totalVideoFrames: number;
-  readonly droppedVideoFrames: number;
-}
-
 export interface InfoDataSource {
   readonly files: () => ReadonlyArray<VideoFile>;
   readonly audios: () => ReadonlyArray<AudioTrack>;
@@ -18,21 +13,23 @@ export interface InfoDataSource {
   readonly videoEl: () => HTMLVideoElement | null;
 }
 
+// --- Refresh rate (measured once at module load, before video starts) ---
+
 let measuredRefreshRate: number | null = null;
 
+const REFRESH_SAMPLES = 30;
+
 const measureRefreshRate = (): void => {
-  if (measuredRefreshRate !== null) return;
   let prev = 0;
   let count = 0;
   let sum = 0;
-  const SAMPLES = 10;
   const tick = (ts: number): void => {
     if (prev > 0) {
       sum += ts - prev;
       count++;
     }
     prev = ts;
-    if (count < SAMPLES) {
+    if (count < REFRESH_SAMPLES) {
       requestAnimationFrame(tick);
     } else {
       measuredRefreshRate = Math.round(1000 / (sum / count));
@@ -41,28 +38,44 @@ const measureRefreshRate = (): void => {
   requestAnimationFrame(tick);
 };
 
-const getVideoFps = (videoEl: HTMLVideoElement | null, quality: VideoPlaybackQuality | null): number | null => {
-  if (!videoEl || !quality || quality.totalVideoFrames === 0) return null;
-  const ct = videoEl.currentTime;
-  if (ct <= 1) return null;
-  return Math.round(quality.totalVideoFrames / ct);
+measureRefreshRate();
+
+// --- Frame counters ---
+
+interface FrameCounters {
+  readonly total: number;
+  readonly dropped: number;
+}
+
+const getFrameCounters = (videoEl: HTMLVideoElement | null): FrameCounters | null => {
+  if (!videoEl) return null;
+  const v = videoEl as unknown as {
+    readonly getVideoPlaybackQuality?: () => { readonly totalVideoFrames: number; readonly droppedVideoFrames: number };
+    readonly webkitDecodedFrameCount?: number;
+    readonly webkitDroppedFrameCount?: number;
+  };
+  if (typeof v.getVideoPlaybackQuality === 'function') {
+    const q = v.getVideoPlaybackQuality();
+    if (q.totalVideoFrames > 0) return { total: q.totalVideoFrames, dropped: q.droppedVideoFrames };
+  }
+  if (typeof v.webkitDecodedFrameCount === 'number' && v.webkitDecodedFrameCount > 0) {
+    return { total: v.webkitDecodedFrameCount, dropped: v.webkitDroppedFrameCount || 0 };
+  }
+  return null;
 };
 
-const getPlaybackQuality = (videoEl: HTMLVideoElement | null): VideoPlaybackQuality | null => {
-  if (!videoEl) return null;
-  const fn = (videoEl as unknown as { readonly getVideoPlaybackQuality?: () => VideoPlaybackQuality }).getVideoPlaybackQuality;
-  if (typeof fn !== 'function') return null;
-  return fn.call(videoEl);
-};
+// --- PlayerInfo ---
 
 export class PlayerInfo {
   private readonly $root: JQuery;
   private readonly src: InfoDataSource;
+  private prevFrames = 0;
+  private prevTime = 0;
+  private currentFps: number | null = null;
 
   constructor($root: JQuery, src: InfoDataSource) {
     this.$root = $root;
     this.src = src;
-    measureRefreshRate();
   }
 
   show(): void {
@@ -75,11 +88,27 @@ export class PlayerInfo {
   }
 
   updateBadge(): void {
+    this.sampleFps();
     this.$root.find('.player__info').html(this.getStreamInfo());
   }
 
-  getDroppedFrames(): VideoPlaybackQuality | null {
-    return getPlaybackQuality(this.src.videoEl());
+  getDroppedFrames(): FrameCounters | null {
+    return getFrameCounters(this.src.videoEl());
+  }
+
+  private sampleFps(): void {
+    const counters = getFrameCounters(this.src.videoEl());
+    const now = Date.now();
+    if (!counters) { this.prevFrames = 0; this.prevTime = 0; return; }
+    if (this.prevTime > 0 && now - this.prevTime > 500) {
+      const dt = (now - this.prevTime) / 1000;
+      const df = counters.total - this.prevFrames;
+      if (df > 0 && dt > 0) {
+        this.currentFps = Math.round(df / dt);
+      }
+    }
+    this.prevFrames = counters.total;
+    this.prevTime = now;
   }
 
   private getStreamInfo(): string {
@@ -128,19 +157,17 @@ export class PlayerInfo {
     lines.push(line2.join(' &bull; '));
 
     // Line 3: fps/Hz + dropped frames
-    const videoEl = this.src.videoEl();
-    const quality = getPlaybackQuality(videoEl);
+    const counters = getFrameCounters(this.src.videoEl());
     const line3: string[] = [];
     const fpsParts: string[] = [];
-    const videoFps = getVideoFps(videoEl, quality);
-    if (videoFps !== null) fpsParts.push(videoFps + 'fps');
+    if (this.currentFps !== null) fpsParts.push(this.currentFps + 'fps');
     if (measuredRefreshRate !== null) fpsParts.push(measuredRefreshRate + 'Hz');
     if (fpsParts.length > 0) line3.push(fpsParts.join('/'));
-    if (quality && quality.totalVideoFrames > 0) {
-      const pct = quality.droppedVideoFrames > 0
-        ? ' (' + (quality.droppedVideoFrames / quality.totalVideoFrames * 100).toFixed(1) + '%)'
+    if (counters && counters.total > 0) {
+      const pct = counters.dropped > 0
+        ? ' (' + (counters.dropped / counters.total * 100).toFixed(1) + '%)'
         : '';
-      line3.push('dropped ' + quality.droppedVideoFrames + '/' + quality.totalVideoFrames + pct);
+      line3.push('dropped ' + counters.dropped + '/' + counters.total + pct);
     }
     if (line3.length > 0) lines.push(line3.join(' &bull; '));
 
