@@ -409,11 +409,12 @@ class PlayerController {
     }
 
     if (needSeek && this.videoEl) {
-      if (this.hlsInstance) {
-        this.hlsInstance.stopLoad();
-        this.hlsInstance.startLoad(next.position);
+      if (this.hlsInstance && this.media.hlsUrl) {
+        this.showSpinner();
+        this.playSource(this.media.hlsUrl);
+      } else {
+        this.videoEl.currentTime = next.position;
       }
-      this.videoEl.currentTime = next.position;
     }
 
     if (needSub && this.videoEl) {
