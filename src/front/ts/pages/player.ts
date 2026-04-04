@@ -21,7 +21,7 @@ import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitl
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
 import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, handlePanelKey, clearPanelIdle } from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
-import { InfoState, updateInfoBadge, showInfo, hideInfo } from './player/info';
+import { PlayerInfo } from './player/info';
 
 // --- Interfaces ---
 
@@ -106,9 +106,21 @@ class PlayerController {
   private wasWatched = false;
   private playSourceDebug = '';
 
+  // Info
+  private readonly info = new PlayerInfo(this.$root, {
+    files: () => this.media.files,
+    audios: () => this.media.audios,
+    subs: () => this.media.subs,
+    selectedQuality: () => this.state.quality,
+    selectedAudio: () => this.state.audio,
+    selectedSub: () => this.state.sub,
+    hlsInstance: () => this.hlsInstance,
+    videoEl: () => this.videoEl,
+  });
+
   // Panel callbacks
   private readonly panelCallbacks: PanelCallbacks = {
-    onShowInfo: () => { showInfo(this.$root, this.getInfoState()); },
+    onShowInfo: () => { this.info.show(); },
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
     onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
     onApplyQuality: (idx) => { if (idx !== this.state.quality) this.continueWith({ quality: idx }); },
@@ -183,18 +195,6 @@ class PlayerController {
     } else if (this.media.video !== undefined) {
       toggleWatched(this.media.item.id, this.media.video);
     }
-  }
-
-  private getInfoState(): InfoState {
-    return {
-      files: this.media.files,
-      audios: this.media.audios,
-      subs: this.media.subs,
-      selectedQuality: this.state.quality,
-      selectedAudio: this.state.audio,
-      selectedSub: this.state.sub,
-      hlsInstance: this.hlsInstance,
-    };
   }
 
   private getPanelData(): PanelData {
@@ -432,7 +432,7 @@ class PlayerController {
 
   private showBar(): void {
     this.$root.find('.player__header, .player__gradient, .player__bar').removeClass('hidden');
-    showInfo(this.$root, this.getInfoState());
+    this.info.show();
     this.updateProgressBar();
     this.startProgressTimer();
     this.clearBarTimer();
@@ -444,7 +444,7 @@ class PlayerController {
   private hideBar(): void {
     this.stopProgressTimer();
     this.$root.find('.player__header, .player__gradient, .player__bar').addClass('hidden');
-    hideInfo(this.$root);
+    this.info.hide();
   }
 
   private clearBarTimer(): void {
@@ -656,7 +656,7 @@ class PlayerController {
     this.hideSpinner();
     this.startMarkTimer();
     this.showBar();
-    updateInfoBadge(this.$root, this.getInfoState());
+    this.info.updateBadge();
   }
 
   private showSpinner(): void {
@@ -810,6 +810,7 @@ class PlayerController {
     this.markedWatched = false;
     this.markTimer = window.setInterval(() => {
       this.sendMarkTime();
+      this.logPlaybackQuality();
       if (this.wasWatched) {
         this.wasWatched = false;
         plog.info('resetting watched status after 30s of playback');
@@ -828,6 +829,15 @@ class PlayerController {
         }
       }
     }, 30000);
+  }
+
+  private logPlaybackQuality(): void {
+    const q = this.info.getDroppedFrames();
+    if (!q || q.totalVideoFrames === 0) return;
+    const pct = (q.droppedVideoFrames / q.totalVideoFrames * 100).toFixed(1);
+    plog.info('playbackQuality total={total} dropped={dropped} ({pct}%)', {
+      total: q.totalVideoFrames, dropped: q.droppedVideoFrames, pct,
+    });
   }
 
   private stopMarkTimer(): void {
