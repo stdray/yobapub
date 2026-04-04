@@ -409,6 +409,10 @@ class PlayerController {
     }
 
     if (needSeek && this.videoEl) {
+      if (this.hlsInstance) {
+        this.hlsInstance.stopLoad();
+        this.hlsInstance.startLoad(next.position);
+      }
       this.videoEl.currentTime = next.position;
     }
 
