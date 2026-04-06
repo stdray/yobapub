@@ -129,10 +129,17 @@ class Platform {
   exitApp = (): void => {
     try {
       if (typeof tizen !== 'undefined' && tizen.application) {
+        console.log('[Platform] Calling tizen.application exit');
         tizen.application.getCurrentApplication().exit();
+        return;
       }
     } catch (e) {
-      console.log('[Platform] Cannot exit app');
+      console.log('[Platform] tizen exit failed', e);
+    }
+    try {
+      window.close();
+    } catch (e) {
+      console.log('[Platform] window.close failed', e);
     }
   };
 }

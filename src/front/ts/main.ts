@@ -73,6 +73,7 @@ if (storage.getAccessToken()) {
 }
 
 const closeApp = (): void => {
+  console.log('[App] closeApp called, NativeApp:', typeof (window as any).NativeApp);
   if ((window as any).NativeApp) {
     (window as any).NativeApp.exit();
   } else {

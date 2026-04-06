@@ -13,33 +13,6 @@ export interface InfoDataSource {
   readonly videoEl: () => HTMLVideoElement | null;
 }
 
-// --- Refresh rate (measured lazily on first info show) ---
-
-let measuredRefreshRate: number | null = null;
-let refreshMeasureStarted = false;
-
-const REFRESH_SAMPLES = 30;
-
-const measureRefreshRate = (): void => {
-  if (refreshMeasureStarted) return;
-  refreshMeasureStarted = true;
-  let prev = 0;
-  let count = 0;
-  let sum = 0;
-  const tick = (ts: number): void => {
-    if (prev > 0) {
-      sum += ts - prev;
-      count++;
-    }
-    prev = ts;
-    if (count < REFRESH_SAMPLES) {
-      requestAnimationFrame(tick);
-    } else {
-      measuredRefreshRate = Math.round(1000 / (sum / count));
-    }
-  };
-  requestAnimationFrame(tick);
-};
 
 // --- Frame counters ---
 
@@ -80,7 +53,6 @@ export class PlayerInfo {
   }
 
   show(): void {
-    measureRefreshRate();
     this.updateBadge();
     this.$root.find('.player__info').removeClass('hidden');
   }
@@ -161,10 +133,7 @@ export class PlayerInfo {
     // Line 3: fps/Hz + dropped frames
     const counters = getFrameCounters(this.src.videoEl());
     const line3: string[] = [];
-    const fpsParts: string[] = [];
-    if (this.currentFps !== null) fpsParts.push(this.currentFps + 'fps');
-    if (measuredRefreshRate !== null) fpsParts.push(measuredRefreshRate + 'Hz');
-    if (fpsParts.length > 0) line3.push(fpsParts.join('/'));
+    if (this.currentFps !== null) line3.push(this.currentFps + 'fps');
     if (counters && counters.total > 0) {
       const pct = counters.dropped > 0
         ? ' (' + (counters.dropped / counters.total * 100).toFixed(1) + '%)'

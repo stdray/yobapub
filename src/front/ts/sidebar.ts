@@ -144,6 +144,9 @@ class Sidebar {
       case TvKey.Return:
       case TvKey.Backspace:
       case TvKey.Escape:
+        if (this.activeRoute === 'watching') {
+          this.lastBackTime = Date.now();
+        }
         this.focus();
         e.preventDefault();
         return true;
@@ -217,6 +220,7 @@ class Sidebar {
           const now = Date.now();
           if (now - this.lastBackTime < DOUBLE_BACK_MS) {
             this.lastBackTime = 0;
+            this.unfocus();
             router.goBack();
           } else {
             this.lastBackTime = now;
