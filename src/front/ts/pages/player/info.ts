@@ -13,13 +13,16 @@ export interface InfoDataSource {
   readonly videoEl: () => HTMLVideoElement | null;
 }
 
-// --- Refresh rate (measured once at module load, before video starts) ---
+// --- Refresh rate (measured lazily on first info show) ---
 
 let measuredRefreshRate: number | null = null;
+let refreshMeasureStarted = false;
 
 const REFRESH_SAMPLES = 30;
 
 const measureRefreshRate = (): void => {
+  if (refreshMeasureStarted) return;
+  refreshMeasureStarted = true;
   let prev = 0;
   let count = 0;
   let sum = 0;
@@ -37,8 +40,6 @@ const measureRefreshRate = (): void => {
   };
   requestAnimationFrame(tick);
 };
-
-measureRefreshRate();
 
 // --- Frame counters ---
 
@@ -79,6 +80,7 @@ export class PlayerInfo {
   }
 
   show(): void {
+    measureRefreshRate();
     this.updateBadge();
     this.$root.find('.player__info').removeClass('hidden');
   }
