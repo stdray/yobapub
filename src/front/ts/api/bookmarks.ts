@@ -4,11 +4,8 @@ import { BookmarkFoldersResponse, BookmarkItemsResponse, BookmarkItemFoldersResp
 export const getBookmarkFolders = (): JQueryDeferred<BookmarkFoldersResponse> =>
   apiClient.apiGetWithRefresh('/v1/bookmarks');
 
-export const getBookmarkItems = (folderId: number, page?: number): JQueryDeferred<BookmarkItemsResponse> => {
-  const params: Record<string, number> = {};
-  if (page) { params.page = page; }
-  return apiClient.apiGetWithRefresh('/v1/bookmarks/' + folderId, params);
-};
+export const getBookmarkItems = (folderId: number, page?: number): JQueryDeferred<BookmarkItemsResponse> =>
+  apiClient.apiGetWithRefresh('/v1/bookmarks/' + folderId, page ? { page } : {});
 
 export const getItemFolders = (itemId: number): JQueryDeferred<BookmarkItemFoldersResponse> =>
   apiClient.apiGetWithRefresh('/v1/bookmarks/get-item-folders', { item: itemId });

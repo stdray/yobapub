@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import { apiClient } from './client';
-import { DeviceInfoResponse, DeviceSettingsResponse, VipCheckResponse } from '../types/api';
+import { DeviceInfoResponse, DeviceSettingsResponse, UserResponse, VipCheckResponse } from '../types/api';
 
 export interface UserProfile {
   readonly username: string;
@@ -8,15 +8,13 @@ export interface UserProfile {
   readonly subscriptionDays: number;
 }
 
-const parseUserData = (res: unknown): { readonly username: string; readonly avatar: string; readonly days: number } => {
-  const data = Array.isArray(res) ? res[0] : res as Record<string, unknown>;
-  const user = (data && (data as Record<string, unknown>).user) as Record<string, unknown> | undefined;
-  const username = user && user.username ? String(user.username) : '';
-  const profile = user && user.profile as Record<string, unknown> | undefined;
-  const avatar = profile && profile.avatar ? String(profile.avatar) : '';
-  const sub = user && user.subscription as Record<string, unknown> | undefined;
-  const days = sub && typeof sub.days === 'number' ? Math.floor(sub.days) : 0;
-  return { username, avatar, days };
+const parseUserResponse = (res: UserResponse): { username: string; avatar: string; days: number } => {
+  const user = res.user;
+  return {
+    username: user.username || '',
+    avatar: (user.profile && user.profile.avatar) || '',
+    days: (user.subscription && typeof user.subscription.days === 'number') ? Math.floor(user.subscription.days) : 0,
+  };
 };
 
 export class DeviceApi {
@@ -70,9 +68,9 @@ export class DeviceApi {
       d.resolve(this.cachedVip);
       return d;
     }
-    apiClient.apiGetWithRefresh('/v1/user').then(
-      (res: unknown) => {
-        const parsed = parseUserData(res);
+    apiClient.apiGetWithRefresh<UserResponse>('/v1/user').then(
+      (res) => {
+        const parsed = parseUserResponse(res);
         this.cachedProfile = { username: parsed.username, avatar: parsed.avatar, subscriptionDays: parsed.days };
         if (!parsed.username) {
           this.cachedVip = false;

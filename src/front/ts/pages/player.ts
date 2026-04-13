@@ -268,8 +268,8 @@ class PlayerController {
     this.toastTimer = window.setTimeout(() => { $toast.addClass('hidden'); this.toastTimer = null; }, 1500);
   }
 
-  private showOsd(icon: string): void {
-    const symbols: Record<string, string> = { play: '\u25B6', pause: '\u275A\u275A', rw: '\u25C0\u25C0', ff: '\u25B6\u25B6' };
+  private showOsd(icon: 'play' | 'pause' | 'rw' | 'ff'): void {
+    const symbols = { play: '\u25B6', pause: '\u275A\u275A', rw: '\u25C0\u25C0', ff: '\u25B6\u25B6' };
     this.$root.find('.player__osd').text(symbols[icon] || icon).removeClass('hidden');
     if (this.osdTimer) clearTimeout(this.osdTimer);
     this.osdTimer = window.setTimeout(() => {

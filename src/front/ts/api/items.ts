@@ -5,14 +5,13 @@ import { getWatchingInfo } from './watching';
 export const getItem = (id: number): JQueryDeferred<ItemResponse> =>
   apiClient.apiGetWithRefresh('/v1/items/' + id);
 
-export const getItems = (type: string, sort?: string): JQueryDeferred<ItemsResponse> => {
-  const params: Record<string, string> = { type: type };
-  if (sort) params.sort = sort;
-  return apiClient.apiGetWithRefresh('/v1/items', params);
-};
+export const getItems = (type: string, sort?: string): JQueryDeferred<ItemsResponse> =>
+  apiClient.apiGetWithRefresh('/v1/items', sort ? { type, sort } : { type });
 
-export const searchItems = (query: string, page?: number, perpage?: number): JQueryDeferred<ItemsResponse> => {
-  const params: Record<string, string | number> = { q: query, field: 'title' };
+export const searchItems = (
+  query: string, page?: number, perpage?: number
+): JQueryDeferred<ItemsResponse> => {
+  const params: { q: string; field: string; page?: number; perpage?: number } = { q: query, field: 'title' };
   if (page !== undefined) params.page = page;
   if (perpage !== undefined) params.perpage = perpage;
   return apiClient.apiGetWithRefresh('/v1/items/search', params);

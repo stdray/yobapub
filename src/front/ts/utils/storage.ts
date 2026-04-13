@@ -48,7 +48,8 @@ const KEYS = {
   DEVICE_ID: 'kp_device_id'
 } as const;
 
-const STREAMING_TYPES: Readonly<Record<string, string>> = { hls: 'hls', hls2: 'hls2', hls4: 'hls4' };
+type StreamingType = 'hls' | 'hls2' | 'hls4';
+const STREAMING_TYPES: { readonly [k: string]: StreamingType | undefined } = { hls: 'hls', hls2: 'hls2', hls4: 'hls4' };
 
 const TITLE_PREFS_KEY = 'kp_title_prefs';
 const TITLE_PREFS_MAX = 100;

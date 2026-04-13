@@ -30,14 +30,14 @@ const MENU_NAVIGATE: ReadonlyArray<() => void> = [
   () => router.navigateSettings(),
 ];
 
-const ROUTE_TO_MENU: Readonly<Record<string, MenuIndex>> = {
+const ROUTE_TO_MENU: Readonly<Partial<Record<RouteName, MenuIndex>>> = {
   novelties: MenuIndex.Novelties,
   watching: MenuIndex.Watching,
   history: MenuIndex.History,
   bookmarks: MenuIndex.Bookmarks,
   tv: MenuIndex.Tv,
   search: MenuIndex.Search,
-  settings: MenuIndex.Settings
+  settings: MenuIndex.Settings,
 };
 
 const MENU_TO_ROUTE: ReadonlyArray<RouteName> = [

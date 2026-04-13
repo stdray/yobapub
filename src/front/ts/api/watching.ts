@@ -11,18 +11,14 @@ export const getWatchingInfo = (id: number): JQueryDeferred<WatchingInfoResponse
   apiClient.apiGetWithRefresh('/v1/watching', { id: id });
 
 export const markTime = (id: number, video: number, time: number, season?: number): JQueryDeferred<void> => {
-  const params: Record<string, number> = { id: id, video: video, time: time };
-  if (season !== undefined) {
-    params.season = season;
-  }
+  const params: { id: number; video: number; time: number; season?: number } = { id, video, time };
+  if (season !== undefined) params.season = season;
   return apiClient.apiGetWithRefresh('/v1/watching/marktime', params);
 };
 
 export const toggleWatched = (id: number, video: number, season?: number): JQueryDeferred<void> => {
-  const params: Record<string, number> = { id: id, video: video };
-  if (season !== undefined) {
-    params.season = season;
-  }
+  const params: { id: number; video: number; season?: number } = { id, video };
+  if (season !== undefined) params.season = season;
   return apiClient.apiGetWithRefresh('/v1/watching/toggle', params);
 };
 

@@ -24,24 +24,28 @@ interface SettingItem {
   options?: SettingOption[];
 }
 
-const DISPLAY_KEYS: Record<string, boolean> = {
+type SettingKey =
+  | 'serverLocation' | 'streamingType' | 'supportSsl'
+  | 'supportHevc' | 'supportHdr' | 'support4k' | 'mixedPlaylist';
+
+const DISPLAY_KEYS: Readonly<Record<SettingKey, true>> = {
   serverLocation: true,
   streamingType: true,
   supportSsl: true,
   supportHevc: true,
   supportHdr: true,
   support4k: true,
-  mixedPlaylist: true
+  mixedPlaylist: true,
 };
 
-const LABELS: Record<string, string> = {
+const LABELS: Readonly<Record<SettingKey, string>> = {
   serverLocation: 'Сервер',
   streamingType: 'Тип стриминга',
   supportSsl: 'SSL',
   supportHevc: 'HEVC',
   supportHdr: 'HDR',
   support4k: '4K',
-  mixedPlaylist: 'Смешанный плейлист'
+  mixedPlaylist: 'Смешанный плейлист',
 };
 
 const tplPageCompiled = doT.template(`
@@ -111,10 +115,12 @@ const parseListOptions = (key: string, setting: DeviceSetting): SettingOption[] 
   return opts;
 };
 
+const isSettingKey = (key: string): key is SettingKey => key in DISPLAY_KEYS;
+
 const parseSettings = (raw: Record<string, DeviceSetting>): SettingItem[] => {
   const items: SettingItem[] = [];
   for (const key of Object.keys(raw)) {
-    if (!DISPLAY_KEYS[key]) continue;
+    if (!isSettingKey(key)) continue;
     const setting = raw[key];
     const label = LABELS[key] || (setting.label || key);
     if (setting.type === 'list') {
