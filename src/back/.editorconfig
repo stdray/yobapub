@@ -1,0 +1,82 @@
+root = true
+
+[*.cs]
+# ── Formatting ─────────────────────────────────────────────
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+max_line_length = 140
+
+# ── Naming conventions ─────────────────────────────────────
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_prefix
+dotnet_naming_rule.private_fields_underscore.severity = warning
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private, private_protected
+
+dotnet_naming_style.underscore_prefix.capitalization = camel_case
+dotnet_naming_style.underscore_prefix.required_prefix = _
+
+dotnet_naming_rule.async_methods_suffix.symbols = async_methods
+dotnet_naming_rule.async_methods_suffix.style = async_suffix
+dotnet_naming_rule.async_methods_suffix.severity = warning
+
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+
+dotnet_naming_style.async_suffix.capitalization = pascal_case
+dotnet_naming_style.async_suffix.required_suffix = Async
+
+# ── Code quality (Roslyn analyzers) ────────────────────────
+# CA1062: Validate arguments of public methods — too noisy with nullable enabled
+dotnet_diagnostic.CA1062.severity = none
+# CA1848: Use LoggerMessage delegates — overkill for this project size
+dotnet_diagnostic.CA1848.severity = none
+# CA2007: Do not directly await a Task (ConfigureAwait) — not relevant for ASP.NET Core
+dotnet_diagnostic.CA2007.severity = none
+
+# IDE0005: Remove unnecessary using — keep build clean
+dotnet_diagnostic.IDE0005.severity = warning
+# IDE0090: Simplify new expression (target-typed new)
+dotnet_diagnostic.IDE0090.severity = warning
+# IDE0044: Make field readonly
+dotnet_diagnostic.IDE0044.severity = warning
+# IDE0059: Unnecessary assignment
+dotnet_diagnostic.IDE0059.severity = warning
+# IDE0060: Remove unused parameter
+dotnet_diagnostic.IDE0060.severity = warning
+
+# CA1304/CA1305/CA1310: Specify culture — too noisy, most string ops are culture-invariant here
+dotnet_diagnostic.CA1304.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CA1310.severity = none
+
+# CA1822: Mark members as static
+dotnet_diagnostic.CA1822.severity = warning
+
+# CA1860: Prefer Length/Count check over Any()
+dotnet_diagnostic.CA1860.severity = warning
+
+# CA1861: Prefer 'static readonly' fields over constant array arguments
+dotnet_diagnostic.CA1861.severity = warning
+
+# CA1725: Parameter names should match base declaration — too noisy with interface impls
+dotnet_diagnostic.CA1725.severity = none
+# CA1727: Use PascalCase for logging placeholders — not enforcing this convention
+dotnet_diagnostic.CA1727.severity = none
+# CA1816: Call GC.SuppressFinalize — valid but low priority for this project
+dotnet_diagnostic.CA1816.severity = suggestion
+# CA1862: Use StringComparison overloads — not always relevant
+dotnet_diagnostic.CA1862.severity = suggestion
+# CA1873: Avoid expensive logging argument evaluation — low priority
+dotnet_diagnostic.CA1873.severity = suggestion
+
+# CA1707: Identifiers should not contain underscores — test methods use Method_Scenario_Expected
+dotnet_diagnostic.CA1707.severity = none
+
+# CA2227: Collection properties should be read only — too strict for DTOs/ViewModels
+dotnet_diagnostic.CA2227.severity = none

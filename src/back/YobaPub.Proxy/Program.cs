@@ -246,6 +246,7 @@ app.MapGet("/hls/proxy", async (string url, IHttpClientFactory factory, HttpCont
     }
 });
 
+#pragma warning disable CA1861 // constant arrays in one-shot endpoint
 app.MapGet("/.well-known/assetlinks.json", () => Results.Json(
     new[] {
         new {

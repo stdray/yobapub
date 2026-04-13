@@ -1,5 +1,3 @@
-using YobaPub.Proxy;
-
 namespace YobaPub.Proxy.Tests;
 
 public class HlsRewriterTests

@@ -86,8 +86,7 @@ const tplOptions = (data: { readonly title: string; readonly options: Array<{ re
 
 const parseSettings = (raw: Record<string, any>): SettingItem[] => {
   const items: SettingItem[] = [];
-  for (const key in raw) {
-    if (!raw.hasOwnProperty(key)) continue;
+  for (const key of Object.keys(raw)) {
     if (!DISPLAY_KEYS[key]) continue;
 
     const setting = raw[key];

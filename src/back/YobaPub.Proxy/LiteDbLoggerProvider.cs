@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace YobaPub.Proxy;
 
 public sealed class LiteDbLoggerProvider(LogStore store, DebugSettingsStore debugSettings) : ILoggerProvider

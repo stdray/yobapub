@@ -31,8 +31,12 @@ export enum TvKey {
   Key9 = 57
 }
 
+/* eslint-disable no-var -- ambient declarations require var */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Tizen SDK global, no typings
 declare var tizen: any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Tizen SDK global, no typings
 declare var webapis: any;
+/* eslint-enable no-var */
 
 export interface DeviceInfo {
   readonly title: string;
@@ -59,12 +63,12 @@ class Platform {
         for (let i = 0; i < keysToRegister.length; i++) {
           try {
             tizen.tvinputdevice.registerKey(keysToRegister[i]);
-          } catch (e) {
+          } catch (_e) {
             // key may not be supported on this device
           }
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // not running on Tizen
     }
   };
@@ -82,7 +86,7 @@ class Platform {
         software = 'Tizen' + (firmware ? ' ' + firmware : '');
         title = 'YobaPub ' + hardware;
       }
-    } catch (e) {
+    } catch (_e) {
       // not on Tizen
     }
 
@@ -117,7 +121,7 @@ class Platform {
         const cap = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
         if (cap) return parseFloat(cap) || 0;
       }
-    } catch (e) { /* ignore */ }
+    } catch (_e) { /* ignore */ }
     const m = navigator.userAgent.match(/Tizen\s*([\d.]+)/);
     return m ? (parseFloat(m[1]) || 0) : 0;
   };
@@ -128,6 +132,7 @@ class Platform {
   };
 
   isAndroidWebView = (): boolean => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped native bridge
     return typeof (window as any).NativeApp !== 'undefined' || /Android.*wv\b/.test(navigator.userAgent);
   };
 

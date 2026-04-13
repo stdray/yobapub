@@ -15,9 +15,10 @@ npm run dev          # webpack-dev-server on 0.0.0.0:8080
 npm run build:dev    # development build
 npm run build:release # production build (minified)
 npm run typecheck    # TypeScript check (tsc --noEmit)
+npm run lint         # ESLint (typescript-eslint + @stylistic)
 npm run csslint      # check CSS for unsupported features (doiuse vs Chrome >= 28)
 npm run escheck      # verify built JS is ES5-compatible (es-check on dist/release)
-npm run release      # typecheck + csslint + build:release + escheck
+npm run release      # typecheck + lint + csslint + build:release + escheck
 ```
 
 Backend (.NET proxy) is in `src/back/YobaPub.Proxy/`. No frontend tests exist.

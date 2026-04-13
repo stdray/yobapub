@@ -8,8 +8,7 @@ import { TvKey } from '../utils/platform';
 import { storage } from '../utils/storage';
 import { PageKeys, PageUtils } from '../utils/page';
 import { gridMove } from '../utils/grid';
-import { tplCard, tplEmptyText } from '../utils/templates';
-import { renderRatings } from '../utils/templates';
+import { tplCard, tplEmptyText, renderRatings } from '../utils/templates';
 
 interface KbKeyData {
   char: string;
