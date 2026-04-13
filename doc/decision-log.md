@@ -13,6 +13,39 @@
 
 ---
 
+## 2026-04-13 22:40 — перенести resume-seek из `canplay` в `FRAG_BUFFERED`
+
+**Решение:** в `pages/player.ts` seek на `pendingStartSeek` для resume-сценария (`pos > 0`) перенесён из обработчика `video canplay` в обработчик `hls FRAG_BUFFERED`. Seek выполняется один раз, когда `v.buffered.length > 0` (т.е. в SourceBuffer уже появилась реальная медиа-дата). Canplay теперь отвечает только за PTS-offset снап (свежий запуск, `pendingStartSeek == 0`, `ct < bStart`).
+
+**Причина:** лог `XXWSS5jFVEia_jG-YrWlTQ` на версии `f44fb8f` (resume с pos=94, стрим с PTS-offset):
+
+```
+19:41:19 FRAG_LOADED sn=1
+19:41:21 video canplay ct=0
+19:41:21 startSeek target=94 from ct=0 br=[none]   ← буфер пустой!
+19:41:21 video seeking ct=94
+19:41:22 FRAG_BUFFERED sn=1 ct=94 br=[none]
+19:41:24 FRAG_BUFFERED sn=10 start=91.52 ct=94 br=91.5-100.1
+19:41:24 video playing ct=94 rs=3
+19:41:24 video seeking ct=93.9999                  ← мистический второй seek
+19:41:24 video seeked ct=94
+19:41:25 video playing ct=94.069 rs=4
+```
+
+На момент `canplay` `video.buffered.length == 0` — FRAG_LOADED отработал, но SourceBuffer ещё не отдал append. Наш seek сработал до появления данных в буфере. Это механически эквивалентно `_seekToStartPos` в hls.js: seek на ранней фазе декодера. Далее, когда реальный fragment sn=10 всё-таки добавился, Tizen 2.3 декодер сделал свою внутреннюю I-frame-подстройку (`ct=93.9999`), и именно в этот момент звук ушёл в рассинхрон. Пользователь подтвердил: "рассинхрон звука в начале, после перемотки исправилось".
+
+Прежняя гипотеза про "canplay эмулирует user-style seek" не выдержала: сработала в логе `88c1679` лишь потому, что в том конкретном стриме либо не было PTS-offset, либо декодер случайно прогрелся по-другому. Правильный механизм: playhead должен быть **внутри** какого-то уже буферизованного диапазона к моменту seek'а. Тогда присвоение `currentTime=target` (вне буфера) заставит hls.js выполнить `stopLoad` + `startLoad(target)` + flush SourceBuffer и скачать целевой фрагмент с нуля — это и есть тот путь, который работает при обычной ручной перемотке (см. запись 17:55).
+
+`FRAG_BUFFERED` гарантирует, что в `v.buffered` уже есть данные: fragment sn=1 успел добавиться, playhead на ct=0 находится внутри/рядом с первым диапазоном, и seek на target=94 перекидывает playhead за пределы буфера → flush → новый fragment → декодер-резет.
+
+**Данные:**
+- лог `XXWSS5jFVEia_jG-YrWlTQ` (ver `f44fb8f`, trace `5c65`): startSeek при `br=[none]`, затем мистический seek `ct=93.9999` → рассинхрон.
+- коммит `098d5d0` с правками в `pages/player.ts`: `FRAG_BUFFERED` handler, `canplay` handler.
+
+**Результат:** ждём проверки. Ожидаемая картина: `startSeek` логируется только после первого `FRAG_BUFFERED` с непустым `br`, далее `stopLoad`/`startLoad(target)` в hls.js, `seeked` в целевой позиции без мистического второго seek и без рассинхрона.
+
+---
+
 ## 2026-04-14 00:00 — media-кнопки пульта (Rw/Play/Pause/Ff) не доходили до JS
 
 **Решение:** регистрировать media/color/digit клавиши через `tizen.tvinputdevice.registerKey()` в локальном `src/tizen-widget/src/index.html` **до** `document.location.replace('http://yobapub.3po.su')`. Раньше регистрация была только во фронтенде (`ts/utils/platform.ts`), но там уже нет доступа к `tizen` объекту.
