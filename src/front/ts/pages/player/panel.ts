@@ -267,8 +267,10 @@ export const handlePanelKey = (
         if (state.listIndex < items.length - 1) { state.listIndex++; renderPanelList($root, state, data); }
         e.preventDefault(); break;
       case TvKey.Enter:
-        if (items[state.listIndex] && items[state.listIndex].selected) { closePanelList($root, state, cbs); }
-        else { applyPanelSelection($root, state, cbs); }
+        if (items[state.listIndex] && !items[state.listIndex].selected) {
+          applyPanelSelection($root, state, cbs);
+        }
+        closePanelList($root, state, cbs);
         e.preventDefault(); break;
       case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
         closePanelList($root, state, cbs); e.preventDefault(); break;
