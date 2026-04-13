@@ -1063,7 +1063,7 @@ video::cue {
 .search__results { flex: 1; overflow-y: auto; }
 
 /* Keyboard */
-.kb__row { display: flex; gap: 8px; margin-bottom: 8px; justify-content: center; }
+.kb__row { display: flex; gap: 0; margin-bottom: 0; justify-content: center; }
 
 .kb__key {
   width: 64px;
@@ -1072,6 +1072,7 @@ video::cue {
   align-items: center;
   justify-content: center;
   background: rgba(255,255,255,0.15);
+  border: 3px solid transparent;
   border-radius: 12px;
   font-size: 32px;
   color: #fff;
