@@ -198,15 +198,15 @@ const updateFocus = (): void => {
   if (focusArea === 'bookmarks') {
     const $el = $root.find('[data-action="bookmark"]');
     $el.addClass('focused');
-    if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
+    if (infoEl) infoEl.scrollTop = 0;
   } else if (focusArea === 'watchlist') {
     const $el = $root.find('[data-action="watchlist"]');
     $el.addClass('focused');
-    if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
+    if (infoEl) infoEl.scrollTop = 0;
   } else if (focusArea === 'play') {
     const $el = $root.find('.btn').eq(0);
     $el.addClass('focused');
-    if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
+    if (infoEl) infoEl.scrollTop = 0;
   } else if (focusArea === 'seasons') {
     const $el = $root.find('.episodes__season-tab').eq(focusedSeasonTab);
     $el.addClass('focused');
