@@ -274,9 +274,11 @@ class SearchPage implements Page {
     return this.pagination.current < Math.ceil(this.pagination.total / this.pagination.perpage);
   }
 
-  private switchToResults(): void {
+  private switchToResults(resetIndex?: boolean): void {
     this.focusArea = 'results';
-    this.focusedIndex = 0;
+    if (resetIndex || this.focusedIndex >= this.results.length) {
+      this.focusedIndex = 0;
+    }
     this.updateKeyboardFocus();
     this.updateResultsFocus();
     this.renderPreview();

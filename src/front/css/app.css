@@ -1168,7 +1168,7 @@ video::cue {
   align-items: center;
   justify-content: center;
   background: rgba(255,255,255,0.15);
-  border: 10px solid transparent;
+  border: 14px solid transparent;
   border-radius: 0;
   font-size: 32px;
   color: #fff;
@@ -1176,10 +1176,9 @@ video::cue {
 
 .kb__key.focused {
   background: #e50914;
-  transform: scale(1.1);
 }
 
-.kb__key--wide { flex: 1; width: auto; }
+.kb__key--wide { flex: 8; }
 
 
 
