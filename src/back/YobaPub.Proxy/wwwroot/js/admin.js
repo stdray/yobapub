@@ -108,14 +108,14 @@ class LogShare {
   static showDialog(url) {
     const dlg = document.createElement('dialog');
     dlg.className = 'share-dialog';
-    const jsonUrl = `${url}/json`;
+    const tsvUrl = `${url}/tsv`;
     const htmlUrl = url;
     dlg.innerHTML = `
       <div class="share-dialog-body">
         <div class="share-url">${htmlUrl}</div>
         <div class="share-actions">
           <button type="button" data-share-copy="html">Копировать ссылку на HTML</button>
-          <button type="button" data-share-copy="json">Копировать ссылку на JSON</button>
+          <button type="button" data-share-copy="tsv">Копировать ссылку на TSV</button>
           <button type="button" data-share-close>Закрыть</button>
         </div>
       </div>
@@ -124,7 +124,7 @@ class LogShare {
       const copyBtn = e.target.closest('[data-share-copy]');
       if (copyBtn) {
         const which = copyBtn.dataset.shareCopy;
-        Clipboard.copy(which === 'json' ? jsonUrl : htmlUrl);
+        Clipboard.copy(which === 'tsv' ? tsvUrl : htmlUrl);
         Clipboard.flashText(copyBtn, 'Скопировано');
         return;
       }

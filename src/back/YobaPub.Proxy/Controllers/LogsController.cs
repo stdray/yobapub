@@ -50,7 +50,7 @@ public class LogsController(LogStore store, LogShareStore shares) : Controller
     {
         var entry = store.FindById(id);
         if (entry == null) return NotFound();
-        return Content(FormatEntry(entry), "text/plain; charset=utf-8");
+        return Content(LogFormatter.FormatEntry(entry), "text/plain; charset=utf-8");
     }
 
     [HttpGet("download")]
@@ -59,7 +59,7 @@ public class LogsController(LogStore store, LogShareStore shares) : Controller
         var entries = store.QueryAll(query);
         if (limit is > 0)
             entries = entries.Take(limit.Value).ToArray();
-        var tsv = FormatTsv(entries);
+        var tsv = LogFormatter.FormatTsv(entries, includeIp: true);
         var bytes = System.Text.Encoding.UTF8.GetBytes(tsv);
         var filename = $"logs_{DateTime.Now:yyyyMMdd_HHmmss}.tsv";
         return File(bytes, "text/tab-separated-values", filename);
@@ -71,7 +71,7 @@ public class LogsController(LogStore store, LogShareStore shares) : Controller
         var entries = store.QueryAll(query);
         if (limit is > 0)
             entries = entries.Take(limit.Value).ToArray();
-        return Content(FormatTsv(entries), "text/plain; charset=utf-8");
+        return Content(LogFormatter.FormatTsv(entries, includeIp: true), "text/plain; charset=utf-8");
     }
 
     [HttpPost("share")]
@@ -90,30 +90,4 @@ public class LogsController(LogStore store, LogShareStore shares) : Controller
         return RedirectToAction(nameof(Index), query);
     }
 
-    private static string FormatTsv(LogEntry[] entries)
-    {
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Time\tDevice\tTraceId\tIP\tLevel\tCategory\tMessage\tStackTrace");
-        foreach (var e in entries)
-        {
-            var st = (e.StackTrace ?? "").Replace("\r", "").Replace("\n", "\\n").Replace("\t", "\\t");
-            sb.AppendLine($"{e.ServerTs.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}\t{e.DeviceId}\t{e.TraceId ?? ""}\t{e.ClientIp}\t{e.Level}\t{e.Category}\t{e.Message}\t{st}");
-        }
-        return sb.ToString();
-    }
-
-    private static string FormatEntry(LogEntry e)
-    {
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"Time: {e.ServerTs.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}");
-        sb.AppendLine($"Device: {e.DeviceId}");
-        if (!string.IsNullOrEmpty(e.TraceId)) sb.AppendLine($"TraceId: {e.TraceId}");
-        sb.AppendLine($"IP: {e.ClientIp}");
-        sb.AppendLine($"Level: {e.Level}");
-        sb.AppendLine($"Category: {e.Category}");
-        sb.AppendLine($"Message: {e.Message}");
-        if (!string.IsNullOrEmpty(e.Props) && e.Props != "{}") sb.AppendLine($"Props: {e.Props}");
-        if (!string.IsNullOrEmpty(e.StackTrace)) sb.AppendLine($"StackTrace:\n{e.StackTrace}");
-        return sb.ToString();
-    }
 }
