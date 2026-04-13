@@ -98,32 +98,30 @@ interface OptionsData {
 const tplOptions = (data: OptionsData): string =>
   tplOptionsCompiled(data);
 
+const parseListOptions = (key: string, setting: DeviceSetting): SettingOption[] => {
+  if (!Array.isArray(setting.value)) return [];
+  const opts: SettingOption[] = [];
+  for (let i = 0; i < setting.value.length; i++) {
+    const v = setting.value[i];
+    const optLabel = String(v.label || v.id || '').toLowerCase();
+    if (key === 'streamingType' && optLabel === 'http') continue;
+    if (key === 'streamingType' && platform.isLegacyTizen() && optLabel === 'hls4') continue;
+    opts.push({ id: v.id, label: v.label, description: v.description || '', selected: v.selected });
+  }
+  return opts;
+};
+
 const parseSettings = (raw: Record<string, DeviceSetting>): SettingItem[] => {
   const items: SettingItem[] = [];
   for (const key of Object.keys(raw)) {
     if (!DISPLAY_KEYS[key]) continue;
-
     const setting = raw[key];
     const label = LABELS[key] || (setting.label || key);
-
     if (setting.type === 'list') {
-      const opts: SettingOption[] = [];
-      if (Array.isArray(setting.value)) {
-        for (let i = 0; i < setting.value.length; i++) {
-          const optLabel = String(setting.value[i].label || setting.value[i].id || '').toLowerCase();
-          if (key === 'streamingType' && optLabel === 'http') continue;
-          if (key === 'streamingType' && platform.isLegacyTizen() && optLabel === 'hls4') continue;
-          opts.push({
-            id: setting.value[i].id,
-            label: setting.value[i].label,
-            description: setting.value[i].description || '',
-            selected: setting.value[i].selected
-          });
-        }
-      }
-      items.push({ key: key, label: label, type: 'list', value: null, options: opts });
+      items.push({ key, label, type: 'list', value: null, options: parseListOptions(key, setting) });
     } else {
-      items.push({ key: key, label: label, type: 'checkbox', value: typeof setting.value === 'boolean' ? setting.value : null });
+      const val = typeof setting.value === 'boolean' ? setting.value : null;
+      items.push({ key, label, type: 'checkbox', value: val });
     }
   }
   return items;

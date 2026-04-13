@@ -84,19 +84,21 @@ const startAuth = (): void => {
         if (remaining <= 0 && countdownTimer !== null) { clearInterval(countdownTimer); }
       }, 1000);
 
-      poller = pollDeviceToken(
-        data.code,
-        data.interval,
-        data.expires_in,
-        () => {
+      poller = pollDeviceToken({
+        code: data.code,
+        interval: data.interval,
+        expiresIn: data.expires_in,
+        onSuccess: () => {
           cleanup();
           const info = platform.getDeviceInfo();
-          apiClient.apiPost('/v1/device/notify', { title: info.title, hardware: info.hardware, software: info.software });
+          apiClient.apiPost('/v1/device/notify', {
+            title: info.title, hardware: info.hardware, software: info.software,
+          });
           router.navigateWatching();
         },
-        () => { cleanup(); $root.html(tplExpired({})); },
-        (msg) => { cleanup(); $root.html(tplError({ message: msg })); }
-      );
+        onExpired: () => { cleanup(); $root.html(tplExpired({})); },
+        onError: (msg) => { cleanup(); $root.html(tplError({ message: msg })); },
+      });
     },
     (xhr: JQueryXHR) => {
       let msg = 'Ошибка подключения к серверу';

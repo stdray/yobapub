@@ -325,37 +325,42 @@ class PlayerController {
 
   // --- Track navigation ---
 
+  private navigateEpisode(dir: number): boolean {
+    const item = this.media.item;
+    if (!item || !item.seasons) return false;
+    const si = item.seasons.findIndex((s) => s.number === this.media.season);
+    if (si < 0) return false;
+    const s = item.seasons[si];
+    const ei = s.episodes.findIndex((ep) => ep.number === this.media.episode);
+    if (ei < 0) return false;
+
+    const nextEi = ei + dir;
+    if (nextEi >= 0 && nextEi < s.episodes.length) {
+      this.sendMarkTime(); this.destroyPlayer();
+      this.media.episode = s.episodes[nextEi].number;
+      this.loadAndPlay();
+      return true;
+    }
+    const nextSi = si + dir;
+    if (nextSi >= 0 && nextSi < item.seasons.length) {
+      const ns = item.seasons[nextSi];
+      const ep = dir > 0 ? ns.episodes[0] : ns.episodes[ns.episodes.length - 1];
+      if (ep) {
+        this.sendMarkTime(); this.destroyPlayer();
+        this.media.season = ns.number;
+        this.media.episode = ep.number;
+        this.loadAndPlay();
+        return true;
+      }
+    }
+    return false;
+  }
+
   private navigateTrack(dir: number): boolean {
     if (!this.media.item) return false;
 
-    if (this.media.season !== undefined && this.media.episode !== undefined && this.media.item.seasons) {
-      for (let si = 0; si < this.media.item.seasons.length; si++) {
-        const s = this.media.item.seasons[si];
-        if (s.number !== this.media.season) continue;
-        for (let ei = 0; ei < s.episodes.length; ei++) {
-          if (s.episodes[ei].number !== this.media.episode) continue;
-          const targetIdx = ei + dir;
-          if (targetIdx >= 0 && targetIdx < s.episodes.length) {
-            this.sendMarkTime(); this.destroyPlayer();
-            this.media.episode = s.episodes[targetIdx].number;
-            this.loadAndPlay();
-            return true;
-          }
-          const targetSeason = si + dir;
-          if (targetSeason >= 0 && targetSeason < this.media.item.seasons.length) {
-            const ts = this.media.item.seasons[targetSeason];
-            const ep = dir > 0 ? ts.episodes[0] : ts.episodes[ts.episodes.length - 1];
-            if (ep) {
-              this.sendMarkTime(); this.destroyPlayer();
-              this.media.season = ts.number;
-              this.media.episode = ep.number;
-              this.loadAndPlay();
-              return true;
-            }
-          }
-          return false;
-        }
-      }
+    if (this.media.season !== undefined && this.media.episode !== undefined) {
+      return this.navigateEpisode(dir);
     } else if (this.media.video !== undefined && this.media.item.videos) {
       const newVideo = this.media.video + dir;
       if (newVideo >= 1 && newVideo <= this.media.item.videos.length) {
@@ -499,10 +504,13 @@ class PlayerController {
 
   private doSavePrefs(): void {
     if (!this.media.item) return;
-    saveCurrentPrefs(
-      this.media.item.id, this.media.files, this.media.audios, this.media.subs,
-      this.state.quality, this.state.audio, this.state.sub,
-    );
+    saveCurrentPrefs({
+      itemId: this.media.item.id,
+      files: this.media.files, audios: this.media.audios, subs: this.media.subs,
+      selectedQuality: this.state.quality,
+      selectedAudio: this.state.audio,
+      selectedSub: this.state.sub,
+    });
   }
 
   // --- Playback ---

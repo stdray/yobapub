@@ -15,14 +15,17 @@ export const requestDeviceCode = (): JQueryXHR =>
     dataType: 'json'
   });
 
-export const pollDeviceToken = (
-  code: string,
-  interval: number,
-  expiresIn: number,
-  onSuccess: () => void,
-  onExpired: () => void,
-  onError: (msg: string) => void
-): { stop: () => void } => {
+export interface PollDeviceTokenOpts {
+  readonly code: string;
+  readonly interval: number;
+  readonly expiresIn: number;
+  readonly onSuccess: () => void;
+  readonly onExpired: () => void;
+  readonly onError: (msg: string) => void;
+}
+
+export const pollDeviceToken = (opts: PollDeviceTokenOpts): { stop: () => void } => {
+  const { code, interval, expiresIn, onSuccess, onExpired, onError } = opts;
   let stopped = false;
   let elapsed = 0;
   let timerId: number | null = null;
@@ -41,9 +44,9 @@ export const pollDeviceToken = (
         grant_type: 'device_token',
         client_id: apiClient.getClientId(),
         client_secret: apiClient.getClientSecret(),
-        code: code
+        code: code,
       },
-      dataType: 'json'
+      dataType: 'json',
     }).then(
       (data: TokenResponse) => {
         if (stopped) return;
@@ -65,7 +68,7 @@ export const pollDeviceToken = (
           elapsed += interval;
           timerId = window.setTimeout(poll, interval * 1000);
         }
-      }
+      },
     );
   };
 
@@ -77,6 +80,6 @@ export const pollDeviceToken = (
       if (timerId !== null) {
         clearTimeout(timerId);
       }
-    }
+    },
   };
 };

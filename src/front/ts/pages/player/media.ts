@@ -69,26 +69,17 @@ export const isVideoWatched = (item: Item, videoNum: number): boolean => {
   return idx >= 0 && idx < item.videos.length && item.videos[idx].watched === 1;
 };
 
+const isValidResume = (time: number, duration?: number): boolean =>
+  time > 0 && duration !== undefined && time < duration - 10;
+
 export const getResumeTime = (item: Item, seasonNum?: number, epNum?: number, videoNum?: number): number => {
   if (seasonNum !== undefined && epNum !== undefined && item.seasons) {
-    for (let i = 0; i < item.seasons.length; i++) {
-      const s = item.seasons[i];
-      if (s.number === seasonNum) {
-        for (let j = 0; j < s.episodes.length; j++) {
-          const ep = s.episodes[j];
-          if (ep.number === epNum && ep.watching) {
-            const t = ep.watching.time;
-            if (t > 0 && ep.duration && t < ep.duration - 10) return t;
-          }
-        }
-      }
-    }
+    const s = item.seasons.find((ss) => ss.number === seasonNum);
+    const ep = s && s.episodes.find((e) => e.number === epNum);
+    if (ep && ep.watching && isValidResume(ep.watching.time, ep.duration)) return ep.watching.time;
   } else if (videoNum !== undefined && item.videos) {
-    const vi = videoNum - 1;
-    if (vi >= 0 && vi < item.videos.length) {
-      const v = item.videos[vi];
-      if (v.watching && v.watching.time > 0 && v.duration && v.watching.time < v.duration - 10) return v.watching.time;
-    }
+    const v = item.videos[videoNum - 1];
+    if (v && v.watching && isValidResume(v.watching.time, v.duration)) return v.watching.time;
   }
   return 0;
 };

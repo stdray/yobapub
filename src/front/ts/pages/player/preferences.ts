@@ -51,15 +51,18 @@ export const restoreSubIndex = (subs: Subtitle[], prefs: TitlePrefs | null): num
   return -1;
 };
 
-export const saveCurrentPrefs = (
-  itemId: number,
-  files: VideoFile[],
-  audios: AudioTrack[],
-  subs: Subtitle[],
-  selectedQuality: number,
-  selectedAudio: number,
-  selectedSub: number
-): void => {
+export interface SavePrefsOpts {
+  readonly itemId: number;
+  readonly files: ReadonlyArray<VideoFile>;
+  readonly audios: ReadonlyArray<AudioTrack>;
+  readonly subs: ReadonlyArray<Subtitle>;
+  readonly selectedQuality: number;
+  readonly selectedAudio: number;
+  readonly selectedSub: number;
+}
+
+export const saveCurrentPrefs = (opts: SavePrefsOpts): void => {
+  const { itemId, files, audios, subs, selectedQuality, selectedAudio, selectedSub } = opts;
   const prefs: TitlePrefs = { id: itemId };
   if (files.length > 0 && selectedQuality < files.length) {
     prefs.quality = files[selectedQuality].quality;
