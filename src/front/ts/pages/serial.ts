@@ -71,13 +71,18 @@ const tplSeasonTab = (data: { readonly idx: number; readonly num: number; readon
 
 const tplEpisodeCompiled = doT.template(`
   <div class="episode" data-ep="{{=it.idx}}">
-    <span class="episode__number">{{=it.number}}</span>
-    <span class="episode__title">{{=it.title}}</span>
-    <span class="episode__status">{{=it.status}}</span>
+    <div class="episode__thumb{{?!it.thumbnail}} episode__thumb--empty{{?}}">
+      {{?it.thumbnail}}<img src="{{=it.thumbnail}}" alt="" loading="lazy">{{??}}&#9654;{{?}}
+    </div>
+    <div class="episode__body">
+      <span class="episode__number">{{=it.number}}</span>
+      <span class="episode__title">{{=it.title}}</span>
+      <span class="episode__status">{{=it.status}}</span>
+    </div>
   </div>
 `);
 
-const tplEpisode = (data: { readonly idx: number; readonly number: number; readonly title: string; readonly status: string }): string =>
+const tplEpisode = (data: { readonly idx: number; readonly number: number; readonly title: string; readonly status: string; readonly thumbnail: string }): string =>
   tplEpisodeCompiled(data);
 
 const getEpisodeStatus = (seasonNum: number, epNum: number): { time: number; status: number } => {
@@ -131,7 +136,7 @@ const buildEpisodes = (season: Season | undefined): string => {
     let statusText = '';
     if (st.status === 1) statusText = '\u2713';
     else if (st.status === 0 && st.time > 0) statusText = formatTimeShort(st.time);
-    html += tplEpisode({ idx: j, number: ep.number, title: ep.title || 'Эпизод ' + ep.number, status: statusText });
+    html += tplEpisode({ idx: j, number: ep.number, title: ep.title || 'Эпизод ' + ep.number, status: statusText, thumbnail: ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '' });
   }
   return html;
 };
