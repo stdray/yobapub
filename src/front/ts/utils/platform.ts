@@ -31,6 +31,10 @@ export enum TvKey {
   Key9 = 57
 }
 
+import { Logger } from './log';
+
+const pfLog = new Logger('platform');
+
 declare var tizen: any;
 declare var webapis: any;
 
@@ -61,7 +65,10 @@ class Platform {
             failed.push(keysToRegister[i] + ':' + ((e && (e as Error).message) || 'err'));
           }
         }
-        console.log('[Platform] registerTizenKeys ok=' + registered.join(',') + ' failed=' + failed.join(','));
+        pfLog.info('registerTizenKeys ok={ok} failed={failed}', {
+          ok: registered.join(','),
+          failed: failed.join(','),
+        });
         // diagnostic: dump supported keys list so we can see real keyCodes for this device
         try {
           if (tizen.tvinputdevice.getSupportedKeys) {
@@ -70,16 +77,16 @@ class Platform {
             for (let j = 0; j < supported.length; j++) {
               dump.push(supported[j].name + '=' + supported[j].code);
             }
-            console.log('[Platform] supportedKeys ' + dump.join(' '));
+            pfLog.info('supportedKeys {keys}', { keys: dump.join(' ') });
           }
         } catch (e) {
-          console.log('[Platform] getSupportedKeys failed', e);
+          pfLog.warn('getSupportedKeys failed {msg}', { msg: (e && (e as Error).message) || 'err' });
         }
       } else {
-        console.log('[Platform] tizen.tvinputdevice not available');
+        pfLog.info('tizen.tvinputdevice not available');
       }
     } catch (e) {
-      console.log('[Platform] Not running on Tizen');
+      pfLog.info('not running on Tizen');
     }
   };
 
