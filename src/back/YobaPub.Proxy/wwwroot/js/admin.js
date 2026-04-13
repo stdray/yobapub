@@ -101,12 +101,38 @@ class LogShare {
     if (ttlDays > 0) data.append('ttlDays', String(ttlDays));
     fetch('/admin/logs/share', { method: 'POST', body: data })
       .then((r) => r.json())
-      .then((res) => {
-        Clipboard.copy(res.url);
-        Clipboard.flashText(document.getElementById('status'), 'Ссылка скопирована');
-        window.prompt('Ссылка для агентов (JSON: +/json, текст: +/text):', res.url);
-      });
+      .then((res) => { LogShare.showDialog(res.url); });
     return true;
+  }
+
+  static showDialog(url) {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'share-dialog';
+    const jsonUrl = `${url}/json`;
+    const htmlUrl = url;
+    dlg.innerHTML = `
+      <div class="share-dialog-body">
+        <div class="share-url">${htmlUrl}</div>
+        <div class="share-actions">
+          <button type="button" data-share-copy="html">Копировать ссылку на HTML</button>
+          <button type="button" data-share-copy="json">Копировать ссылку на JSON</button>
+          <button type="button" data-share-close>Закрыть</button>
+        </div>
+      </div>
+    `;
+    dlg.addEventListener('click', (e) => {
+      const copyBtn = e.target.closest('[data-share-copy]');
+      if (copyBtn) {
+        const which = copyBtn.dataset.shareCopy;
+        Clipboard.copy(which === 'json' ? jsonUrl : htmlUrl);
+        Clipboard.flashText(copyBtn, 'Скопировано');
+        return;
+      }
+      if (e.target.closest('[data-share-close]')) dlg.close();
+    });
+    dlg.addEventListener('close', () => dlg.remove());
+    document.body.appendChild(dlg);
+    dlg.showModal();
   }
 }
 
