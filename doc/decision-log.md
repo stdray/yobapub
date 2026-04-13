@@ -13,6 +13,42 @@
 
 ---
 
+## 2026-04-13 19:45 — откат healing seek (он оказался причиной, а не фиксом)
+
+**Решение:** удалить healing seek целиком — и startup (`playing` handler), и stall (`bufferStalledError` handler). Возврат обработчика stall к варианту "только `nudgePastBufferGap` + `recoverMediaError` при `hadBufferFullError`".
+
+**Причина:** пользователь описал паттерн на лицо: "воспроизведение начинается — звук в порядке, потом лаг, воспроизведение снова — звук рассинхронизирован". Перечитал лог `mOXef-oPpES8RruV1dMKsQ` (15:53:37) под эту гипотезу:
+
+```
+video seeked ct=3287 rs=4          ← hls.js startPos seek
+video playing ct=3286.9999 rs=4    ← 1-й playing, звук ОК (rs=4)
+video canplay rs=4
+video seeking cur=3287.0998        ← наш healingSeek стартует
+healingSeek ct=3286.9999 -> 3287.0998
+video seeked ct=3287.126 rs=3      ← rs упал 4→3 несмотря на in-buffer target
+video playing ct=3287.17 rs=4      ← 2-й playing, рассинхрон
+```
+
+`readyState` падает с 4 до 3 при seek'е внутри уже буферизованного диапазона (3287.1 ∈ 3283.2-3302.4) — decoder перезагружает данные, и ровно после этого возникает рассинхрон. **Healing seek создавал проблему, которую якобы лечил.**
+
+Подтверждение 18:30 (`2xJFWM3AHEunGvsCI5LLqQ`) было ложным — либо decoder в том конкретном запуске случайно ожил, либо рассинхрон был, но мы его не заметили. Confirmation bias: искали подтверждение, приняли первое совпадение.
+
+Про "ручная перемотка лечит": это работает потому что target **вне буфера** (seek с 3287 на 3426 при buffered 3283.2-3302.4). Hls.js флашит SourceBuffer и делает fresh append новых фрагментов — вот это и ресетит decoder. Seek на `+0.1` внутри буфера такого эффекта не даёт — ни flush'а, ни нового append'а, только перезагрузка того же сегмента, которая зачем-то и роняет rs с 4 до 3.
+
+**Данные:**
+- логи: `mOXef-oPpES8RruV1dMKsQ` (десинк после healingSeek), `b9iA6oP0ckmA9j3SrLh4UA` (то же), `_yX-NfX2jEy3-ekMvJNfHQ` (без десинка, но double playing)
+- откатываем коммиты `f696538` (healing seek на `playing`) и `e73ab1f` (healing seek на `bufferStalledError`) по содержимому, не через git revert — оставляем их в истории как исследование
+- связанные записи: 2026-04-13 18:30 (ложно подтверждённый healing seek), 2026-04-13 19:10 (stallHealSeek на основе той же ложной гипотезы)
+
+**Результат:** ждём проверки. Три возможных исхода:
+1. **Десинка нет** — значит healing seek был чистым виновником. Проблема решена отсутствием кода.
+2. **Десинк остался** — значит есть исходная причина (скорее всего `new Hls + loadSource` с `startPosition > 0` на Tizen 2.3), healing seek её только усугублял. Нужен другой механизм — например, flush через `hls.stopLoad()/startLoad()` или seek за пределы буфера.
+3. **Другой паттерн десинка** — анализируем заново.
+
+Старое объяснение "healing seek мимикрирует эффект `currentTime=pos` на существующем hls.js инстансе, который лечил рассинхрон" **неверно**: тот эффект работал потому, что target был вне буфера и hls.js делал полный reload.
+
+---
+
 ## 2026-04-13 19:10 — healing nudge на `bufferStalledError` без gap'а
 
 **Решение:** в обработчике `bufferStalledError` в `src/front/ts/pages/player.ts` при `!nudgePastBufferGap() && !hadBufferFullError` делаем свой `videoEl.currentTime += 0.1` (лог `hls stallHealSeek`). Раньше в этой ветке мы не делали ничего — ждали, пока hls.js сам разберётся.

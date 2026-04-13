@@ -103,7 +103,6 @@ class PlayerController {
   private hadBufferFullError = false;
   private playbackStarted = false;
   private firstFragSnapped = false;
-  private healingSeekDone = false;
   private markedWatched = false;
   private wasWatched = false;
   private playSourceDebug = '';
@@ -510,7 +509,6 @@ class PlayerController {
     this.media.hlsUrl = originalUrl;
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
     this.firstFragSnapped = false;
-    this.healingSeekDone = false;
     this.playSourceDebug = 'url=' + originalUrl.substring(0, 120);
     plog.newTraceId();
     const cfg = this.buildHlsConfig();
@@ -623,22 +621,12 @@ class PlayerController {
           plog.warn('hls bufferStalledError hadFull={hadFull} started={started} ct={ct} rs={rs} br={br}', {
             hadFull: this.hadBufferFullError, ...diag,
           });
-          if (!this.nudgePastBufferGap()) {
-            if (this.hadBufferFullError) {
-              plog.warn('hls RECOVER via bufferStalledError started={started} ct={ct} rs={rs} br={br}', diag);
-              hls.recoverMediaError();
-              if (this.videoEl) this.videoEl.play();
-              this.hadBufferFullError = false;
-              this.appendErrorCount = 0;
-            } else if (this.videoEl) {
-              // Playhead is inside a buffered range but decoder stalled (Tizen 2.3 MSE quirk).
-              // Same fix as the startup healing seek: nudge currentTime +0.1 to flush the decoder.
-              // Without this, hls.js's own bufferNudgeOnStall takes ~10s to fire.
-              const ct = this.videoEl.currentTime;
-              const target = ct + 0.1;
-              plog.warn('hls stallHealSeek ct={ct} -> {target}', { ct, target });
-              this.videoEl.currentTime = target;
-            }
+          if (!this.nudgePastBufferGap() && this.hadBufferFullError) {
+            plog.warn('hls RECOVER via bufferStalledError started={started} ct={ct} rs={rs} br={br}', diag);
+            hls.recoverMediaError();
+            if (this.videoEl) this.videoEl.play();
+            this.hadBufferFullError = false;
+            this.appendErrorCount = 0;
           }
         }
         return;
@@ -809,13 +797,6 @@ class PlayerController {
         br: this.formatBuffered(this.videoEl),
       });
       this.hideSpinner();
-      if (!this.healingSeekDone && this.videoEl) {
-        this.healingSeekDone = true;
-        const ct = this.videoEl.currentTime;
-        const target = ct + 0.1;
-        plog.info('healingSeek ct={ct} -> {target}', { ct, target });
-        this.videoEl.currentTime = target;
-      }
     });
     this.videoEl.addEventListener('seeked', () => {
       plog.debug('video seeked ct={ct} readyState={rs} buffered={br}', {
