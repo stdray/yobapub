@@ -574,6 +574,19 @@ class PlayerController {
         ct: v ? v.currentTime : -1,
         br: this.formatBuffered(v),
       });
+      // Resume: apply pending start seek only once real data is in SourceBuffer so the
+      // assignment causes hls.js to stopLoad+startLoad+flush and fetch the target fragment
+      // from scratch (decoder-reset path). Seeking before the buffer is populated is
+      // indistinguishable from hls.js _seekToStartPos and triggers the Tizen 2.3 A/V desync.
+      if (this.pendingStartSeek > 0 && v && v.buffered.length > 0) {
+        const target = this.pendingStartSeek;
+        this.pendingStartSeek = 0;
+        this.firstFragSnapped = true;
+        plog.info('startSeek target={target} from ct={ct} br={br}', {
+          target, ct: v.currentTime, br: this.formatBuffered(v),
+        });
+        v.currentTime = target;
+      }
     });
     hls.on(Hls.Events.LEVEL_SWITCHING, (_e: string, data: { level?: number; width?: number; height?: number; bitrate?: number; videoCodec?: string; audioCodec?: string }) => {
       plog.info('hls LEVEL_SWITCHING level={level} {w}x{h} bitrate={br} videoCodec={vc} audioCodec={ac}', {
@@ -811,17 +824,14 @@ class PlayerController {
       plog.debug('video canplay currentTime={currentTime}', { currentTime: v ? v.currentTime : -1 });
       this.hideSpinner();
       if (!v) return;
-      let target = this.pendingStartSeek;
-      this.pendingStartSeek = 0;
-      // Fresh playback (pendingStartSeek==0): some HLS streams have first-segment PTS != 0,
-      // leaving the SourceBuffer starting at e.g. 10.0 while playhead sits at 0. Gap-controller
-      // won't close gaps > maxBufferHole. Snap once to the buffered start so playback can begin.
-      if (target <= 0 && !this.firstFragSnapped && v.buffered.length > 0 && v.currentTime < v.buffered.start(0)) {
-        target = v.buffered.start(0) + 0.05;
-      }
-      if (target > 0) {
+      // Fresh playback (pos=0): some HLS streams have first-segment PTS != 0, leaving the
+      // SourceBuffer starting at e.g. 10.0 while playhead sits at 0. Gap-controller won't
+      // close gaps > maxBufferHole. Snap once to the buffered start so playback can begin.
+      // Resume (pendingStartSeek > 0) is handled in FRAG_BUFFERED, not here.
+      if (this.pendingStartSeek === 0 && !this.firstFragSnapped && v.buffered.length > 0 && v.currentTime < v.buffered.start(0)) {
+        const target = v.buffered.start(0) + 0.05;
         this.firstFragSnapped = true;
-        plog.info('startSeek target={target} from ct={ct} br={br}', {
+        plog.info('startSeek pts-snap target={target} from ct={ct} br={br}', {
           target, ct: v.currentTime, br: this.formatBuffered(v),
         });
         v.currentTime = target;
