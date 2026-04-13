@@ -273,6 +273,9 @@ html, body {
   width: 360px;
   flex-shrink: 0;
   margin-right: 50px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .detail__poster {
@@ -280,11 +283,13 @@ html, body {
   height: 540px;
   border-radius: 12px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .detail__ep-preview {
   width: 360px;
-  height: 202px;
+  flex: 1;
+  min-height: 0;
   margin-top: 16px;
   border-radius: 8px;
   overflow: hidden;

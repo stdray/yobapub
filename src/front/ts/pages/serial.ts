@@ -225,13 +225,21 @@ const updateFocus = (): void => {
 
   // обновить превью эпизода под постером
   const $preview = $root.find('.detail__ep-preview');
+  let previewThumb = '';
   if (focusArea === 'episodes') {
-    const thumb = $root.find('.episode').eq(focusedEpisode).attr('data-thumb') || '';
-    if (thumb) {
-      $preview.html('<img src="' + thumb + '" alt="">');
-    } else {
-      $preview.html('');
+    previewThumb = $root.find('.episode').eq(focusedEpisode).attr('data-thumb') || '';
+  } else if (focusArea === 'play' && currentItem && currentItem.seasons) {
+    const resume = findResumeEpisode();
+    if (resume) {
+      const ep = currentItem.seasons[resume.seasonIdx].episodes[resume.episodeIdx];
+      previewThumb = ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '';
+    } else if (currentItem.seasons.length > 0 && currentItem.seasons[0].episodes.length > 0) {
+      const ep = currentItem.seasons[0].episodes[0];
+      previewThumb = ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '';
     }
+  }
+  if (previewThumb) {
+    $preview.html('<img src="' + previewThumb + '" alt="">');
   } else {
     $preview.html('');
   }
