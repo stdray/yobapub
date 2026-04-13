@@ -1047,7 +1047,7 @@ video::cue {
 
 /* --- Search --- */
 .search {
-  padding: 30px;
+  padding: 30px 30px 30px 50px;
   display: flex;
   height: 100%;
   gap: 60px;
@@ -1097,36 +1097,38 @@ video::cue {
   padding: 12px;
 }
 
-.search__results { flex: 1; overflow-y: auto; }
+.search__results { flex: 1; overflow-y: auto; overflow-x: hidden; }
+
+.search-grid .card { width: calc(33.333% - 30px); }
 
 /* Search preview */
 .search-preview__title {
   font-size: 30px;
   font-weight: bold;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   line-height: 1.2;
   color: #fff;
 }
 
 .search-preview__title-en {
-  font-size: 26px;
-  color: #aaa;
-  margin-bottom: 10px;
+  font-size: 28px;
+  color: #ccc;
+  margin-bottom: 12px;
 }
 
 .search-preview__meta {
-  font-size: 26px;
-  color: #bbb;
-  margin-bottom: 8px;
-}
-
-.search-preview__ratings {
+  font-size: 28px;
+  color: #ddd;
   margin-bottom: 10px;
 }
 
+.search-preview__ratings {
+  margin-bottom: 12px;
+}
+
 .search-preview__plot {
-  font-size: 24px;
-  color: #ddd;
+  font-size: 26px;
+  color: #eee;
   line-height: 1.5;
   overflow: hidden;
   display: -webkit-box;
