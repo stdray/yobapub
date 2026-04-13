@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import * as doT from 'dot';
 import { RouteParams } from '../types/app';
-import { Item, ItemsResponse } from '../types/api';
+import { Item, ItemsResponse, Pagination } from '../types/api';
 import { searchItems } from '../api/items';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
@@ -24,16 +24,33 @@ const KB_LAYOUTS: Record<'ru' | 'en', string[][]> = {
     ['й','ц','у','к','е','н','г','ш','щ','з','х','ъ'],
     ['ф','ы','в','а','п','р','о','л','д','ж','э'],
     ['я','ч','с','м','и','т','ь','б','ю','⌫'],
-    ['EN','_','⎵','⎵','⎵','⎵','⎵','⎵','OK']
+    ['EN','✕','⎵','⎵','⎵','⎵','⎵','⎵','OK']
   ],
   en: [
     ['1','2','3','4','5','6','7','8','9','0'],
     ['q','w','e','r','t','y','u','i','o','p'],
     ['a','s','d','f','g','h','j','k','l'],
     ['z','x','c','v','b','n','m','⌫'],
-    ['RU','_','⎵','⎵','⎵','⎵','⎵','⎵','OK']
+    ['RU','✕','⎵','⎵','⎵','⎵','⎵','⎵','OK']
   ]
 };
+
+const SEARCH_DEBOUNCE_MS = 500;
+const SEARCH_PERPAGE = 20;
+
+type FocusArea = 'keyboard' | 'results';
+
+interface SearchState {
+  query: string;
+  results: Item[];
+  focusedIndex: number;
+  focusArea: FocusArea;
+  kbRow: number;
+  kbCol: number;
+  currentLayout: 'ru' | 'en';
+  noResults: boolean;
+  pagination: Pagination | null;
+}
 
 const tplKeyboardCompiled = doT.template(`
   <div class="kb">
@@ -63,19 +80,20 @@ const tplLayoutCompiled = doT.template(`
 const tplLayout = (data: Record<string, never>): string =>
   tplLayoutCompiled(data);
 
-type FocusArea = 'keyboard' | 'results';
-
 class SearchPage extends SidebarPage {
   private query = '';
   private results: Item[] = [];
   private focusedIndex = 0;
   private loading = false;
+  private loadingMore = false;
   private noResults = false;
   private searchTimer: number | null = null;
+  private searchSeq = 0;
   private focusArea: FocusArea = 'keyboard';
   private kbRow = 0;
   private kbCol = 0;
   private currentLayout: 'ru' | 'en' = 'ru';
+  private pagination: Pagination | null = null;
 
   constructor() { super('search'); }
 
@@ -85,22 +103,57 @@ class SearchPage extends SidebarPage {
   }
 
   protected onMount(params: RouteParams): void {
-    this.query = params.searchQuery || '';
-    this.results = [];
-    this.focusedIndex = 0;
-    this.focusArea = 'keyboard';
-    this.kbRow = 0;
-    this.kbCol = 0;
-    this.currentLayout = 'ru';
-    this.noResults = false;
-    this.loading = false;
-    this.render();
-    if (this.query.length >= 3) this.doSearch();
+    if (params._searchState) {
+      const s = params._searchState as SearchState;
+      this.query = s.query;
+      this.results = s.results;
+      this.focusedIndex = s.focusedIndex;
+      this.focusArea = s.focusArea;
+      this.kbRow = s.kbRow;
+      this.kbCol = s.kbCol;
+      this.currentLayout = s.currentLayout;
+      this.noResults = s.noResults;
+      this.pagination = s.pagination;
+      this.loading = false;
+      this.loadingMore = false;
+      this.render();
+    } else {
+      this.query = params.searchQuery || '';
+      this.results = [];
+      this.focusedIndex = 0;
+      this.focusArea = 'keyboard';
+      this.kbRow = 0;
+      this.kbCol = 0;
+      this.currentLayout = 'ru';
+      this.noResults = false;
+      this.loading = false;
+      this.loadingMore = false;
+      this.pagination = null;
+      this.render();
+      if (this.query.length >= 3) this.doSearch();
+    }
   }
 
   protected onUnmount(): void {
     if (this.searchTimer !== null) { clearTimeout(this.searchTimer); this.searchTimer = null; }
     this.results = [];
+    this.pagination = null;
+  }
+
+  private saveState(): void {
+    router.setParams({
+      _searchState: {
+        query: this.query,
+        results: this.results,
+        focusedIndex: this.focusedIndex,
+        focusArea: this.focusArea,
+        kbRow: this.kbRow,
+        kbCol: this.kbCol,
+        currentLayout: this.currentLayout,
+        noResults: this.noResults,
+        pagination: this.pagination
+      } as SearchState
+    });
   }
 
   protected handleKey(e: JQuery.Event): void {
@@ -175,6 +228,18 @@ class SearchPage extends SidebarPage {
     }
   }
 
+  private get hasMorePages(): boolean {
+    if (!this.pagination) return false;
+    return this.pagination.current < Math.ceil(this.pagination.total / this.pagination.perpage);
+  }
+
+  private switchToResults(): void {
+    this.focusArea = 'results';
+    this.focusedIndex = 0;
+    this.updateKeyboardFocus();
+    this.updateResultsFocus();
+  }
+
   private updateResultsFocus(): void {
     const $cards = this.$root.find('.search-grid .card');
     $cards.removeClass('focused');
@@ -197,30 +262,57 @@ class SearchPage extends SidebarPage {
     if (this.query.length < 3) {
       this.results = [];
       this.noResults = false;
+      this.pagination = null;
       this.renderResults();
       return;
     }
     this.searchTimer = setTimeout(() => {
       this.doSearch();
-    }, 1000) as unknown as number;
+    }, SEARCH_DEBOUNCE_MS) as unknown as number;
   }
 
   private doSearch(): void {
+    const seq = ++this.searchSeq;
     this.loading = true;
     this.renderResults();
-    searchItems(this.query).then(
+    searchItems(this.query, 1, SEARCH_PERPAGE).then(
       (res: ItemsResponse) => {
+        if (seq !== this.searchSeq) return;
         this.loading = false;
         this.results = (res && res.items) || [];
+        this.pagination = (res && res.pagination) || null;
         this.noResults = this.results.length === 0;
         this.focusedIndex = 0;
         this.renderResults();
       },
       () => {
+        if (seq !== this.searchSeq) return;
         this.loading = false;
         this.results = [];
+        this.pagination = null;
         this.noResults = true;
         this.renderResults();
+      }
+    );
+  }
+
+  private loadNextPage(): void {
+    if (!this.hasMorePages || this.loadingMore || !this.pagination) return;
+    const nextPage = this.pagination.current + 1;
+    const seq = this.searchSeq;
+    this.loadingMore = true;
+    searchItems(this.query, nextPage, SEARCH_PERPAGE).then(
+      (res: ItemsResponse) => {
+        if (seq !== this.searchSeq) return;
+        this.loadingMore = false;
+        const newItems = (res && res.items) || [];
+        this.results = this.results.concat(newItems);
+        this.pagination = (res && res.pagination) || null;
+        this.renderResults();
+      },
+      () => {
+        if (seq !== this.searchSeq) return;
+        this.loadingMore = false;
       }
     );
   }
@@ -228,7 +320,9 @@ class SearchPage extends SidebarPage {
   private pressKey(char: string): void {
     if (char === '⌫') {
       this.query = this.query.slice(0, -1);
-    } else if (char === '⎵' || char === '_') {
+    } else if (char === '✕') {
+      this.query = '';
+    } else if (char === '⎵') {
       this.query += ' ';
     } else if (char === 'EN') {
       this.currentLayout = 'en';
@@ -239,12 +333,7 @@ class SearchPage extends SidebarPage {
       this.renderKeyboard();
       return;
     } else if (char === 'OK') {
-      if (this.results.length > 0) {
-        this.focusArea = 'results';
-        this.focusedIndex = 0;
-        this.updateKeyboardFocus();
-        this.updateResultsFocus();
-      }
+      if (this.results.length > 0) { this.switchToResults(); }
       return;
     } else {
       this.query += char;
@@ -263,6 +352,7 @@ class SearchPage extends SidebarPage {
         e.preventDefault(); break;
       case TvKey.Right:
         if (this.kbCol < row.length - 1) { this.kbCol++; this.updateKeyboardFocus(); }
+        else if (this.results.length > 0) { this.switchToResults(); }
         e.preventDefault(); break;
       case TvKey.Up:
         if (this.kbRow > 0) {
@@ -277,10 +367,7 @@ class SearchPage extends SidebarPage {
           this.kbCol = Math.min(this.kbCol, layout[this.kbRow].length - 1);
           this.updateKeyboardFocus();
         } else if (this.results.length > 0) {
-          this.focusArea = 'results';
-          this.focusedIndex = 0;
-          this.updateKeyboardFocus();
-          this.updateResultsFocus();
+          this.switchToResults();
         }
         e.preventDefault(); break;
       case TvKey.Enter:
@@ -301,13 +388,18 @@ class SearchPage extends SidebarPage {
         e.preventDefault(); break;
       }
       case TvKey.Left: {
-        const nl = gridMove(this.focusedIndex, total, 'left');
+        const nl = sidebar.gridLeftOrFocus(this.focusedIndex, total);
         if (nl >= 0) { this.focusedIndex = nl; this.updateResultsFocus(); }
         e.preventDefault(); break;
       }
       case TvKey.Down: {
         const nd = gridMove(this.focusedIndex, total, 'down');
-        if (nd >= 0) { this.focusedIndex = nd; this.updateResultsFocus(); }
+        if (nd >= 0) {
+          this.focusedIndex = nd;
+          this.updateResultsFocus();
+        } else if (this.hasMorePages) {
+          this.loadNextPage();
+        }
         e.preventDefault(); break;
       }
       case TvKey.Up: {
@@ -323,6 +415,7 @@ class SearchPage extends SidebarPage {
       case TvKey.Enter: {
         const item = this.results[this.focusedIndex];
         if (item) {
+          this.saveState();
           router.navigateItem(item);
         }
         e.preventDefault(); break;
@@ -330,10 +423,8 @@ class SearchPage extends SidebarPage {
       case TvKey.Return:
       case TvKey.Backspace:
       case TvKey.Escape:
-        this.focusArea = 'keyboard';
-        this.updateKeyboardFocus();
-        this.updateResultsFocus();
-        e.preventDefault(); break;
+        sidebar.backOrFocus(e);
+        break;
     }
   }
 }

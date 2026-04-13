@@ -17,6 +17,7 @@ export interface RouteParams {
   historyPage?: number;
   historyFocusedIndex?: number;
   episodeId?: number;
+  _searchState?: unknown;
 }
 
 export interface Page {
