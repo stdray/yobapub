@@ -6,7 +6,7 @@ import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { router } from '../router';
 import { TvKey, platform } from '../utils/platform';
 import { storage } from '../utils/storage';
-import { buildBaseHlsConfig, HlsConfig, logPlaybackStart } from '../utils/hls-proxy';
+import { buildBaseHlsConfig, logPlaybackStart } from '../utils/hls-proxy';
 import { showHlsError } from '../utils/hls-error';
 import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
@@ -465,17 +465,16 @@ class PlayerController {
 
   // --- Playback ---
 
-  private buildHlsConfig(): HlsConfig {
+  private buildHlsConfig(): Record<string, number> {
     const cfg = buildBaseHlsConfig();
     if (this.state.position > 0) cfg.startPosition = this.state.position;
-    cfg.autoStartLoad = false;
     cfg.maxBufferHole = 1.0;
     cfg.highBufferWatchdogPeriod = 10;
     cfg.nudgeMaxRetry = 3;
     cfg.abrEwmaFastLive = 5.0;
     cfg.abrEwmaSlowLive = 10.0;
-    cfg.abrEwmaFastVod = 5.0;
-    cfg.abrEwmaSlowVod = 10.0;
+    cfg.abrEwmaFastVoD = 5.0;
+    cfg.abrEwmaSlowVoD = 10.0;
     return cfg;
   }
 
@@ -562,8 +561,6 @@ class PlayerController {
         details: lvls.map((l) => l.width + 'x' + l.height + '@' + l.bitrate + ' vc=' + (l.videoCodec || '?') + ' ac=' + (l.audioCodec || '?')).join(', '),
       });
       this.pinQualityLevel(hls);
-      const startPos = this.state.position > 0 ? this.state.position : -1;
-      hls.startLoad(startPos);
       this.onSourceReady();
     });
     hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; error?: unknown; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {

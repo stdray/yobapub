@@ -1,9 +1,6 @@
-import Hls from 'hls.js';
 import { storage } from './storage';
 import { platform } from './platform';
 import { Logger } from './log';
-
-export type HlsConfig = Partial<Hls.Config>;
 
 interface HlsBufferLimits {
   readonly maxBufferLength: number;
@@ -21,7 +18,7 @@ export const getBufferLimits = (tizenVersion: number): HlsBufferLimits => {
   return { maxBufferLength: 30, maxMaxBufferLength: 90 };
 };
 
-export const buildBaseHlsConfig = (): HlsConfig => {
+export const buildBaseHlsConfig = (): Record<string, number> => {
   const limits = getBufferLimits(platform.getTizenVersion());
   return {
     fragLoadingMaxRetry: 3,

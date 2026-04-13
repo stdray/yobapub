@@ -104,7 +104,7 @@ const startPlayback = (streamUrl: string): void => {
   if (HlsCtor && HlsCtor.isSupported()) {
     plog.info('Using HLS.js');
 
-    const hlsConfig = buildBaseHlsConfig();
+    const hlsConfig: Record<string, any> = buildBaseHlsConfig();
 
     if (storage.isProxyTv()) {
       plog.debug('Proxy enabled, will rewrite URLs');
