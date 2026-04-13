@@ -196,7 +196,7 @@ class SearchPage implements Page {
         const char = rowChars[ci];
         rowKeys.push({
           char: char,
-          label: char === '⌫' ? 'Del' : char === '⎵' ? '' : char,
+          label: char === '⌫' ? '<-' : char === '⎵' ? '' : char,
           wide: char === '⎵'
         });
       }

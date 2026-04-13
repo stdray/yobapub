@@ -22,7 +22,9 @@ let watchingInfo: WatchingInfoItem | null = null;
 
 const tplDetailCompiled = doT.template(`
   <div class="detail">
-    <div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>
+    <div class="detail__left">
+      <div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>
+    </div>
     <div class="detail__info">
       <div class="detail__title">{{=it.titleRu}}</div>
       {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
