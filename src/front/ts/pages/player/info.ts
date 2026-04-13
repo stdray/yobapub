@@ -103,7 +103,7 @@ export class PlayerInfo {
     if (ss >= 0 && ss < subs.length) {
       line1.push('Sub: ' + subs[ss].lang.toUpperCase());
     } else {
-      line1.push('Sub: \u0412\u044b\u043a\u043b');
+      line1.push('Sub: Выкл');
     }
     if (line1.length > 0) lines.push(line1.join(' &bull; '));
 
@@ -114,7 +114,7 @@ export class PlayerInfo {
     if (files.length > 0 && sq < files.length) {
       const f = files[sq];
       const ql = f.quality || (f.h + 'p');
-      line2.push(ql + ' ' + f.w + '\u00d7' + f.h);
+      line2.push(ql + ' ' + f.w + '×' + f.h);
       if (f.codec) line2.push(f.codec.toUpperCase());
     }
     const hls = this.src.hlsInstance();

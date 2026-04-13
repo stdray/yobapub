@@ -8,20 +8,30 @@ export interface MediaInfo {
   duration: number;
 }
 
+interface FoundEpisode {
+  season: NonNullable<Item['seasons']>[number];
+  episode: NonNullable<Item['seasons']>[number]['episodes'][number];
+}
+
+const findEpisode = (item: Item, seasonNum: number, epNum: number): FoundEpisode | undefined => {
+  if (!item.seasons) return undefined;
+  const s = item.seasons.find((ss) => ss.number === seasonNum);
+  if (!s) return undefined;
+  const ep = s.episodes.find((e) => e.number === epNum);
+  if (!ep) return undefined;
+  return { season: s, episode: ep };
+};
+
 export const findEpisodeMedia = (item: Item, seasonNum: number, epNum: number): MediaInfo | null => {
-  if (!item.seasons) return null;
-  for (let i = 0; i < item.seasons.length; i++) {
-    const s = item.seasons[i];
-    if (s.number === seasonNum) {
-      for (let j = 0; j < s.episodes.length; j++) {
-        const ep = s.episodes[j];
-        if (ep.number === epNum) {
-          return { mid: ep.id, title: ep.title || 'S' + seasonNum + 'E' + epNum, audios: ep.audios || [], duration: ep.duration || 0 };
-        }
-      }
-    }
-  }
-  return null;
+  const found = findEpisode(item, seasonNum, epNum);
+  if (!found) return null;
+  const ep = found.episode;
+  return {
+    mid: ep.id,
+    title: ep.title || 'S' + seasonNum + 'E' + epNum,
+    audios: ep.audios || [],
+    duration: ep.duration || 0,
+  };
 };
 
 export const findVideoMedia = (item: Item, videoNum: number): MediaInfo | null => {
@@ -48,19 +58,9 @@ export const loadMediaLinks = (mid: number, cb: (files: VideoFile[], subs: Subti
 
 
 export const isEpisodeWatched = (item: Item, seasonNum: number, epNum: number): boolean => {
-  if (!item.seasons) return false;
-  for (let i = 0; i < item.seasons.length; i++) {
-    const s = item.seasons[i];
-    if (s.number === seasonNum) {
-      for (let j = 0; j < s.episodes.length; j++) {
-        const ep = s.episodes[j];
-        if (ep.number === epNum) {
-          return ep.watching !== undefined && ep.watching.status === 1;
-        }
-      }
-    }
-  }
-  return false;
+  const found = findEpisode(item, seasonNum, epNum);
+  if (!found) return false;
+  return found.episode.watching !== undefined && found.episode.watching.status === 1;
 };
 
 export const isVideoWatched = (item: Item, videoNum: number): boolean => {

@@ -37,9 +37,9 @@ export class DetailControls {
 
   readonly bookmarksTpl = (): string =>
     '<span class="detail__rating focusable" data-action="bookmark">' +
-    'Закладки <span class="detail__bookmark-arrow">\u25C0</span> ' +
+    'Закладки <span class="detail__bookmark-arrow">◀</span> ' +
     '<span class="detail__rating-value detail__picker-name">-</span>' +
-    ' <span class="detail__bookmark-arrow">\u25B6</span>' +
+    ' <span class="detail__bookmark-arrow">▶</span>' +
     '</span>' +
     '<span class="detail__bookmark-tags"></span>';
 
@@ -84,7 +84,7 @@ export class DetailControls {
     const folder = this.allFolders[this.pickerIdx];
     if (folder) {
       const isIn = this.itemFolderIds.has(folder.id);
-      this.$root.find('.detail__picker-name').text((isIn ? '\u2713 ' : '') + folder.title);
+      this.$root.find('.detail__picker-name').text((isIn ? '✓ ' : '') + folder.title);
     } else {
       this.$root.find('.detail__picker-name').text('-');
     }

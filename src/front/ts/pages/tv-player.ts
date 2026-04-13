@@ -9,104 +9,119 @@ import { storage } from '../utils/storage';
 import { showHlsError } from '../utils/hls-error';
 import Hls from 'hls.js';
 
-const $root = $('#page-tv-player');
-const keys = new PageKeys();
 const plog = new Logger('tv-player');
-let hls: Hls | null = null;
-let video: HTMLVideoElement | null = null;
-let overlayTimer: number | null = null;
 
-const clearOverlayTimer = (): void => {
-  if (overlayTimer !== null) { clearTimeout(overlayTimer); overlayTimer = null; }
-};
+class TvPlayerPage implements Page {
+  private readonly $root = $('#page-tv-player');
+  private readonly keys = new PageKeys();
 
-const showOverlay = (autoHide = true): void => {
-  clearOverlayTimer();
-  $root.find('.tv-player__overlay').removeClass('hidden');
-  if (autoHide) {
-    overlayTimer = window.setTimeout(() => {
-      $root.find('.tv-player__overlay').addClass('hidden');
-    }, 3000);
+  private hls: Hls | null = null;
+  private video: HTMLVideoElement | null = null;
+  private overlayTimer: number | null = null;
+
+  // --- overlay ---
+
+  private clearOverlayTimer(): void {
+    if (this.overlayTimer !== null) {
+      clearTimeout(this.overlayTimer);
+      this.overlayTimer = null;
+    }
   }
-};
 
-const render = (title: string): void => {
-  plog.debug('render called', { title });
-  $root.html(
-    '<div class="tv-player">' +
-      '<video class="tv-player__video" autoplay></video>' +
-      '<div class="tv-player__spinner"><div class="spinner"><div class="spinner__circle"></div></div></div>' +
-      '<div class="tv-player__overlay">' +
-        '<div class="tv-player__title">' + title + '</div>' +
-      '</div>' +
-    '</div>'
-  );
-  video = $root.find('video')[0] as HTMLVideoElement;
-  plog.debug('video element rendered', { videoExists: !!video });
+  private showOverlay(autoHide = true): void {
+    this.clearOverlayTimer();
+    this.$root.find('.tv-player__overlay').removeClass('hidden');
+    if (autoHide) {
+      this.overlayTimer = window.setTimeout(() => {
+        this.$root.find('.tv-player__overlay').addClass('hidden');
+      }, 3000);
+    }
+  }
 
-  if (video) {
-    const v = video;
-    // Логирование видео-событий
-    video.addEventListener('play', () => plog.debug('video: play'));
-    video.addEventListener('playing', () => {
+  // --- render ---
+
+  private render(title: string): void {
+    plog.debug('render called', { title });
+    this.$root.html(
+      '<div class="tv-player">' +
+        '<video class="tv-player__video" autoplay></video>' +
+        '<div class="tv-player__spinner"><div class="spinner"><div class="spinner__circle"></div></div></div>' +
+        '<div class="tv-player__overlay">' +
+          '<div class="tv-player__title">' + title + '</div>' +
+        '</div>' +
+      '</div>',
+    );
+    this.video = this.$root.find('video')[0] as HTMLVideoElement;
+    plog.debug('video element rendered', { videoExists: !!this.video });
+
+    if (this.video) {
+      this.bindVideoEvents(this.video);
+    }
+  }
+
+  private bindVideoEvents(v: HTMLVideoElement): void {
+    v.addEventListener('play', () => plog.debug('video: play'));
+    v.addEventListener('playing', () => {
       plog.debug('video: playing');
-      $root.find('.tv-player__spinner').hide();
-      showOverlay();
+      this.$root.find('.tv-player__spinner').hide();
+      this.showOverlay();
     });
-    video.addEventListener('pause', () => {
+    v.addEventListener('pause', () => {
       plog.debug('video: pause');
-      showOverlay(false);
+      this.showOverlay(false);
     });
-    video.addEventListener('ended', () => plog.debug('video: ended'));
-    video.addEventListener('error', () => {
-      const err = video?.error;
+    v.addEventListener('ended', () => plog.debug('video: ended'));
+    v.addEventListener('error', () => {
+      const err = v.error;
       const devInfo = platform.getDeviceInfo();
       plog.error('video: error', {
-        code: err?.code,
-        message: err?.message,
-        ua: navigator.userAgent,
-        hw: devInfo.hardware,
-        sw: devInfo.software,
+        code: err?.code, message: err?.message,
+        ua: navigator.userAgent, hw: devInfo.hardware, sw: devInfo.software,
       });
     });
-    video.addEventListener('stalled', () => plog.debug('video: stalled'));
-    video.addEventListener('waiting', () => {
+    v.addEventListener('stalled', () => plog.debug('video: stalled'));
+    v.addEventListener('waiting', () => {
       plog.debug('video: waiting');
-      $root.find('.tv-player__spinner').show();
+      this.$root.find('.tv-player__spinner').show();
     });
-    video.addEventListener('loadstart', () => plog.debug('video: loadstart'));
-    video.addEventListener('progress', () => plog.debug('video: progress'));
-    video.addEventListener('suspend', () => plog.debug('video: suspend'));
-    video.addEventListener('abort', () => plog.debug('video: abort'));
-    video.addEventListener('emptied', () => plog.debug('video: emptied'));
-    video.addEventListener('loadedmetadata', () => plog.debug('video: loadedmetadata'));
-    video.addEventListener('loadeddata', () => plog.debug('video: loadeddata'));
-    video.addEventListener('canplay', () => plog.debug('video: canplay'));
-    video.addEventListener('canplaythrough', () => plog.debug('video: canplaythrough'));
-    video.addEventListener('durationchange', () => plog.debug('video: durationchange', { duration: v.duration }));
-    video.addEventListener('timeupdate', () => {
-      // Not logging timeupdate as it fires constantly
-    });
-    video.addEventListener('ratechange', () => plog.debug('video: ratechange'));
-    video.addEventListener('seeking', () => plog.debug('video: seeking'));
-    video.addEventListener('seeked', () => plog.debug('video: seeked'));
-    video.addEventListener('volumechange', () => plog.debug('video: volumechange'));
+    v.addEventListener('loadstart', () => plog.debug('video: loadstart'));
+    v.addEventListener('progress', () => plog.debug('video: progress'));
+    v.addEventListener('suspend', () => plog.debug('video: suspend'));
+    v.addEventListener('abort', () => plog.debug('video: abort'));
+    v.addEventListener('emptied', () => plog.debug('video: emptied'));
+    v.addEventListener('loadedmetadata', () => plog.debug('video: loadedmetadata'));
+    v.addEventListener('loadeddata', () => plog.debug('video: loadeddata'));
+    v.addEventListener('canplay', () => plog.debug('video: canplay'));
+    v.addEventListener('canplaythrough', () => plog.debug('video: canplaythrough'));
+    v.addEventListener('durationchange', () => plog.debug('video: durationchange', { duration: v.duration }));
+    v.addEventListener('ratechange', () => plog.debug('video: ratechange'));
+    v.addEventListener('seeking', () => plog.debug('video: seeking'));
+    v.addEventListener('seeked', () => plog.debug('video: seeked'));
+    v.addEventListener('volumechange', () => plog.debug('video: volumechange'));
   }
-}
 
-const startPlayback = (streamUrl: string): void => {
-  plog.debug('startPlayback called', { streamUrl: streamUrl.substring(0, 80), videoExists: !!video });
-  if (!video) {
-    plog.error('video element not found');
-    return;
+  // --- playback ---
+
+  private startPlayback(streamUrl: string): void {
+    plog.debug('startPlayback called', { streamUrl: streamUrl.substring(0, 80), videoExists: !!this.video });
+    if (!this.video) { plog.error('video element not found'); return; }
+
+    plog.debug('HLS check', { hlsExists: !!Hls, hlsSupported: Hls && Hls.isSupported() });
+    if (Hls && Hls.isSupported()) {
+      this.startHlsPlayback(this.video, streamUrl);
+    } else if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
+      plog.info('Using native HLS playback');
+      this.video.src = streamUrl;
+    } else {
+      plog.error('HLS not supported and native playback not available');
+    }
   }
-  plog.debug('HLS check', { hlsExists: !!Hls, hlsSupported: Hls && Hls.isSupported() });
-  if (Hls && Hls.isSupported()) {
+
+  private startHlsPlayback(videoEl: HTMLVideoElement, streamUrl: string): void {
     plog.info('Using HLS.js');
+    const h = new Hls(buildBaseHlsConfig());
+    this.hls = h;
 
-    const hlsConfig = buildBaseHlsConfig();
-
-    hls = new Hls(hlsConfig);
     plog.newTraceId();
     logPlaybackStart(plog, streamUrl);
 
@@ -115,94 +130,71 @@ const startPlayback = (streamUrl: string): void => {
       streamUrl = '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0&proxy=true';
     }
 
-    // Register all events before loadSource/attachMedia
-    hls.on(Hls.Events.MANIFEST_LOADING, (_e: unknown, data: { url?: string }) => {
+    this.bindHlsDebugEvents(h);
+    this.bindHlsManifestParsed(h, videoEl);
+    this.bindHlsError(h);
+
+    h.loadSource(streamUrl);
+    h.attachMedia(videoEl);
+    plog.debug('HLS attached to video element');
+  }
+
+  private bindHlsDebugEvents(h: Hls): void {
+    h.on(Hls.Events.MANIFEST_LOADING, (_e, data) => {
       plog.debug('HLS MANIFEST_LOADING', { url: data?.url ? data.url.substring(0, 120) : null });
     });
-    hls.on(Hls.Events.MANIFEST_LOADED, (_e: unknown, data: { levels?: unknown[] }) => {
+    h.on(Hls.Events.MANIFEST_LOADED, (_e, data) => {
       plog.debug('HLS MANIFEST_LOADED', { levels: data?.levels ? data.levels.length : 0 });
     });
-    hls.on(Hls.Events.LEVEL_LOADING, (_e: unknown, data: { url?: string; level?: number }) => {
+    h.on(Hls.Events.LEVEL_LOADING, (_e, data) => {
       plog.debug('HLS LEVEL_LOADING', { level: data?.level, url: data?.url ? data.url.substring(0, 120) : null });
     });
-    hls.on(Hls.Events.LEVEL_LOADED, (_e: unknown, data: { level?: number; details?: { fragments?: unknown[] } }) => {
-      plog.debug('HLS LEVEL_LOADED', { level: data?.level, frags: data?.details?.fragments ? data.details.fragments.length : 0 });
+    h.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
+      plog.debug('HLS LEVEL_LOADED', {
+        level: data?.levelId,
+        frags: data?.details?.fragments ? data.details.fragments.length : 0,
+      });
     });
-    hls.on(Hls.Events.FRAG_LOADING, (_e: unknown, data: { frag?: { sn: number; url?: string } }) => {
-      plog.debug('HLS FRAG_LOADING', { sn: data?.frag?.sn, url: data?.frag?.url ? data.frag.url.substring(0, 120) : null });
+    h.on(Hls.Events.FRAG_LOADING, (_e, data) => {
+      plog.debug('HLS FRAG_LOADING', {
+        sn: data?.frag?.sn,
+        url: data?.frag?.url ? data.frag.url.substring(0, 120) : null,
+      });
     });
-    hls.on(Hls.Events.FRAG_LOADED, (_e: unknown, data: { frag?: { sn: number } }) => {
+    h.on(Hls.Events.FRAG_LOADED, (_e, data) => {
       plog.debug('HLS FRAG_LOADED', { sn: data?.frag?.sn });
     });
+  }
 
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+  private bindHlsManifestParsed(h: Hls, videoEl: HTMLVideoElement): void {
+    h.on(Hls.Events.MANIFEST_PARSED, () => {
       plog.debug('HLS MANIFEST_PARSED');
-      if (video) {
-        video.play().catch((err: unknown) => {
-          plog.warn('autoplay blocked, trying muted', { error: String(err) });
-          if (video) {
-            video.muted = true;
-            video.play().catch((err2: unknown) => {
-              plog.error('muted play also failed', { error: String(err2) });
-            });
-          }
+      videoEl.play().catch((err: unknown) => {
+        plog.warn('autoplay blocked, trying muted', { error: String(err) });
+        videoEl.muted = true;
+        videoEl.play().catch((err2: unknown) => {
+          plog.error('muted play also failed', { error: String(err2) });
         });
-      }
+      });
     });
+  }
 
-    hls.on(Hls.Events.ERROR, (event: unknown, data: {
-      fatal: boolean; type: string; details: string; error?: unknown; reason?: string;
-      response?: { code: number; text?: string }; url?: string;
-      frag?: { sn: number; url?: string; level?: number };
-      context?: { url?: string; type?: string };
-      networkDetails?: XMLHttpRequest; level?: number; buffer?: number;
-    }) => {
-      const errorInfo: Record<string, unknown> = {
-        fatal: data?.fatal,
-        type: data?.type
-      };
-      if (data?.details) errorInfo.details = String(data.details).substring(0, 100);
-      if (data?.error) errorInfo.error = String(data.error).substring(0, 200);
-      if (data?.reason) errorInfo.reason = String(data.reason).substring(0, 200);
-      if (data?.response) {
-        errorInfo.responseCode = data.response.code;
-        if (data.response.text) errorInfo.responseText = String(data.response.text).substring(0, 200);
-      }
-      if (data?.url) errorInfo.url = String(data.url).substring(0, 200);
-      if (data?.frag) {
-        errorInfo.fragSn = data.frag.sn;
-        errorInfo.fragUrl = data.frag.url ? String(data.frag.url).substring(0, 200) : undefined;
-        errorInfo.fragLevel = data.frag.level;
-      }
-      if (data?.context) {
-        errorInfo.ctxUrl = data.context.url ? String(data.context.url).substring(0, 200) : undefined;
-        errorInfo.ctxType = data.context.type;
-      }
-      if (data?.networkDetails) {
-        const nd = data.networkDetails as XMLHttpRequest;
-        errorInfo.httpStatus = nd.status;
-        errorInfo.httpStatusText = nd.statusText;
-      }
-      if (data?.level !== undefined) errorInfo.level = data.level;
-      if (data?.buffer !== undefined) errorInfo.buffer = data.buffer;
-
-      plog.error('HLS error', errorInfo);
+  private bindHlsError(h: Hls): void {
+    h.on(Hls.Events.ERROR, (_event, data) => {
+      const info = this.collectErrorInfo(data);
+      plog.error('HLS error', info);
 
       if (data && data.fatal) {
         if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
           plog.warn('Media error, attempting recovery');
-          try {
-            hls?.recoverMediaError();
-          } catch (e) {
-            plog.error('Recovery failed', { error: String(e) });
-          }
+          try { h.recoverMediaError(); } catch (e) { plog.error('Recovery failed', { error: String(e) }); }
         } else {
-          stopPlayback();
-          showHlsError(plog, $root, data, 'tv-player');
-          keys.unbind();
-          keys.bind((e: JQuery.Event) => {
-            if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace ||
-                e.keyCode === TvKey.Escape || e.keyCode === TvKey.Stop) {
+          this.stopPlayback();
+          showHlsError(plog, this.$root, data, 'tv-player');
+          this.keys.unbind();
+          this.keys.bind((e: JQuery.Event) => {
+            const kc = e.keyCode;
+            if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
               router.goBack();
               e.preventDefault();
             }
@@ -210,75 +202,83 @@ const startPlayback = (streamUrl: string): void => {
         }
       }
     });
-
-    hls.loadSource(streamUrl);
-    hls.attachMedia(video);
-    plog.debug('HLS attached to video element');
-  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    plog.info('Using native HLS playback');
-    video.src = streamUrl;
-  } else {
-    plog.error('HLS not supported and native playback not available');
   }
-}
 
-const stopPlayback = (): void => {
-  plog.debug('stopPlayback called');
-  if (hls) {
-    plog.debug('destroying HLS instance');
-    hls.destroy();
-    hls = null;
+  private collectErrorInfo(data: Hls.errorData): Record<string, unknown> {
+    const info: Record<string, unknown> = { fatal: data?.fatal, type: data?.type };
+    if (data?.details) info.details = String(data.details).substring(0, 100);
+    if (data?.url) info.url = String(data.url).substring(0, 200);
+    if (data?.networkDetails) {
+      const nd = data.networkDetails as XMLHttpRequest;
+      info.httpStatus = nd.status;
+      info.httpStatusText = nd.statusText;
+    }
+    return info;
   }
-  if (video) {
-    plog.debug('clearing video element');
-    video.pause();
-    video.src = '';
-    video = null;
-  }
-}
 
-const handleKey = (e: JQuery.Event): void => {
-  plog.debug('handleKey', { keyCode: e.keyCode });
-  switch (e.keyCode) {
-    case TvKey.Enter:
-      if (video) {
-        if (video.paused) {
-          plog.debug('play pressed');
-          video.play().catch((err) => {
-            plog.error('play() failed', { error: String(err) });
-          });
-        } else {
-          plog.debug('pause pressed');
-          video.pause();
+  private stopPlayback(): void {
+    plog.debug('stopPlayback called');
+    if (this.hls) {
+      plog.debug('destroying HLS instance');
+      this.hls.destroy();
+      this.hls = null;
+    }
+    if (this.video) {
+      plog.debug('clearing video element');
+      this.video.pause();
+      this.video.src = '';
+      this.video = null;
+    }
+  }
+
+  // --- keys ---
+
+  private readonly handleKey = (e: JQuery.Event): void => {
+    plog.debug('handleKey', { keyCode: e.keyCode });
+    switch (e.keyCode) {
+      case TvKey.Enter:
+        if (this.video) {
+          if (this.video.paused) {
+            plog.debug('play pressed');
+            this.video.play().catch((err) => {
+              plog.error('play() failed', { error: String(err) });
+            });
+          } else {
+            plog.debug('pause pressed');
+            this.video.pause();
+          }
         }
-      }
-      e.preventDefault(); break;
-    case TvKey.Return:
-    case TvKey.Backspace:
-    case TvKey.Escape:
-    case TvKey.Stop:
-      plog.debug('stop/back pressed');
-      stopPlayback();
-      router.goBack();
-      e.preventDefault(); break;
-  }
-};
+        e.preventDefault(); break;
+      case TvKey.Return:
+      case TvKey.Backspace:
+      case TvKey.Escape:
+      case TvKey.Stop:
+        plog.debug('stop/back pressed');
+        this.stopPlayback();
+        router.goBack();
+        e.preventDefault(); break;
+    }
+  };
 
-export const tvPlayerPage: Page = {
+  // --- Page ---
+
   mount(params: RouteParams): void {
     plog.info('tvPlayerPage mount', {
       channelTitle: params.channelTitle,
-      channelStream: params.channelStream ? params.channelStream.substring(0, 80) : 'N/A'
+      channelStream: params.channelStream ? params.channelStream.substring(0, 80) : 'N/A',
     });
-    render(params.channelTitle || '');
-    startPlayback(params.channelStream || '');
-    keys.bind(handleKey);
-  },
+    this.render(params.channelTitle || '');
+    this.startPlayback(params.channelStream || '');
+    this.keys.bind(this.handleKey);
+  }
+
   unmount(): void {
     plog.debug('tvPlayerPage unmount');
-    clearOverlayTimer();
-    stopPlayback();
-    keys.unbind();
-    PageUtils.clearPage($root);
+    this.clearOverlayTimer();
+    this.stopPlayback();
+    this.keys.unbind();
+    PageUtils.clearPage(this.$root);
   }
-};
+}
+
+export const tvPlayerPage = new TvPlayerPage();

@@ -145,7 +145,7 @@ const buildEpisodes = (season: Season | undefined): string => {
     const ep = season.episodes[j];
     const st = getEpisodeStatus(season.number, ep.number);
     let statusText = '';
-    if (st.status === 1) statusText = '\u2713';
+    if (st.status === 1) statusText = '✓';
     else if (st.status === 0 && st.time > 0) statusText = formatTimeShort(st.time);
     html += tplEpisode({
       idx: j, number: ep.number,
