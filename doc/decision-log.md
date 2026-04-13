@@ -42,7 +42,23 @@ video playing ct=3857.0928 rs=4             ← реальный старт
 - `Error().stack` на Chromium 28 V8 пустой без `throw` — подтверждено, это ожидаемо; для наших целей достаточно `site`.
 - патчи в `pages/player.ts`: `buildHlsConfig`, `playSource`, `MANIFEST_PARSED` handler, `canplay` handler + новое поле `pendingStartSeek`.
 
-**Результат:** ждём проверки. Ожидаемая картина нового лога: один `startSeek target=X from ct=Y` из нашего кода на `canplay`, далее обычная пара `seeking`→`seeked` и `playing` rs=4 без рассинхрона.
+**Результат:** **подтверждено.** Лог `-2vdGUOuJEac9TRUyc6LUw` на версии `88c1679` (`ba6a` trace):
+
+```
+17:24:42 startSeek target=3886 from ct=0     ← наш seek, единственный JS-инициированный
+17:24:42 video seeking ct=3886
+17:24:43 hls FRAG_BUFFERED sn=1 start=0      ← hls.js успел подхватить fragment 0 до flush
+17:24:45 hls FRAG_BUFFERED sn=389 start=3883.2  ← flush+reload под seek
+17:24:45 video seeked ct=3886 rs=3
+17:24:46 video playing ct=3886.027 rs=3
+17:24:46 video playing ct=3886.073 rs=4      ← стабильный старт
+```
+
+`ctwrap site=stream-controller:_seekToStartPos` в логе полностью отсутствует — hls.js не пытается делать startup seek, потому что `cfg.startPosition` не задан. Второго мистического `seeking` тоже нет. Пользователь подтверждает отсутствие рассинхрона.
+
+Цена: один впустую скачанный фрагмент с начала (видно в `buffered=0.0-14.4,3883.2-...` после seek). Приемлемо.
+
+Побочное наблюдение: одиночный `bufferStalledError` сразу после seek при `rs=3` — декодер догоняет ~1 секунду, nudge не срабатывает (нет gap'а), recover не нужен, далее самостоятельно выходит в `rs=4`. Нормально.
 
 ---
 
