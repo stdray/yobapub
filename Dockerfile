@@ -16,7 +16,7 @@ ENV GITVERSION_SHORT_SHA=$GITVERSION_SHORT_SHA
 ENV GITVERSION_COMMIT_DATE=$GITVERSION_COMMIT_DATE
 ENV GITVERSION_BUILD_DATE=$GITVERSION_BUILD_DATE
 
-RUN npx webpack --mode production
+RUN npm run build:release
 
 # Stage 2: Build backend
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
