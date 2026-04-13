@@ -2,6 +2,7 @@ import Hls from 'hls.js';
 import { storage } from './storage';
 import { platform } from './platform';
 import { Logger } from './log';
+import { formatAppVersion } from './format';
 
 export type HlsConfig = Partial<Hls.Config>;
 
@@ -32,13 +33,29 @@ export const buildBaseHlsConfig = (): HlsConfig => {
   };
 };
 
-export const logPlaybackStart = (log: Logger, url: string, extra?: Record<string, unknown>): void => {
-  log.info('playback url={url} ver={ver} ua={ua} proxy={proxy} streaming={streaming}', {
-    url: url.substring(0, 120),
-    ver: __APP_VERSION__,
+export interface PlaybackOpts {
+  readonly startPosition?: number;
+  readonly quality?: number;
+  readonly audio?: number;
+  readonly sub?: number;
+}
+
+export const logPlaybackStart = (log: Logger, url: string, opts?: PlaybackOpts): void => {
+  log.info('app ver={ver}', { ver: formatAppVersion() });
+  const di = platform.getDeviceInfo();
+  log.info('device hw={hw} sw={sw} tizen={tizen} ua={ua}', {
+    hw: di.hardware,
+    sw: di.software,
+    tizen: platform.getTizenVersion(),
     ua: navigator.userAgent,
+  });
+  log.info('playback url={url}', { url });
+  log.info('playback opts proxy={proxy} streaming={streaming} startPos={startPos} quality={quality} audio={audio} sub={sub}', {
     proxy: storage.isProxyAll(),
     streaming: storage.getStreamingType(),
-    ...extra,
+    startPos: opts && opts.startPosition !== undefined ? opts.startPosition : null,
+    quality: opts && opts.quality !== undefined ? opts.quality : null,
+    audio: opts && opts.audio !== undefined ? opts.audio : null,
+    sub: opts && opts.sub !== undefined ? opts.sub : null,
   });
 };

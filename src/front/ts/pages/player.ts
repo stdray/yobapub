@@ -397,14 +397,11 @@ class PlayerController {
       const f = this.media.files[this.state.quality];
       let hlsUrl = this.getHlsUrl(f);
       if (!hlsUrl) return;
-      this.media.hlsUrl = hlsUrl;
-      const audioIndex = this.media.audios.length > 0 ? this.media.audios[this.state.audio].index : 1;
-      const rewriteUrl = getRewrittenHlsUrl(hlsUrl, audioIndex);
       if (!this.videoEl) {
-        this.playUrl(rewriteUrl, title || this.media.title);
+        this.playUrl(hlsUrl, title || this.media.title);
       } else {
         this.showSpinner();
-        this.playSource(rewriteUrl);
+        this.playSource(hlsUrl);
       }
       return;
     }
@@ -510,15 +507,22 @@ class PlayerController {
     }
   }
 
-  private playSource(url: string): void {
+  private playSource(originalUrl: string): void {
     if (!this.videoEl) return;
-    this.media.hlsUrl = url;
+    this.media.hlsUrl = originalUrl;
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
     this.firstFragSnapped = false;
-    this.playSourceDebug = 'url=' + url.substring(0, 120);
+    this.playSourceDebug = 'url=' + originalUrl.substring(0, 120);
     plog.newTraceId();
     const cfg = this.buildHlsConfig();
-    logPlaybackStart(plog, url, { startPosition: cfg.startPosition || 0 });
+    logPlaybackStart(plog, originalUrl, {
+      startPosition: cfg.startPosition || 0,
+      quality: this.state.quality,
+      audio: this.state.audio,
+      sub: this.state.sub,
+    });
+    const audioIndex = this.media.audios.length > 0 ? this.media.audios[this.state.audio].index : 1;
+    const url = getRewrittenHlsUrl(originalUrl, audioIndex);
     const hls = new Hls(cfg);
     this.hlsInstance = hls;
     hls.on(Hls.Events.FRAG_LOADING, (_e: string, data: { frag?: { sn: number; start: number; duration: number } }) => {
@@ -551,21 +555,6 @@ class PlayerController {
         ct: v ? v.currentTime : -1,
         br: this.formatBuffered(v),
       });
-      // Tizen 2.3: hls.js seeks video to startPosition with float drift (e.g. 283.2 -> 283.1999),
-      // landing just before the buffered range. Gap-controller then nudges by nudgeOffset (0.1),
-      // causing a second seek mid-playback that desyncs audio on Chromium 28 MSE.
-      // Pre-empt: snap currentTime just inside the first buffered range before gap-controller runs.
-      if (!this.firstFragSnapped && v && v.buffered.length > 0) {
-        this.firstFragSnapped = true;
-        const bStart = v.buffered.start(0);
-        if (v.currentTime < bStart) {
-          const target = bStart + 0.05;
-          plog.info('firstFragSnap ct={ct} bStart={bStart} -> {target}', {
-            ct: v.currentTime, bStart, target,
-          });
-          v.currentTime = target;
-        }
-      }
     });
     hls.on(Hls.Events.LEVEL_SWITCHING, (_e: string, data: { level?: number; width?: number; height?: number; bitrate?: number; videoCodec?: string; audioCodec?: string }) => {
       plog.info('hls LEVEL_SWITCHING level={level} {w}x{h} bitrate={br} videoCodec={vc} audioCodec={ac}', {
@@ -682,27 +671,7 @@ class PlayerController {
   private onSourceReady(): void {
     if (!this.videoEl) return;
     plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime });
-    if (this.state.position > 0 && platform.isLegacyTizen()) {
-      // Tizen 2.3: startPosition is ignored by hls.js on Chromium 28.
-      // Wait for playback to stabilize, then seek manually.
-      const pos = this.state.position;
-      const v = this.videoEl;
-      let done = false;
-      const onTimeUpdate = () => {
-        if (done || v !== this.videoEl) return;
-        if (v.currentTime < 1 && v.buffered.length === 0) return;
-        done = true;
-        v.removeEventListener('timeupdate', onTimeUpdate);
-        plog.info('onSourceReady stable ct={ct}, seeking to {pos}', { ct: v.currentTime, pos });
-        if (Math.abs(v.currentTime - pos) > 2) {
-          v.currentTime = pos;
-        }
-      };
-      v.addEventListener('timeupdate', onTimeUpdate);
-      v.play();
-    } else {
-      if (!this.state.paused) this.videoEl.play();
-    }
+    if (!this.state.paused) this.videoEl.play();
     this.playbackStarted = true;
     if (this.state.sub >= 0 && this.videoEl) {
       loadSubtitleTrack(this.videoEl, this.$root, this.media.subs, this.state.sub);
@@ -801,7 +770,22 @@ class PlayerController {
       this.showSpinner();
     });
     this.videoEl.addEventListener('seeking', () => {
-      plog.debug('video seeking currentTime={currentTime}', { currentTime: this.videoEl ? this.videoEl.currentTime : -1 });
+      const v = this.videoEl;
+      plog.debug('video seeking currentTime={currentTime}', { currentTime: v ? v.currentTime : -1 });
+      // Tizen 2.3: hls.js seeks to startPosition but float drift lands ct just before buffered.start(0).
+      // Gap-controller then nudges by 0.1, causing a second seek mid-playback that desyncs audio.
+      // One-shot correction: on the first startup seek that lands strictly before the buffered range, snap inside.
+      if (!this.firstFragSnapped && v && v.buffered.length > 0) {
+        const bStart = v.buffered.start(0);
+        if (v.currentTime < bStart && bStart - v.currentTime < 1) {
+          this.firstFragSnapped = true;
+          const target = bStart + 0.05;
+          plog.info('startupSeekSnap ct={ct} bStart={bStart} -> {target}', {
+            ct: v.currentTime, bStart, target,
+          });
+          v.currentTime = target;
+        }
+      }
     });
     this.videoEl.addEventListener('canplay', () => {
       plog.debug('video canplay currentTime={currentTime}', { currentTime: this.videoEl ? this.videoEl.currentTime : -1 });

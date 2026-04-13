@@ -19,3 +19,8 @@ export const formatTimeShort = (sec: number): string => {
   const s = sec % 60;
   return m + ':' + (s < 10 ? '0' : '') + s;
 };
+
+export const formatAppVersion = (): string =>
+  __BUILD_SHORT_SHA__
+    ? __APP_VERSION__ + ' (' + __BUILD_SHORT_SHA__ + ', ' + __BUILD_DATE__ + ')'
+    : __APP_VERSION__ + ' (' + __BUILD_DATE__ + ')';

@@ -6,6 +6,7 @@ import { DeviceSettingsResponse } from '../types/api';
 import { TvKey, platform } from '../utils/platform';
 import { storage, Storage, QualityId } from '../utils/storage';
 import { PageUtils } from '../utils/page';
+import { formatAppVersion } from '../utils/format';
 import { sidebar } from '../sidebar';
 import { SidebarPage } from './sidebar-page';
 
@@ -131,10 +132,7 @@ const buildQualitySetting = (): SettingItem => {
 };
 
 const buildVersionSetting = (): SettingItem => {
-  const version = __BUILD_SHORT_SHA__
-    ? __APP_VERSION__ + ' (' + __BUILD_SHORT_SHA__ + ', ' + __BUILD_DATE__ + ')'
-    : __APP_VERSION__ + ' (' + __BUILD_DATE__ + ')';
-  return { key: '_version', label: 'Версия', type: 'readonly', value: version };
+  return { key: '_version', label: 'Версия', type: 'readonly', value: formatAppVersion() };
 };
 
 const buildSubSizeSetting = (): SettingItem => ({

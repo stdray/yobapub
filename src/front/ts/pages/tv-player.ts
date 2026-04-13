@@ -106,14 +106,14 @@ const startPlayback = (streamUrl: string): void => {
 
     const hlsConfig = buildBaseHlsConfig();
 
+    hls = new HlsCtor(hlsConfig);
+    plog.newTraceId();
+    logPlaybackStart(plog, streamUrl);
+
     if (storage.isProxyTv()) {
       plog.debug('Proxy enabled, will rewrite URLs');
       streamUrl = '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0&proxy=true';
     }
-
-    hls = new HlsCtor(hlsConfig);
-    plog.newTraceId();
-    logPlaybackStart(plog, streamUrl);
 
     // Register all events before loadSource/attachMedia
     hls.on(HlsCtor.Events.MANIFEST_LOADING, (_e: unknown, data: { url?: string }) => {
