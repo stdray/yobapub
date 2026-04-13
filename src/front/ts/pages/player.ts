@@ -465,9 +465,22 @@ class PlayerController {
 
   // --- Playback ---
 
+  // Tizen 2.3 rounds assigned currentTime down by ~1e-4 (float repr), so a
+  // startPosition of 3811.2 is read back as 3811.1998999..., landing 0.0001 s
+  // before the buffered range start. hls.js gap-controller then nudges by
+  // +0.1 s, causing a visible seek and audio/video desync. Offsetting the
+  // resume position by 0.2 s ensures currentTime stays inside the buffer.
+  private static readonly RESUME_POSITION_OFFSET = 0.2;
+
+  private getResumeStartPosition(): number {
+    if (this.state.position <= 0) return -1;
+    return this.state.position + PlayerController.RESUME_POSITION_OFFSET;
+  }
+
   private buildHlsConfig(): HlsConfig {
     const cfg = buildBaseHlsConfig();
-    if (this.state.position > 0) cfg.startPosition = this.state.position;
+    const startPos = this.getResumeStartPosition();
+    if (startPos >= 0) cfg.startPosition = startPos;
     cfg.autoStartLoad = false;
     cfg.maxBufferHole = 1.0;
     cfg.highBufferWatchdogPeriod = 10;
@@ -562,8 +575,7 @@ class PlayerController {
         details: lvls.map((l) => l.width + 'x' + l.height + '@' + l.bitrate + ' vc=' + (l.videoCodec || '?') + ' ac=' + (l.audioCodec || '?')).join(', '),
       });
       this.pinQualityLevel(hls);
-      const startPos = this.state.position > 0 ? this.state.position : -1;
-      hls.startLoad(startPos);
+      hls.startLoad(this.getResumeStartPosition());
       this.onSourceReady();
     });
     hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; error?: unknown; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {

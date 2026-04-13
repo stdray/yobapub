@@ -125,7 +125,7 @@ class LogShare {
       if (copyBtn) {
         const which = copyBtn.dataset.shareCopy;
         Clipboard.copy(which === 'tsv' ? tsvUrl : htmlUrl);
-        Clipboard.flashText(copyBtn, 'Скопировано');
+        dlg.close();
         return;
       }
       if (e.target.closest('[data-share-close]')) dlg.close();
