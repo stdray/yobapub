@@ -46,6 +46,48 @@ export interface DeviceInfo {
 
 class Platform {
   registerTizenKeys = (): void => {
+    // diagnostic: probe which runtime APIs are actually available so we know
+    // why tizen.tvinputdevice is missing on this device (missing privilege, legacy SDK, etc.)
+    try {
+      const w = window as unknown as { Common?: unknown };
+      const hasTizen = typeof tizen !== 'undefined';
+      const tizenKeys = hasTizen ? (() => {
+        try { return Object.keys(tizen).join(','); } catch (_e) { return 'err'; }
+      })() : '';
+      const hasWebapis = typeof webapis !== 'undefined';
+      const webapisKeys = hasWebapis ? (() => {
+        try { return Object.keys(webapis).join(','); } catch (_e) { return 'err'; }
+      })() : '';
+      const hasCommon = typeof w.Common !== 'undefined';
+      const hasTvKeyPlugin = !!document.getElementById('pluginObjectTVKey');
+      pfLog.info(
+        'runtime probe hasTizen={ht} tizenKeys={tk} hasWebapis={hw} webapisKeys={wk} hasCommon={hc} hasTvKeyPlugin={htp} ua={ua}',
+        {
+          ht: hasTizen, tk: tizenKeys, hw: hasWebapis, wk: webapisKeys,
+          hc: hasCommon, htp: hasTvKeyPlugin,
+          ua: (navigator.userAgent || '').substring(0, 200),
+        }
+      );
+    } catch (e) {
+      pfLog.warn('runtime probe failed {msg}', { msg: (e && (e as Error).message) || 'err' });
+    }
+
+    // diagnostic: global window-level keydown listener so we see EVERY key on ANY
+    // page, not just player — confirms whether media keys reach the WebKit keydown
+    // pipeline at all. Tag with gkd so it's distinguishable from per-page handlers.
+    try {
+      window.addEventListener('keydown', (ev: KeyboardEvent): void => {
+        pfLog.info('gkd kc={kc} key={key} code={code} which={which}', {
+          kc: ev.keyCode || 0,
+          key: ev.key || '',
+          code: ev.code || '',
+          which: ev.which || 0,
+        });
+      }, true);
+    } catch (e) {
+      pfLog.warn('gkd listener failed {msg}', { msg: (e && (e as Error).message) || 'err' });
+    }
+
     try {
       if (typeof tizen !== 'undefined' && tizen.tvinputdevice) {
         const keysToRegister = [
