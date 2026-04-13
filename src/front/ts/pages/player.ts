@@ -636,7 +636,27 @@ class PlayerController {
   private onSourceReady(): void {
     if (!this.videoEl) return;
     plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime });
-    if (!this.state.paused) this.videoEl.play();
+    if (this.state.position > 0 && platform.isLegacyTizen()) {
+      // Tizen 2.3: startPosition is ignored by hls.js on Chromium 28.
+      // Wait for playback to stabilize, then seek manually.
+      const pos = this.state.position;
+      const v = this.videoEl;
+      let done = false;
+      const onTimeUpdate = () => {
+        if (done || v !== this.videoEl) return;
+        if (v.currentTime < 1 && v.buffered.length === 0) return;
+        done = true;
+        v.removeEventListener('timeupdate', onTimeUpdate);
+        plog.info('onSourceReady stable ct={ct}, seeking to {pos}', { ct: v.currentTime, pos });
+        if (Math.abs(v.currentTime - pos) > 2) {
+          v.currentTime = pos;
+        }
+      };
+      v.addEventListener('timeupdate', onTimeUpdate);
+      v.play();
+    } else {
+      if (!this.state.paused) this.videoEl.play();
+    }
     this.playbackStarted = true;
     if (this.state.sub >= 0 && this.videoEl) {
       loadSubtitleTrack(this.videoEl, this.$root, this.media.subs, this.state.sub);
