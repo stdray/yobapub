@@ -13,6 +13,45 @@ import { Logger } from '../utils/log';
 
 const plog = new Logger('player');
 
+// DIAGNOSTIC: wrap currentTime setter on HTMLMediaElement.prototype to log every
+// assignment with stack trace. Tracking who really seeks at startup on Tizen 2.3.
+// Installed once on first playSource call so plog already has a traceId and logs
+// appear in the session tsv view. Remove after the source is identified.
+let ctWrapInstalled = false;
+const installCtWrap = (log: Logger): void => {
+  if (ctWrapInstalled) return;
+  try {
+    const proto = HTMLMediaElement.prototype;
+    const ctDesc = Object.getOwnPropertyDescriptor(proto, 'currentTime');
+    log.info('ctwrap probe hasDesc={hasDesc} hasGet={hasGet} hasSet={hasSet}', {
+      hasDesc: !!ctDesc,
+      hasGet: !!(ctDesc && typeof ctDesc.get === 'function'),
+      hasSet: !!(ctDesc && typeof ctDesc.set === 'function'),
+    });
+    if (!ctDesc || typeof ctDesc.set !== 'function' || typeof ctDesc.get !== 'function') return;
+    const origSet = ctDesc.set;
+    const origGet = ctDesc.get;
+    Object.defineProperty(proto, 'currentTime', {
+      configurable: true,
+      get(this: HTMLMediaElement): number { return (origGet as () => number).call(this); },
+      set(this: HTMLMediaElement, value: number): void {
+        const prev = (origGet as () => number).call(this);
+        const stack = ((new Error().stack || '').split('\n').slice(1, 10).join(' | ')).substring(0, 600);
+        try {
+          plog.info('ctwrap set value={value} prev={prev} seeking={seeking} rs={rs} stack={stack}', {
+            value, prev, seeking: this.seeking, rs: this.readyState, stack,
+          });
+        } catch (_e) { /* never break playback on log failure */ }
+        (origSet as (v: number) => void).call(this, value);
+      },
+    });
+    ctWrapInstalled = true;
+    log.info('ctwrap installed on prototype');
+  } catch (e) {
+    log.warn('ctwrap install failed error={error}', { error: String(e) });
+  }
+};
+
 import Hls from 'hls.js';
 import { tplPlayer } from './player/template';
 import { MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime, isEpisodeWatched, isVideoWatched } from './player/media';
@@ -511,6 +550,7 @@ class PlayerController {
     this.firstFragSnapped = false;
     this.playSourceDebug = 'url=' + originalUrl.substring(0, 120);
     plog.newTraceId();
+    installCtWrap(plog);
     const cfg = this.buildHlsConfig();
     logPlaybackStart(plog, originalUrl, {
       startPosition: cfg.startPosition || 0,
