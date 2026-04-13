@@ -13,19 +13,6 @@ import { Logger } from '../utils/log';
 
 const plog = new Logger('player');
 
-interface HlsLevel {
-  readonly height?: number;
-  readonly width?: number;
-  readonly bitrate?: number;
-  readonly videoCodec?: string;
-  readonly audioCodec?: string;
-}
-
-interface HlsInternals {
-  readonly currentLevel?: number;
-  readonly levels?: ReadonlyArray<HlsLevel>;
-}
-
 interface HlsFragData {
   frag?: { sn: number; start: number; duration: number };
   stats?: { total: number; trequest: number; tfirst: number; tload: number };
@@ -540,8 +527,7 @@ class PlayerController {
   }
 
   private pinQualityLevel(hls: Hls): void {
-    const hlsAny = hls as unknown as HlsInternals & { currentLevel: number };
-    const levels = hlsAny.levels;
+    const levels = hls.levels;
     if (!levels || levels.length <= 1) return;
 
     const target = this.media.files[this.state.quality];
@@ -556,7 +542,7 @@ class PlayerController {
     }
 
     if (bestIdx >= 0) {
-      hlsAny.currentLevel = bestIdx;
+      hls.currentLevel = bestIdx;
       plog.info('pinQualityLevel idx={idx} target={w}x{h} level={lw}x{lh} bitrate={br}', {
         idx: bestIdx, w: target.w, h: target.h,
         lw: levels[bestIdx].width, lh: levels[bestIdx].height,
@@ -639,8 +625,7 @@ class PlayerController {
       });
     });
     hls.on(Hls.Events.LEVEL_SWITCHED, (_e: string, data: { level?: number }) => {
-      const hlsAny = hls as unknown as HlsInternals;
-      const lvl = hlsAny.levels && data.level !== undefined ? hlsAny.levels[data.level] : undefined;
+      const lvl = data.level !== undefined ? hls.levels[data.level] : undefined;
       plog.info('hls LEVEL_SWITCHED level={level} {w}x{h} bitrate={br} videoCodec={vc} audioCodec={ac}', {
         level: data.level,
         w: lvl ? lvl.width : null, h: lvl ? lvl.height : null,
@@ -648,8 +633,7 @@ class PlayerController {
       });
     });
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      const hlsAny = hls as unknown as HlsInternals;
-      const lvls = hlsAny.levels || [];
+      const lvls = hls.levels;
       plog.info('hls MANIFEST_PARSED levels={count} details={details}', {
         count: lvls.length,
         details: lvls.map((l) =>
@@ -775,6 +759,12 @@ class PlayerController {
     try { return new URL(this.media.hlsUrl).hostname; } catch { return ''; }
   }
 
+  private getCurrentHlsLevel(): Hls.Level | undefined {
+    const h = this.hlsInstance;
+    if (!h || h.currentLevel < 0 || !h.levels) return undefined;
+    return h.levels[h.currentLevel];
+  }
+
   private getVideoErrorMessage(error: MediaError | null): string {
     if (!error) return 'Неизвестная ошибка воспроизведения';
     switch (error.code) {
@@ -796,15 +786,13 @@ class PlayerController {
     const code = error ? error.code : 0;
     const detail = error && (error as { message?: string }).message ? (error as { message?: string }).message : '';
     const domain = this.getHlsDomain();
-    const hlsAny = this.hlsInstance as unknown as HlsInternals | null;
-    const curLevel = hlsAny && hlsAny.currentLevel !== undefined && hlsAny.currentLevel >= 0 && hlsAny.levels
-      ? hlsAny.levels[hlsAny.currentLevel] : undefined;
+    const curLevel = this.getCurrentHlsLevel();
     const devInfo = platform.getDeviceInfo();
     plog.error('playbackError {code} {msg} {detail} {domain} hlsLevel={hlsLevel} hlsRes={hlsRes} videoCodec={vc} audioCodec={ac}', {
       code, msg, detail: detail || null, domain,
       url: url.substring(0, 120), ua: navigator.userAgent,
       hw: devInfo.hardware, sw: devInfo.software,
-      hlsLevel: hlsAny ? hlsAny.currentLevel : null,
+      hlsLevel: this.hlsInstance ? this.hlsInstance.currentLevel : null,
       hlsRes: curLevel ? curLevel.width + 'x' + curLevel.height : null,
       vc: curLevel ? curLevel.videoCodec || null : null,
       ac: curLevel ? curLevel.audioCodec || null : null,
@@ -907,9 +895,7 @@ class PlayerController {
     this.videoEl.addEventListener('error', () => {
       const v = this.videoEl;
       const err2 = v ? v.error : null;
-      const hlsAny = this.hlsInstance as unknown as HlsInternals | null;
-      const curLevel = hlsAny && hlsAny.currentLevel !== undefined && hlsAny.currentLevel >= 0 && hlsAny.levels
-        ? hlsAny.levels[hlsAny.currentLevel] : undefined;
+      const curLevel = this.getCurrentHlsLevel();
       plog.error('video error code={code} message={message} ct={ct} readyState={rs}'
         + ' buffered={br} hlsLevel={hlsLevel} videoCodec={vc} audioCodec={ac} hlsBitrate={hlsBitrate}', {
         code: err2 ? err2.code : null,
@@ -917,7 +903,7 @@ class PlayerController {
         ct: v ? v.currentTime : null,
         rs: v ? v.readyState : null,
         br: this.formatBuffered(v || null),
-        hlsLevel: hlsAny ? hlsAny.currentLevel : null,
+        hlsLevel: this.hlsInstance ? this.hlsInstance.currentLevel : null,
         vc: curLevel ? curLevel.videoCodec || null : null,
         ac: curLevel ? curLevel.audioCodec || null : null,
         hlsBitrate: curLevel ? curLevel.bitrate : null,
