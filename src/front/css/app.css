@@ -1120,6 +1120,10 @@ video::cue {
   margin-left: -30px;
 }
 
+.search__results > .spinner {
+  height: 100%;
+}
+
 
 
 /* Search preview */
@@ -1132,13 +1136,13 @@ video::cue {
 }
 
 .search-preview__title-en {
-  font-size: 28px;
+  font-size: 32px;
   color: #ccc;
   margin-bottom: 12px;
 }
 
 .search-preview__meta {
-  font-size: 28px;
+  font-size: 32px;
   color: #ddd;
   margin-bottom: 10px;
 }
@@ -1148,7 +1152,7 @@ video::cue {
 }
 
 .search-preview__plot {
-  font-size: 26px;
+  font-size: 30px;
   color: #eee;
   line-height: 1.5;
   overflow: hidden;
