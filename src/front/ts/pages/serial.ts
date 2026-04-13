@@ -216,7 +216,10 @@ const updateFocus = (): void => {
     if ($eps.length > 0) {
       const $ep = $eps.eq(focusedEpisode);
       $ep.addClass('focused');
-      if (infoEl) PageUtils.scrollIntoView($ep[0], infoEl, 20);
+      if (infoEl) {
+        PageUtils.scrollIntoView($ep[0], infoEl, 20);
+        setTimeout(() => PageUtils.scrollIntoView($ep[0], infoEl, 20), 220);
+      }
     }
   }
 };
