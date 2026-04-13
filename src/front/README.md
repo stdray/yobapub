@@ -1,215 +1,201 @@
 # KinoPub Tizen TV App
 
-Клиент KinoPub для телевизоров Samsung (Tizen 2.3 / 3.0).
+KinoPub client for Samsung Tizen TVs (2.3 / 3.0).
 
-## API документация
+## API Documentation
 
 - https://kinoapi.com/
 
-## Архитектура
+## Architecture
 
-Одностраничное приложение (SPA) без фреймворков. Навигация между экранами реализована через простой роутер, переключающий видимость DOM-контейнеров. Все экраны рендерятся в `<div id="app">`.
+Single-page application (SPA) without frameworks. Page navigation is implemented via a custom router that toggles visibility of DOM containers. All pages render inside `<div id="app">`.
 
 ```
 src/
-├── index.html              # Точка входа, подключение стилей и скриптов
+├── index.html                  # Entry point, vendor scripts, styles
 ├── css/
-│   └── app.css             # Все стили (простой CSS, без препроцессоров)
+│   └── app.css                 # All styles (plain CSS + nesting via postcss-preset-env)
 ├── ts/
-│   ├── main.ts             # Инициализация приложения, роутер
+│   ├── main.ts                 # App init, page registration, router setup
+│   ├── router.ts               # Router class: navigate, goBack, setParams, typed helpers
+│   ├── sidebar.ts              # Sidebar menu (Novelties, Watching, History, Bookmarks, TV, Search, Settings, Exit)
+│   ├── config.ts               # OAuth client ID / secret
+│   ├── settings.ts             # App constants (CARDS_PER_ROW)
 │   ├── api/
-│   │   ├── client.ts       # HTTP-клиент (обёртка над jQuery.ajax)
-│   │   ├── auth.ts         # OAuth Device Flow (получение кода, polling, refresh)
-│   │   ├── watching.ts     # /v1/watching/movies, /v1/watching/serials
-│   │   └── items.ts        # /v1/items, /v1/items/<id>
+│   │   ├── client.ts           # ApiClient: GET/POST with auto token refresh on 401
+│   │   ├── auth.ts             # OAuth Device Flow (device_code, device_token)
+│   │   ├── watching.ts         # /v1/watching/* (movies, serials, marktime, toggle)
+│   │   ├── items.ts            # /v1/items, /v1/items/<id>, /v1/items/search
+│   │   ├── bookmarks.ts        # /v1/bookmarks/* (folders, toggle, create)
+│   │   ├── device.ts           # /v1/device/info, /v1/device/unlink
+│   │   ├── history.ts          # /v1/history
+│   │   └── tv.ts               # /v1/tv (live channels)
 │   ├── types/
-│   │   ├── api.ts          # Типы ответов API (Item, Season, Episode, Video, Pagination и т.д.)
-│   │   └── app.ts          # Внутренние типы приложения (Route, AppState)
+│   │   ├── api.ts              # API response types (Item, Season, Episode, Video, Pagination, etc.)
+│   │   ├── app.ts              # Internal types (RouteName, RouteParams, Page)
+│   │   ├── dot.d.ts            # doT.js type declarations
+│   │   ├── globals.d.ts        # Global declarations (__APP_VERSION__, __BUILD_SHA__, etc.)
+│   │   └── object-fit-images.d.ts
 │   ├── pages/
-│   │   ├── login.ts        # Экран «Вход по коду»
-│   │   ├── watching.ts     # Экран «Я смотрю» (сериалы + фильмы)
-│   │   ├── movie.ts        # Карточка фильма (инфо + кнопка «Смотреть»)
-│   │   ├── serial.ts       # Карточка сериала (инфо + сезоны → эпизоды)
-│   │   └── player.ts       # Воспроизведение видео
-│   ├── components/
-│   │   ├── card.ts         # Компонент карточки (постер + название)
-│   │   └── spinner.ts      # Индикатор загрузки
-│   ├── nav/
-│   │   └── navigation.ts   # Обёртка над LRUD для пространственной навигации
+│   │   ├── sidebar-page.ts     # SidebarPage abstract base class for pages with sidebar
+│   │   ├── login.ts            # Login screen (device code flow)
+│   │   ├── watching.ts         # "Watching" screen (serials + movies)    [extends SidebarPage]
+│   │   ├── novelties.ts        # "Novelties" screen (new releases)       [extends SidebarPage]
+│   │   ├── history.ts          # Watch history                           [extends SidebarPage]
+│   │   ├── bookmarks.ts        # Bookmark folders                        [extends SidebarPage]
+│   │   ├── tv.ts               # Live TV channels                        [extends SidebarPage]
+│   │   ├── search.ts           # Search screen
+│   │   ├── movie.ts            # Movie detail (info + "Watch" button)
+│   │   ├── serial.ts           # Serial detail (seasons → episodes)
+│   │   ├── settings.ts         # App settings
+│   │   ├── player.ts           # Video player (HLS/HTTP via <video> + hls.js)
+│   │   ├── player/
+│   │   │   ├── hls.ts          # HLS URL rewriting for proxy
+│   │   │   ├── info.ts         # OSD info overlay
+│   │   │   ├── media.ts        # Media source resolution (files, audio, subtitles)
+│   │   │   ├── panel.ts        # Settings panel (audio/subs/quality selection)
+│   │   │   ├── preferences.ts  # Per-title playback preferences
+│   │   │   ├── progress.ts     # Progress bar and seek preview
+│   │   │   ├── subtitles.ts    # Subtitle rendering and styling
+│   │   │   └── template.ts     # doT template for player UI
+│   │   └── tv-player.ts        # Live TV player
 │   └── utils/
-│       ├── storage.ts      # localStorage: токены, настройки
-│       └── platform.ts     # Определение Tizen-платформы, обработка HW-кнопок пульта
+│       ├── page.ts             # PageKeys (keydown bind/unbind), PageUtils (show/hide, scroll)
+│       ├── platform.ts         # TvKey enum, Tizen platform API, media key registration
+│       ├── grid.ts             # gridMove() for card grid navigation
+│       ├── storage.ts          # localStorage: tokens, settings, per-title prefs, proxy config
+│       ├── templates.ts        # Shared doT templates: tplCard, tplRating, tplEmptyText, renderRatings, renderPersonnel
+│       ├── format.ts           # formatDuration, formatTimecode, formatTimeShort, formatAppVersion
+│       ├── detail-controls.ts  # DetailControls class for movie/serial detail button navigation
+│       ├── exit-dialog.ts      # Exit confirmation dialog
+│       ├── hls-proxy.ts        # buildBaseHlsConfig(), logPlaybackStart()
+│       ├── hls-error.ts        # showHlsError() for HLS playback error display
+│       ├── log.ts              # Logger class for structured logging
+│       ├── number-set.ts       # Lightweight numeric set utility
+│       └── playback-errors.ts  # Playback error tracking and reporting
 ```
 
-### Потоки данных
+### Data Flow
 
 ```
-[Пульт ДУ] → [Tizen Key Events] → [LRUD Navigation] → [Page Handler]
+[TV Remote] → [Tizen Key Events] → [PageKeys handler] → [Page logic]
                                                               ↓
-                                                        [API Client] → [api.service-kp.com]
+                                                        [API Client] → [.NET Proxy] → [api.service-kp.com]
                                                               ↓
-                                                        [DOM Update (jQuery)]
+                                                        [DOM Update (jQuery + doT templates)]
 ```
 
-## Целевые платформы
+## Target Platforms
 
-| Платформа | Web Engine | ES поддержка |
-|-----------|-----------|--------------|
+| Platform  | Web Engine   | ES Support |
+|-----------|-------------|------------|
 | Tizen 2.3 | Chromium ~28 | ES5 |
-| Tizen 3.0 | Chromium ~47 | ES5 + частично ES6 |
+| Tizen 3.0 | Chromium ~47 | ES5 + partial ES6 |
 
-**Важно:** Весь код (включая `node_modules`) компилируется в строгий ES5 через SWC. В рантайме не должно быть ни одной ES6+ конструкции — ни стрелочных функций, ни `const`/`let`, ни деструктуризации, ни template literals. Полифилы (`Promise`, `Object.assign`, `Array.from` и др.) поставляются через `core-js@3` с `mode: 'usage'` — SWC автоматически добавляет только те, которые реально используются в коде.
+**Important:** All code (including `node_modules`) is compiled to strict ES5 via SWC. No ES6+ constructs may appear at runtime — no arrow functions, no `const`/`let`, no destructuring, no template literals. Polyfills (`Promise`, `Object.assign`, `Array.from`, etc.) are provided via `core-js@3` with `mode: 'usage'` — SWC automatically injects only what is actually used.
 
-## Библиотеки
+## Libraries
 
-| Библиотека | Версия | Назначение |
-|-----------|--------|-----------|
-| **jQuery** | 2.x | DOM-манипуляции, AJAX-запросы, совместимость со старыми движками |
-| **LRUD** | 3.x (`@bbc/lrud`) | Пространственная навигация (вверх/вниз/влево/вправо) для пульта ДУ |
-| **hls.js** | 0.14.x | HLS-стриминг для браузеров без нативной поддержки HLS |
-| **@swc/core** + **swc-loader** | 1.x | Транспиляция TS + ES6+ → строгий ES5 за один проход (включая node_modules) |
-| **core-js** | 3.x | Полифилы ES6+ (`Promise`, `Object.assign`, `Array.from` и т.д.), инжектятся SWC через `mode: 'usage'` |
+| Library | Version | Purpose |
+|---------|---------|---------|
+| **jQuery** | 2.x | DOM manipulation, AJAX requests, old engine compatibility |
+| **doT.js** (`dot`) | 1.x | Lightweight templating engine (compiled templates) |
+| **hls.js** | 0.14.x | HLS streaming for browsers without native HLS support |
+| **object-fit-images** | — | `object-fit` polyfill for `<img>` on Chromium 28 |
+| **@swc/core** + **swc-loader** | 1.x | TS + ES6+ → strict ES5 transpilation in one pass (incl. node_modules) |
+| **core-js** | 3.x | ES6+ polyfills, injected by SWC via `mode: 'usage'` |
 
-> **Почему hls.js, а не video.js:** Video.js тяжёлый (~500KB), тянет зависимости, проблемы с ES5. hls.js легковесный (~60KB), работает напрямую с `<video>`, достаточен для HLS-потоков KinoPub. Для HTTP-потоков (mp4) используем `<video>` напрямую.
+> **Why hls.js over video.js:** Video.js is heavy (~500KB), has many dependencies, and has ES5 issues. hls.js is lightweight (~60KB), works directly with `<video>`, and is sufficient for KinoPub HLS streams. For HTTP streams (mp4) `<video>` is used directly.
 
-## Сборка
+jQuery and hls.js are loaded as vendor scripts (`<script>` in index.html) and declared as webpack `externals`. They are imported normally (`from 'jquery'`, `from 'hls.js'`) but resolved to globals (`jQuery`, `Hls`). `CopyWebpackPlugin` copies them from `node_modules` to `vendor/` at build time.
 
-- **Webpack** — бандлер (target: `['web', 'es5']`)
-- **SWC** (`swc-loader`) — один лоадер заменяет и `ts-loader`, и `babel-loader`
-  - Компилирует TypeScript и транспилирует в строгий ES5 за один проход
-  - Обрабатывает **весь код**, включая `node_modules` (убирает ES6+ из зависимостей)
-  - Быстрее Babel в ~20-70 раз (написан на Rust)
-  - Конфиг в `.swcrc` или прямо в `webpack.config.js`
-- **core-js@3** — полифилы (`Promise`, `Object.assign`, `Array.from` и т.д.) через `mode: 'usage'`
+## Build
+
+- **Webpack** — bundler (`target: ['web', 'es5']`)
+- **SWC** (`swc-loader`) — single loader replacing both `ts-loader` and `babel-loader`
+  - Compiles TypeScript and transpiles to strict ES5 in one pass
+  - Processes **all code**, including `node_modules` (strips ES6+ from dependencies)
+  - ~20–70x faster than Babel (written in Rust)
+- **core-js@3** — polyfills via `mode: 'usage'`
 
 ```
-.ts и .js (включая node_modules) → swc-loader (TS + ES5) → webpack bundle → dist/app.js
+.ts and .js (incl. node_modules) → swc-loader (TS + ES5) → webpack bundle → dist/app.js
 ```
 
-> **Почему SWC, а не Babel:** Один лоадер вместо двух (`ts-loader` + `babel-loader`), минимальный конфиг, быстрая сборка. Транспилирует TypeScript, убирает ES6+ синтаксис из зависимостей, инжектит полифилы — всё за один проход.
+> **Why SWC over Babel:** Single loader instead of two (`ts-loader` + `babel-loader`), minimal config, fast builds. Transpiles TypeScript, strips ES6+ syntax from dependencies, injects polyfills — all in one pass.
 
-## API KinoPub (используемые эндпоинты)
+## Pages (Routes)
 
-Base URL: `https://api.service-kp.com`
+| Route | Page | Description |
+|-------|------|-------------|
+| `login` | `pages/login.ts` | Device code login (OAuth Device Flow) |
+| `watching` | `pages/watching.ts` | "Watching" — unwatched movies + serials with new episodes |
+| `novelties` | `pages/novelties.ts` | New releases by content type |
+| `history` | `pages/history.ts` | Watch history |
+| `bookmarks` | `pages/bookmarks.ts` | Bookmark folders and items |
+| `tv` | `pages/tv.ts` | Live TV channel list |
+| `search` | `pages/search.ts` | Search by title |
+| `movie` | `pages/movie.ts` | Movie detail (info, ratings, "Watch" button) |
+| `serial` | `pages/serial.ts` | Serial detail (seasons → episodes with progress) |
+| `settings` | `pages/settings.ts` | App settings (quality, start page, device, proxy) |
+| `player` | `pages/player.ts` | Video player (HLS/HTTP, seek, marktime, episode switching) |
+| `tv-player` | `pages/tv-player.ts` | Live TV player |
 
-### Аутентификация (OAuth Device Flow)
+## API Endpoints (Used)
 
-| Метод | Endpoint | Назначение |
-|-------|---------|-----------|
-| POST | `/oauth2/device?grant_type=device_code&client_id=...&client_secret=...` | Получение `user_code` для отображения на экране |
-| POST | `/oauth2/device?grant_type=device_token&client_id=...&client_secret=...&code=...` | Polling: ожидание ввода кода пользователем |
-| POST | `/oauth2/token?grant_type=refresh_token&...&refresh_token=...` | Обновление `access_token` |
+Base URL: via .NET reverse proxy → `https://api.service-kp.com`
 
-### Контент
+### Authentication (OAuth Device Flow)
 
-| Метод | Endpoint | Назначение |
-|-------|---------|-----------|
-| GET | `/v1/watching/movies` | Недосмотренные фильмы |
-| GET | `/v1/watching/serials` | Сериалы с новыми/недосмотренными эпизодами |
-| GET | `/v1/items/<id>` | Детальная информация + список видео/сезонов |
-| GET | `/v1/watching?id=<id>` | Прогресс просмотра для конкретного item |
-| GET | `/v1/watching/marktime?id=...&video=...&time=...` | Сохранение позиции просмотра |
+| Method | Endpoint | Purpose |
+|--------|---------|---------|
+| POST | `/oauth2/device` (`grant_type=device_code`) | Get `user_code` for display on screen |
+| POST | `/oauth2/device` (`grant_type=device_token`) | Poll: wait for user to enter code |
 
-## Экраны
+### Content
 
-### 1. Вход по коду (`/login`)
-- Запрос `device_code` → отображение `user_code` и `verification_uri`
-- Таймер обратного отсчёта (`expires_in`)
-- Polling каждые `interval` секунд до получения `access_token`
-- После успешной авторизации → сохранение токенов в `localStorage` → переход на «Я смотрю»
+| Method | Endpoint | Purpose |
+|--------|---------|---------|
+| GET | `/v1/watching/movies` | Unwatched movies |
+| GET | `/v1/watching/serials` | Serials with new/unwatched episodes |
+| GET | `/v1/watching?id=<id>` | Watch progress for a specific item |
+| GET | `/v1/watching/marktime?id=...&video=...&time=...` | Save playback position |
+| GET | `/v1/watching/toggle?id=...&video=...` | Toggle episode watched status |
+| GET | `/v1/watching/togglewatchlist?id=...` | Toggle item in watchlist |
+| GET | `/v1/items/<id>` | Item details + videos/seasons |
+| GET | `/v1/items?type=...&sort=...` | List items by type |
+| GET | `/v1/items/search?q=...` | Search items |
+| GET | `/v1/bookmarks` | Bookmark folders |
+| GET | `/v1/bookmarks/<id>?page=...` | Items in a bookmark folder |
+| POST | `/v1/bookmarks/create` | Create bookmark folder |
+| POST | `/v1/bookmarks/toggle-item` | Toggle item in bookmark folder |
+| GET | `/v1/bookmarks/get-item-folders?item=...` | Get folders containing an item |
+| GET | `/v1/history?page=...` | Watch history |
+| GET | `/v1/tv` | Live TV channels |
+| GET | `/v1/device/info` | Device info / settings |
+| POST | `/v1/device/unlink` | Unlink device |
+| GET | `/v1/user` | Current user info |
 
-### 2. Я смотрю (`/watching`)
-- Два раздела: «Сериалы» и «Фильмы» (горизонтальные ряды карточек)
-- Карточка: постер + название + прогресс (для сериалов: «5 из 10», для фильмов: карточка без прогресса)
-- LRUD-навигация: стрелки влево/вправо по карточкам, вверх/вниз между разделами
-- Enter → переход на карточку детали
+## Tizen Notes
 
-### 3. Карточка фильма (`/movie/:id`)
-- Постер, название (рус/ориг), год, страны, жанры
-- Рейтинги: KinoPub, КиноПоиск, IMDb
-- Описание (plot)
-- Кнопка «Смотреть» (с позиции, если есть прогресс)
-- Для multi-фильмов: список частей
-- LRUD-навигация по элементам
+### TV Remote Keys
 
-### 4. Карточка сериала (`/serial/:id`)
-- Постер, название (рус/ориг), год, страны, жанры
-- Рейтинги: KinoPub, КиноПоиск, IMDb
-- Описание (plot)
-- Список сезонов (горизонтальный ряд / табы)
-- Список эпизодов выбранного сезона (вертикальный список с прогрессом просмотра)
-- LRUD-навигация: влево/вправо по сезонам, вверх/вниз по эпизодам, Enter → плеер
+- `TvKey` enum in `utils/platform.ts` maps key codes (Enter, Return, Backspace, Escape, arrows, Play, Pause, Stop, FF, RW, etc.)
+- Tizen 2.3 requires `tizen.tvinputdevice.registerKey()` for media keys (Play, Pause, Stop, FF, RW)
+- Navigation keys (arrows, Enter, Return) work without registration
+- `PageKeys` class manages `keydown` listeners per page; each page binds on mount, unbinds on unmount
 
-### 5. Плеер (`/player/:id/:video` или `/player/:id/:season/:episode`)
-- Полноэкранное воспроизведение через `<video>` + hls.js
-- Выбор качества (из `files[]`)
-- Периодическое сохранение позиции (`marktime`)
-- Управление пультом: Play/Pause, перемотка, стоп (Return → выход из плеера)
+### Video Player
 
-## Особенности Tizen (из reference-реализации `old/bundle.min.from.jsnice.js`)
+- HLS playback via hls.js + `<video>` element; HTTP (mp4) fallback uses `<video>` directly
+- Quality/audio/subtitle selection via settings panel (`player/panel.ts`)
+- Periodic position saving via `marktime` API
+- Resume: if `time >= duration - 10`, resets to 0 (considers fully watched)
+- Non-linear seek: step accelerates on key hold
 
-### Кнопки пульта
+### Navigation
 
-Enum клавиш, используемый в старом приложении:
-```
-Right=0, Left=1, Up=2, Down=3, Enter=4, Return=5,
-Key0..Key9 (6-15), Red=16, Green=17, Yellow=18, Blue=19,
-Play=20, Pause=21, PlayPause=22, Stop=23, Rec=24, Ff=25, Rw=26,
-Tools=27, ChannelUp=28, ChannelDown=29, ChannelList=30, PreCh=31,
-Teletext=32, FavoriteChannel=33, Exit=34, Info=35, AspectRatio=36, Subtitle=37
-```
-
-- Маппинг `keyCode → действие` получается от устройства через `device.getControlKeys()` и передаётся в контроллер через `control.setKeys()`
-- Tizen 2.3 использует `tizen.tvinputdevice.registerKey()` / `tizen.tvinputdevice.getSupportedKeys()` для регистрации медиа-кнопок (Play, Pause, Stop, FF, RW и т.д.)
-- Навигационные клавиши (стрелки, Enter, Return) работают без регистрации
-- `keydown` слушатель на `window`, отдельный `keyup` для debounce (защита от повторного Enter)
-- Стек обработчиков: каждая страница добавляет свой listener через `control.on()`, убирает через `control.off()`. Return обработан как `backKeyDown()`
-
-### Видеоплеер
-
-- **Два типа плеера**: `TizenPlayer` (через `webapis.avplay` API — нативный плеер Samsung) и HTML5 `<video>` (fallback)
-- **Стримы**: сначала пробует HLS (`files[].url.hls`), при ошибке fallback на HTTP (`files[].url.http`)
-- **Состояния**: Idle, Playing, Paused — управление через `play()`, `pause()`, `resume()`, `stop()`, `seek()`
-- **Перемотка**: нелинейная — `step = 10 + Math.pow(Math.min(count, 3000), 3) / 1000`, ускоряется при удержании Left/Right
-- **Rw/Ff**: переход на предыдущий/следующий эпизод для сериалов
-- **Marktime**: периодическое сохранение позиции просмотра на сервер
-- **Возобновление**: если `time >= duration - 10`, сбрасывает позицию на 0 (считает досмотренным)
-
-### Навигация (LRUD-подобная)
-
-- Кастомная реализация пространственной навигации (не библиотека @bbc/lrud)
-- События: `nav_click` (Enter на элементе), `nav_key` (любая клавиша на элементе)
-- Фокус отслеживается через `self.element`, переключается методом `current(newEl, oldEl, direction)`
-- Элементы могут быть `disabled` или `hidden` — пропускаются при навигации
-
-## План задач
-
-### Фаза 1: Каркас проекта
-- [x] `.gitignore` и `README.md`
-- [ ] Инициализация npm, установка зависимостей
-- [ ] Конфигурация TypeScript (`tsconfig.json`, target ES5)
-- [ ] Конфигурация Webpack
-- [ ] `index.html` с базовой разметкой
-- [ ] Базовые стили (`app.css`)
-- [ ] Tizen `config.xml`
-
-### Фаза 2: Инфраструктура
-- [ ] HTTP-клиент (`api/client.ts`)
-- [ ] Типы API (`types/api.ts`, `types/app.ts`)
-- [ ] Хранилище токенов (`utils/storage.ts`)
-- [ ] Платформа и кнопки пульта (`utils/platform.ts`)
-- [ ] Роутер (`main.ts`)
-- [ ] LRUD-навигация (`nav/navigation.ts`)
-
-### Фаза 3: Экраны
-- [ ] Вход по коду (`pages/login.ts`)
-- [ ] «Я смотрю» (`pages/watching.ts`)
-- [ ] Карточка фильма (`pages/movie.ts`)
-- [ ] Карточка сериала (`pages/serial.ts`)
-- [ ] Плеер (`pages/player.ts`)
-
-### Фаза 4: Полировка
-- [ ] Обработка ошибок сети / истёкших токенов
-- [ ] Автообновление `access_token` через `refresh_token`
-- [ ] Тестирование на Tizen Emulator
-- [ ] Упаковка в `.wgt` для Samsung TV
+- Custom spatial navigation via `gridMove()` (no LRUD library)
+- `PageKeys` handles `keydown` on `window`; each page provides its own key handler
+- `SidebarPage` base class integrates sidebar menu with page key handling
+- `CARDS_PER_ROW = 4` — grid layout constant for card grids

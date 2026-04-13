@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-KinoPub client for Samsung Tizen TVs (2.3 / 3.0). SPA without frameworks — jQuery for DOM/AJAX, doT.js for templating, custom router for page navigation. Russian language UI. API docs: https://kinoapi.com/
+KinoPub client for Samsung Tizen TVs (2.3 / 3.0). SPA without frameworks — jQuery for DOM/AJAX, doT.js (`dot` npm package) for templating, custom router for page navigation. Russian language UI. API docs: https://kinoapi.com/
 
 ## Build Commands
 
@@ -63,19 +63,27 @@ When in doubt, check https://caniuse.com against Chrome 28.
 ## Architecture
 
 ### Router (`ts/router.ts`)
+- `Router` class with typed navigation methods: `navigateWatching()`, `navigateItem(item)`, `navigateMovie(id)`, `navigateSerial(id)`, etc.
 - `registerPage(name, page)` — registers a page by name
 - `navigate(route, params?)` — unmounts current, pushes to history, mounts new
 - `goBack()` — pops history, remounts previous page
 - `setParams(params)` — updates current route params (for focus restoration on back)
+- `onAfterNavigate(cb)` — registers callback fired after every navigation
 - Each page is a `<div id="page-{name}" class="page hidden">` in `index.html`
+- Current routes (12): `login`, `watching`, `bookmarks`, `movie`, `serial`, `player`, `settings`, `novelties`, `search`, `tv`, `tv-player`, `history`
 
 ### Page Interface (`types/app.ts`)
 Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind keys. On unmount: unbind keys, clear DOM, reset state.
 
+### Sidebar (`ts/sidebar.ts`, `pages/sidebar-page.ts`)
+- `SidebarPage` — abstract base class for pages with a side menu (novelties, watching, history, bookmarks, tv)
+- `sidebar.ts` — renders the sidebar menu (items: Novelties, Watching, History, Bookmarks, TV, Search, Settings, Exit)
+- `sidebar.wrapKeys(handler)` — wraps a page key handler to intercept Left arrow for sidebar focus
+
 ### Adding a New Page
 1. Add route name to `RouteName` union in `types/app.ts`
 2. Add any new params to `RouteParams` interface
-3. Create `pages/{name}.ts` implementing `Page`
+3. Create `pages/{name}.ts` implementing `Page` (or extending `SidebarPage` if it needs the sidebar)
 4. Add `<div id="page-{name}" class="page hidden">` to `index.html`
 5. Import and `registerPage()` in `main.ts`
 
@@ -86,19 +94,47 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 - `CARDS_PER_ROW = 4` from `settings.ts`
 
 ### API Layer
-- `apiGetWithRefresh(path, params?)` / `apiPostWithRefresh(path, data)` in `api/client.ts`
+- `ApiClient` class in `api/client.ts` with `apiGetWithRefresh(path, params?)` / `apiPostWithRefresh(path, data)`
 - Auto-refreshes OAuth token on 401
 - All API requests use relative URLs — they always go through the .NET proxy (`src/back/YobaPub.Proxy/`)
 - Media content URLs (posters, video) are optionally rewritten via `proxyUrl(url)` from `utils/storage.ts`, gated by `isProxyAll()`
+- API modules: `auth.ts` (OAuth), `watching.ts`, `items.ts`, `bookmarks.ts`, `device.ts`, `history.ts`, `tv.ts`
+
+### Player (`pages/player.ts`, `pages/player/`)
+The player page is split into submodules:
+- `player.ts` — main page: HLS/HTTP playback via `<video>` + hls.js, seek, episode switching
+- `player/hls.ts` — HLS URL rewriting for proxy
+- `player/info.ts` — OSD info overlay (track names, quality, buffer state)
+- `player/media.ts` — media source resolution (files, audio tracks, subtitles)
+- `player/panel.ts` — settings panel (audio/subs/quality selection)
+- `player/preferences.ts` — per-title playback preferences (quality, audio, subs)
+- `player/progress.ts` — progress bar rendering and seek preview
+- `player/subtitles.ts` — subtitle rendering and styling
+- `player/template.ts` — doT template for the player UI
 
 ### Templates
-- `doT.template(string)` returns a compiled render function
+- `doT.template(string)` returns a compiled render function (`dot` npm package, bundled by webpack)
 - Templates are string concatenations in TypeScript, not separate files
-- Reusable templates in `utils/templates.ts`: `tplCard`, `tplRating`, `tplEmptyText`
+- Reusable templates in `utils/templates.ts`: `tplCard`, `tplRating`, `tplEmptyText`, `renderRatings`, `renderPersonnel`
 
-### External Libs (loaded as vendor scripts, not bundled)
-- `vendor/jquery.min.js` (jQuery 2.x)
-- `vendor/hls.min.js` (hls.js 0.14.x) — accessed via `window.Hls`
+### External Libs (loaded as vendor scripts via webpack `externals` + `CopyWebpackPlugin`)
+- `vendor/jquery.min.js` (jQuery 2.x) — imported as `from 'jquery'`, resolved to global `jQuery`
+- `vendor/hls.min.js` (hls.js 0.14.x) — imported as `from 'hls.js'`, resolved to global `Hls`
+
+### Utilities (`ts/utils/`)
+- `page.ts` — `PageKeys` (binds/unbinds keydown), `PageUtils` (show/hide pages, scroll helpers)
+- `platform.ts` — `TvKey` enum (key codes), `platform` singleton (Tizen API registration)
+- `grid.ts` — `gridMove(index, total, direction)` for card grid navigation
+- `storage.ts` — localStorage wrapper: tokens, settings, per-title preferences, proxy config
+- `templates.ts` — shared doT templates (`tplCard`, `tplRating`, `tplEmptyText`, `renderRatings`, `renderPersonnel`)
+- `format.ts` — `formatDuration`, `formatTimecode`, `formatTimeShort`, `formatAppVersion`
+- `detail-controls.ts` — `DetailControls` class for movie/serial detail page button navigation
+- `exit-dialog.ts` — exit confirmation dialog
+- `hls-proxy.ts` — `buildBaseHlsConfig()`, `logPlaybackStart()`
+- `hls-error.ts` — `showHlsError()` for HLS playback error display
+- `log.ts` — `Logger` class for structured logging
+- `number-set.ts` — lightweight numeric set utility
+- `playback-errors.ts` — playback error tracking and reporting
 
 ## Code Style
 
@@ -120,18 +156,18 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 
 ## Decision Log
 
-Веди `doc/decision-log.md` при любых нетривиальных технических решениях: откаты, изменение направления расследования, эксперименты, подтверждённые/опровергнутые гипотезы. Новая запись сверху, формат в начале файла. Фиксируй: время, решение, причину, связанные данные (логи, коммиты, диффы), результат (или "ждём проверки"). Это обязательно — журнал нужен чтобы не ходить по кругу в длинных расследованиях и помнить какие пути уже пройдены.
+Maintain `doc/decision-log.md` for any non-trivial technical decisions: rollbacks, investigation direction changes, experiments, confirmed/disproved hypotheses. Newest entry on top; format is defined at the top of the file. Record: timestamp, decision, reason, related data (logs, commits, diffs), outcome (or "awaiting verification"). This is mandatory — the log prevents going in circles during long investigations and remembers which paths have already been explored.
 
-## Отладка сложных багов
+## Debugging Hard Bugs
 
-Когда баг плохо воспроизводится, поведение неочевидно, или несколько гипотез подряд не попадают — **не гадай, собирай данные**. По умолчанию всегда предпочитай:
+When a bug is hard to reproduce, behavior is unclear, or several hypotheses miss in a row — **do not guess, collect data**. Default to:
 
-- **Добавить больше логов** — в ключевых точках, с контекстом (значения переменных, флаги, readyState, buffered и т.п.), чтобы восстановить происходящее по одному дампу без запуска.
-- **Диагностический патч** — временный код, который вскрывает внутреннее поведение (например, обернуть `videoEl.currentTime` через `Object.defineProperty` и логировать каждое присваивание со стектрейсом, чтобы узнать кто реально seek'ает). Помечай такие патчи в коде как diagnostic и удаляй после выяснения причины.
-- **Утыкать логами исходники библиотек** в `node_modules` — если поведение чёрного ящика непонятно снаружи, добавь `console.log`/`logger` прямо в hls.js/jQuery/др. Это допустимо и часто быстрее, чем читать код глазами.
-- **Проверить поведение в обычном браузере** с DevTools — если баг не специфичен для Tizen/ТВ, воспроизведи на десктопе, где есть нормальный дебаггер, сетевой инспектор, профайлер и возможность ставить breakpoint'ы.
+- **Add more logging** — at key points, with context (variable values, flags, readyState, buffered ranges, etc.) so the situation can be reconstructed from a single dump without re-running.
+- **Diagnostic patch** — temporary code that exposes internal behavior (e.g. wrap `videoEl.currentTime` via `Object.defineProperty` and log every assignment with a stack trace to find who actually seeks). Mark such patches as diagnostic in the code and remove after investigation.
+- **Instrument library sources** in `node_modules` — if a black box's behavior is unclear from outside, add `console.log`/`logger` directly into hls.js/jQuery/etc. This is acceptable and often faster than reading code by eye.
+- **Test in a regular browser** with DevTools — if the bug is not Tizen/TV-specific, reproduce on desktop where you have a proper debugger, network inspector, profiler, and breakpoints.
 
-Правило: **никогда не гадай два раза подряд**. Если гипотеза не сошлась с данными — не предлагай следующую из того же места, сначала собери больше данных. Гадание по косвенным признакам без фактов сжигает доверие и уводит по ложным веткам (см. `doc/decision-log.md` — историю с healing seek, где три итерации гипотез строились друг на друге без проверки первичной причины).
+Rule: **never guess twice in a row**. If a hypothesis does not match the data, do not propose the next one from the same place — collect more data first. Guessing from indirect evidence without facts burns trust and leads down false paths (see `doc/decision-log.md` — the healing seek story where three iterations of hypotheses built on each other without verifying the root cause).
 
 ## Backend Proxy
 
