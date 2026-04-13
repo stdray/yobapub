@@ -104,6 +104,7 @@ module.exports = function (_env, argv) {
         patterns: [
           { from: 'node_modules/jquery/dist/jquery.min.js', to: 'vendor/jquery.min.js' },
           { from: 'node_modules/hls.js/dist/hls.js', to: 'vendor/hls.min.js' },
+          { from: 'tizen-bootstrap.js', to: 'tizen-bootstrap.js' },
           { from: 'favicon-32.png', to: 'favicon-32.png' },
           { from: 'icon-192.png', to: 'icon-192.png' },
           { from: 'icon-512.png', to: 'icon-512.png' }

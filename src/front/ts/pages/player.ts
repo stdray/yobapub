@@ -954,16 +954,6 @@ class PlayerController {
 
   private readonly handleKey = (e: JQuery.Event): void => {
     const kc = this.getKeyCode(e);
-    // diagnostic: log every keydown to find actual remote codes on Tizen 2.3
-    const orig = (e as { originalEvent?: KeyboardEvent }).originalEvent;
-    plog.info('keydown kc={kc} key={key} code={code} which={which} panelOpen={po} hasVideo={hv}', {
-      kc,
-      key: orig && orig.key ? orig.key : '',
-      code: orig && orig.code ? orig.code : '',
-      which: orig && orig.which ? orig.which : 0,
-      po: this.panel.open,
-      hv: !!this.videoEl,
-    });
     if (!this.videoEl) {
       if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
         this.destroyPlayer(); router.goBack(); e.preventDefault();

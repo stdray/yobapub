@@ -31,10 +31,6 @@ export enum TvKey {
   Key9 = 57
 }
 
-import { Logger } from './log';
-
-const pfLog = new Logger('platform');
-
 declare var tizen: any;
 declare var webapis: any;
 
@@ -45,49 +41,12 @@ export interface DeviceInfo {
 }
 
 class Platform {
+  // Media/color/digit keys are registered in the widget's local index.html
+  // (src/tizen-widget/src/index.html) before document.location.replace to the
+  // external origin — at that point `tizen.tvinputdevice` is available. After
+  // navigation the tizen object is gone on the external document, but the
+  // registration persists as an app-level input-device setting.
   registerTizenKeys = (): void => {
-    // diagnostic: probe which runtime APIs are actually available so we know
-    // why tizen.tvinputdevice is missing on this device (missing privilege, legacy SDK, etc.)
-    try {
-      const w = window as unknown as { Common?: unknown };
-      const hasTizen = typeof tizen !== 'undefined';
-      const tizenKeys = hasTizen ? (() => {
-        try { return Object.keys(tizen).join(','); } catch (_e) { return 'err'; }
-      })() : '';
-      const hasWebapis = typeof webapis !== 'undefined';
-      const webapisKeys = hasWebapis ? (() => {
-        try { return Object.keys(webapis).join(','); } catch (_e) { return 'err'; }
-      })() : '';
-      const hasCommon = typeof w.Common !== 'undefined';
-      const hasTvKeyPlugin = !!document.getElementById('pluginObjectTVKey');
-      pfLog.info(
-        'runtime probe hasTizen={ht} tizenKeys={tk} hasWebapis={hw} webapisKeys={wk} hasCommon={hc} hasTvKeyPlugin={htp} ua={ua}',
-        {
-          ht: hasTizen, tk: tizenKeys, hw: hasWebapis, wk: webapisKeys,
-          hc: hasCommon, htp: hasTvKeyPlugin,
-          ua: (navigator.userAgent || '').substring(0, 200),
-        }
-      );
-    } catch (e) {
-      pfLog.warn('runtime probe failed {msg}', { msg: (e && (e as Error).message) || 'err' });
-    }
-
-    // diagnostic: global window-level keydown listener so we see EVERY key on ANY
-    // page, not just player — confirms whether media keys reach the WebKit keydown
-    // pipeline at all. Tag with gkd so it's distinguishable from per-page handlers.
-    try {
-      window.addEventListener('keydown', (ev: KeyboardEvent): void => {
-        pfLog.info('gkd kc={kc} key={key} code={code} which={which}', {
-          kc: ev.keyCode || 0,
-          key: ev.key || '',
-          code: ev.code || '',
-          which: ev.which || 0,
-        });
-      }, true);
-    } catch (e) {
-      pfLog.warn('gkd listener failed {msg}', { msg: (e && (e as Error).message) || 'err' });
-    }
-
     try {
       if (typeof tizen !== 'undefined' && tizen.tvinputdevice) {
         const keysToRegister = [
@@ -97,38 +56,16 @@ class Platform {
           'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue',
           '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
         ];
-        const registered: string[] = [];
-        const failed: string[] = [];
         for (let i = 0; i < keysToRegister.length; i++) {
           try {
             tizen.tvinputdevice.registerKey(keysToRegister[i]);
-            registered.push(keysToRegister[i]);
           } catch (e) {
-            failed.push(keysToRegister[i] + ':' + ((e && (e as Error).message) || 'err'));
+            // key may not be supported on this device
           }
         }
-        pfLog.info('registerTizenKeys ok={ok} failed={failed}', {
-          ok: registered.join(','),
-          failed: failed.join(','),
-        });
-        // diagnostic: dump supported keys list so we can see real keyCodes for this device
-        try {
-          if (tizen.tvinputdevice.getSupportedKeys) {
-            const supported = tizen.tvinputdevice.getSupportedKeys();
-            const dump: string[] = [];
-            for (let j = 0; j < supported.length; j++) {
-              dump.push(supported[j].name + '=' + supported[j].code);
-            }
-            pfLog.info('supportedKeys {keys}', { keys: dump.join(' ') });
-          }
-        } catch (e) {
-          pfLog.warn('getSupportedKeys failed {msg}', { msg: (e && (e as Error).message) || 'err' });
-        }
-      } else {
-        pfLog.info('tizen.tvinputdevice not available');
       }
     } catch (e) {
-      pfLog.info('not running on Tizen');
+      // not running on Tizen
     }
   };
 

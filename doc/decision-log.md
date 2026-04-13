@@ -13,6 +13,22 @@
 
 ---
 
+## 2026-04-14 00:00 — media-кнопки пульта (Rw/Play/Pause/Ff) не доходили до JS
+
+**Решение:** регистрировать media/color/digit клавиши через `tizen.tvinputdevice.registerKey()` в локальном `src/tizen-widget/src/index.html` **до** `document.location.replace('http://yobapub.3po.su')`. Раньше регистрация была только во фронтенде (`ts/utils/platform.ts`), но там уже нет доступа к `tizen` объекту.
+
+**Причина:** виджет Tizen 2.3 — это тонкая обёртка: `index.html` делает redirect на внешний URL. После `location.replace` на другой origin привилегии пакета к документу не применяются и `tizen` объект отсутствует полностью (подтверждено логом `runtime probe hasTizen=false`). Соответственно `registerKey()` во фронтенде — no-op. Без регистрации Samsung не доставляет media-кнопки в WebKit вообще: в глобальном `keydown` listener'е (`gkd`) видны только стрелки/Enter (37–40, 13), ни одного `MediaPlay/MediaPause/MediaRewind/MediaFastForward` нет.
+
+Гипотеза: `registerKey()` — это app-level настройка input-device, эффект переживает навигацию документа. Поэтому вызвать её один раз в локальном html виджета должно быть достаточно, фронтенд сам их обработает через уже существующий `handleKey` в `pages/player.ts`.
+
+**Данные:** логи 2026-04-13T18:01:18Z `runtime probe hasTizen=false ... ua=Tizen 2.3`, отсутствие media-кодов в `platform gkd` при нажатии кнопок, `src/tizen-widget/src/index.html` (было `<script>document.location.replace(...)</script>` без регистрации), `src/front/ts/utils/platform.ts:48` (ветка `tizen.tvinputdevice not available`), `src/front/ts/pages/player.ts:988-999` (обработчики Play/Pause/Ff/Rw — уже есть).
+
+**Уточнение 0.0.13:** логика вынесена из виджета. `src/tizen-widget/src/index.html` теперь просто `<script src="http://yobapub.3po.su/tizen-bootstrap.js">`, сам скрипт лежит во фронтенд-репо (`src/front/tizen-bootstrap.js`) и копируется webpack'ом (`CopyWebpackPlugin`) в dist как есть. Скрипт выполняется в контексте локального документа виджета (пока `location.replace` ещё не сделан), где `tizen` доступен, регистрирует ключи и уже сам редиректит. Плюс: список клавиш и URL живут в версионируемом фронтенд-коде, виджет пересобирать для изменения этого списка не нужно.
+
+**Результат:** подтверждено на Tizen 2.3 (UJ5500, wgt 0.0.12). После установки в `platform gkd` появились коды 412 (Rw), 415 (Play), 417 (Ff), 19 (Pause), `player.handleKey` отрабатывает `startSeek`/`key Play`/`key Pause`. Диагностические логи (`runtime probe`, `gkd`, per-key keydown в player) убраны, код `registerTizenKeys` во фронтенде сжат обратно до минимального try/catch (он теперь no-op на внешнем домене, но оставлен на случай локальной подачи). Гипотеза про «`registerKey()` — app-level setting, переживает навигацию» — подтверждена.
+
+---
+
 ## 2026-04-13 23:10 — info-панель зависала после закрытия settings-панели
 
 **Решение:** добавил `onAfterClose` в `PanelCallbacks` (`pages/player/panel.ts`), вызываю его в `forceClosePanel` и по окончании анимации `closePanel`. В `player.ts` колбэк зовёт `showBar()`.
