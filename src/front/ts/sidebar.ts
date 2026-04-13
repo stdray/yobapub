@@ -45,7 +45,7 @@ const MENU_TO_ROUTE: ReadonlyArray<RouteName> = [
 ];
 
 const SIDEBAR_ROUTES: ReadonlyArray<RouteName> = [
-  'watching', 'novelties', 'history', 'bookmarks', 'tv', 'search', 'settings'
+  'watching', 'novelties', 'history', 'bookmarks', 'tv', 'settings'
 ];
 
 const DOUBLE_BACK_MS = 3000;

@@ -1029,18 +1029,40 @@ video::cue {
 }
 
 /* --- Search --- */
-.search { padding: 40px; display: flex; flex-direction: column; height: 100%; }
+.search {
+  padding: 30px;
+  display: flex;
+  height: 100%;
+  gap: 30px;
+}
+
+.search__left {
+  width: 480px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
+
+.search__preview {
+  flex: 1;
+  overflow: hidden;
+}
+
+.search__input-area {
+  flex-shrink: 0;
+}
 
 .search-input {
-  font-size: 36px;
-  padding: 16px 24px;
+  font-size: 32px;
+  padding: 12px 20px;
   background: rgba(255,255,255,0.1);
   border-radius: 8px;
-  margin-bottom: 30px;
-  min-height: 70px;
+  margin-bottom: 16px;
+  min-height: 56px;
   display: flex;
   align-items: center;
-  flex-shrink: 0;
 }
 
 .search-input__text { flex: 1; }
@@ -1051,16 +1073,68 @@ video::cue {
 
 @keyframes blink { 50% { opacity: 0; } }
 
-.search__body { display: flex; gap: 40px; flex: 1; overflow: hidden; }
-
 .search__keyboard {
-  flex: 0 0 auto;
   background: rgba(255,255,255,0.05);
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px;
 }
 
 .search__results { flex: 1; overflow-y: auto; }
+
+/* Search preview */
+.search-preview {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+}
+
+.search-preview__poster {
+  width: 160px;
+  flex-shrink: 0;
+}
+
+.search-preview__poster img {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.search-preview__info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.search-preview__title {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.search-preview__title-en {
+  font-size: 20px;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.search-preview__meta {
+  font-size: 20px;
+  color: #aaa;
+  margin-bottom: 4px;
+}
+
+.search-preview__ratings {
+  margin-bottom: 8px;
+}
+
+.search-preview__plot {
+  font-size: 18px;
+  color: #ccc;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+}
 
 /* Keyboard */
 .kb__row { display: flex; gap: 0; margin-bottom: 0; justify-content: center; }

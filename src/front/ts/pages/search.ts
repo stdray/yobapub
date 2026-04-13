@@ -1,16 +1,15 @@
 import $ from 'jquery';
 import * as doT from 'dot';
-import { RouteParams } from '../types/app';
+import { Page, RouteParams } from '../types/app';
 import { Item, ItemsResponse, Pagination } from '../types/api';
 import { searchItems } from '../api/items';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { storage } from '../utils/storage';
-import { PageUtils } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
-import { sidebar } from '../sidebar';
-import { SidebarPage } from './sidebar-page';
+import { renderRatings } from '../utils/templates';
 
 interface KbKeyData {
   char: string;
@@ -69,18 +68,49 @@ const tplKeyboard = (data: { readonly rows: Array<{ readonly label: string; read
 
 const tplLayoutCompiled = doT.template(`
   <div class="search">
-    <div class="search-input"><span class="search-input__text"></span><span class="search-input__cursor">|</span></div>
-    <div class="search__body">
-      <div class="search__keyboard"></div>
-      <div class="search__results"></div>
+    <div class="search__left">
+      <div class="search__preview"></div>
+      <div class="search__input-area">
+        <div class="search-input"><span class="search-input__text"></span><span class="search-input__cursor">|</span></div>
+        <div class="search__keyboard"></div>
+      </div>
     </div>
+    <div class="search__results"></div>
   </div>
 `);
 
 const tplLayout = (data: Record<string, never>): string =>
   tplLayoutCompiled(data);
 
-class SearchPage extends SidebarPage {
+const tplPreviewCompiled = doT.template(`
+  <div class="search-preview">
+    <div class="search-preview__poster"><img src="{{=it.poster}}" alt=""></div>
+    <div class="search-preview__info">
+      <div class="search-preview__title">{{=it.title}}</div>
+      {{?it.titleEn}}<div class="search-preview__title-en">{{=it.titleEn}}</div>{{?}}
+      <div class="search-preview__meta">{{=it.year}}{{?it.countries}} &bull; {{=it.countries}}{{?}}</div>
+      {{?it.genres}}<div class="search-preview__meta">{{=it.genres}}</div>{{?}}
+      {{?it.ratings}}<div class="search-preview__ratings">{{=it.ratings}}</div>{{?}}
+      {{?it.plot}}<div class="search-preview__plot">{{=it.plot}}</div>{{?}}
+    </div>
+  </div>
+`);
+
+const tplPreview = (data: {
+  readonly poster: string;
+  readonly title: string;
+  readonly titleEn: string;
+  readonly year: number;
+  readonly countries: string;
+  readonly genres: string;
+  readonly ratings: string;
+  readonly plot: string;
+}): string =>
+  tplPreviewCompiled(data);
+
+class SearchPage implements Page {
+  private readonly $root = $('#page-search');
+  private readonly keys = new PageKeys();
   private query = '';
   private results: Item[] = [];
   private focusedIndex = 0;
@@ -95,14 +125,8 @@ class SearchPage extends SidebarPage {
   private currentLayout: 'ru' | 'en' = 'ru';
   private pagination: Pagination | null = null;
 
-  constructor() { super('search'); }
-
-  protected onUnfocus(): void {
-    if (this.focusArea === 'keyboard') { this.updateKeyboardFocus(); }
-    else { this.updateResultsFocus(); }
-  }
-
-  protected onMount(params: RouteParams): void {
+  mount(params: RouteParams): void {
+    this.keys.bind((e) => this.handleKey(e));
     if (params._searchState) {
       const s = params._searchState as SearchState;
       this.query = s.query;
@@ -134,8 +158,10 @@ class SearchPage extends SidebarPage {
     }
   }
 
-  protected onUnmount(): void {
+  unmount(): void {
     if (this.searchTimer !== null) { clearTimeout(this.searchTimer); this.searchTimer = null; }
+    this.keys.unbind();
+    PageUtils.clearPage(this.$root);
     this.results = [];
     this.pagination = null;
   }
@@ -156,7 +182,7 @@ class SearchPage extends SidebarPage {
     });
   }
 
-  protected handleKey(e: JQuery.Event): void {
+  private handleKey(e: JQuery.Event): void {
     if (this.focusArea === 'keyboard') {
       this.handleKeyboardKey(e);
     } else {
@@ -174,7 +200,7 @@ class SearchPage extends SidebarPage {
         const char = rowChars[ci];
         rowKeys.push({
           char: char,
-          label: char === '⌫' ? 'Del' : char === '⎵' ? '⎵' : char,
+          label: char === '⌫' ? 'Del' : char === '⎵' ? '' : char,
           wide: char === '⎵'
         });
       }
@@ -228,6 +254,26 @@ class SearchPage extends SidebarPage {
     }
   }
 
+  private renderPreview(): void {
+    const $el = this.$root.find('.search__preview');
+    const item = this.results[this.focusedIndex];
+    if (!item) {
+      $el.empty();
+      return;
+    }
+    const titles = item.title.split(' / ');
+    $el.html(tplPreview({
+      poster: storage.proxyPosterUrl(item.posters.big),
+      title: titles[0],
+      titleEn: titles.length > 1 ? titles[1] : '',
+      year: item.year,
+      countries: item.countries.map((c) => c.title).join(', '),
+      genres: item.genres.map((g) => g.title).join(', '),
+      ratings: renderRatings(item),
+      plot: item.plot || ''
+    }));
+  }
+
   private get hasMorePages(): boolean {
     if (!this.pagination) return false;
     return this.pagination.current < Math.ceil(this.pagination.total / this.pagination.perpage);
@@ -236,6 +282,13 @@ class SearchPage extends SidebarPage {
   private switchToResults(): void {
     this.focusArea = 'results';
     this.focusedIndex = 0;
+    this.updateKeyboardFocus();
+    this.updateResultsFocus();
+    this.renderPreview();
+  }
+
+  private switchToKeyboard(): void {
+    this.focusArea = 'keyboard';
     this.updateKeyboardFocus();
     this.updateResultsFocus();
   }
@@ -255,6 +308,7 @@ class SearchPage extends SidebarPage {
     this.renderInput();
     this.renderKeyboard();
     this.renderResults();
+    this.renderPreview();
   }
 
   private scheduleSearch(): void {
@@ -264,6 +318,7 @@ class SearchPage extends SidebarPage {
       this.noResults = false;
       this.pagination = null;
       this.renderResults();
+      this.renderPreview();
       return;
     }
     this.searchTimer = setTimeout(() => {
@@ -284,6 +339,7 @@ class SearchPage extends SidebarPage {
         this.noResults = this.results.length === 0;
         this.focusedIndex = 0;
         this.renderResults();
+        this.renderPreview();
       },
       () => {
         if (seq !== this.searchSeq) return;
@@ -292,6 +348,7 @@ class SearchPage extends SidebarPage {
         this.pagination = null;
         this.noResults = true;
         this.renderResults();
+        this.renderPreview();
       }
     );
   }
@@ -368,7 +425,11 @@ class SearchPage extends SidebarPage {
       case TvKey.Enter:
         this.pressKey(row[this.kbCol]);
         e.preventDefault(); break;
-      default: sidebar.backOrFocus(e);
+      case TvKey.Return:
+      case TvKey.Backspace:
+      case TvKey.Escape:
+        router.goBack();
+        e.preventDefault(); break;
     }
   }
 
@@ -379,12 +440,13 @@ class SearchPage extends SidebarPage {
     switch (e.keyCode) {
       case TvKey.Right: {
         const nr = gridMove(this.focusedIndex, total, 'right');
-        if (nr >= 0) { this.focusedIndex = nr; this.updateResultsFocus(); }
+        if (nr >= 0) { this.focusedIndex = nr; this.updateResultsFocus(); this.renderPreview(); }
         e.preventDefault(); break;
       }
       case TvKey.Left: {
-        const nl = sidebar.gridLeftOrFocus(this.focusedIndex, total);
-        if (nl >= 0) { this.focusedIndex = nl; this.updateResultsFocus(); }
+        const nl = gridMove(this.focusedIndex, total, 'left');
+        if (nl >= 0) { this.focusedIndex = nl; this.updateResultsFocus(); this.renderPreview(); }
+        else { this.switchToKeyboard(); }
         e.preventDefault(); break;
       }
       case TvKey.Down: {
@@ -392,6 +454,7 @@ class SearchPage extends SidebarPage {
         if (nd >= 0) {
           this.focusedIndex = nd;
           this.updateResultsFocus();
+          this.renderPreview();
         } else if (this.hasMorePages) {
           this.loadNextPage();
         }
@@ -399,12 +462,8 @@ class SearchPage extends SidebarPage {
       }
       case TvKey.Up: {
         const nu = gridMove(this.focusedIndex, total, 'up');
-        if (nu >= 0) { this.focusedIndex = nu; this.updateResultsFocus(); }
-        else {
-          this.focusArea = 'keyboard';
-          this.updateKeyboardFocus();
-          this.updateResultsFocus();
-        }
+        if (nu >= 0) { this.focusedIndex = nu; this.updateResultsFocus(); this.renderPreview(); }
+        else { this.switchToKeyboard(); }
         e.preventDefault(); break;
       }
       case TvKey.Enter: {
@@ -418,8 +477,8 @@ class SearchPage extends SidebarPage {
       case TvKey.Return:
       case TvKey.Backspace:
       case TvKey.Escape:
-        sidebar.backOrFocus(e);
-        break;
+        router.goBack();
+        e.preventDefault(); break;
     }
   }
 }
