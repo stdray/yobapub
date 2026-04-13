@@ -751,26 +751,51 @@ class PlayerController {
     const epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
     this.$root.html(tplPlayer({ title: itemTitle, episode: epTitle }));
     this.videoEl = this.$root.find('video')[0] as HTMLVideoElement;
-    // DIAGNOSTIC: wrap currentTime setter to log every assignment with stack trace.
-    // Tracking who really seeks at startup on Tizen 2.3 (multiple seeking events observed
-    // despite no explicit seek in our code). Remove after the source is identified.
-    const mediaProto = HTMLMediaElement.prototype;
-    const ctDesc = Object.getOwnPropertyDescriptor(mediaProto, 'currentTime');
-    if (ctDesc && typeof ctDesc.set === 'function' && typeof ctDesc.get === 'function') {
-      const origSet = ctDesc.set;
-      const origGet = ctDesc.get;
-      Object.defineProperty(this.videoEl, 'currentTime', {
-        configurable: true,
-        get(this: HTMLMediaElement): number { return (origGet as () => number).call(this); },
-        set(this: HTMLMediaElement, value: number): void {
-          const prev = (origGet as () => number).call(this);
-          const stack = ((new Error().stack || '').split('\n').slice(1, 7).join(' | ')).substring(0, 400);
-          plog.info('ctSet value={value} prev={prev} seeking={seeking} rs={rs} stack={stack}', {
-            value, prev, seeking: this.seeking, rs: this.readyState, stack,
-          });
-          (origSet as (v: number) => void).call(this, value);
-        },
+    // DIAGNOSTIC: wrap currentTime setter on HTMLMediaElement.prototype to log every
+    // assignment with stack trace. Tracking who really seeks at startup on Tizen 2.3.
+    // Prototype-level patching because Object.defineProperty on DOM instances is unreliable
+    // on old WebKit/Chromium 28 — native accessors on the prototype take precedence.
+    // Remove after the source is identified.
+    interface CtDiagWindow extends Window { __ctWrapDone?: boolean; }
+    const diagWin = window as CtDiagWindow;
+    if (!diagWin.__ctWrapDone) {
+      const proto = HTMLMediaElement.prototype;
+      let ctDesc = Object.getOwnPropertyDescriptor(proto, 'currentTime');
+      let descSource = 'proto';
+      if (!ctDesc) {
+        ctDesc = Object.getOwnPropertyDescriptor(this.videoEl, 'currentTime');
+        descSource = 'instance';
+      }
+      plog.info('ctWrap probe source={src} hasDesc={hasDesc} hasGet={hasGet} hasSet={hasSet}', {
+        src: descSource,
+        hasDesc: !!ctDesc,
+        hasGet: !!(ctDesc && typeof ctDesc.get === 'function'),
+        hasSet: !!(ctDesc && typeof ctDesc.set === 'function'),
       });
+      if (ctDesc && typeof ctDesc.set === 'function' && typeof ctDesc.get === 'function') {
+        const origSet = ctDesc.set;
+        const origGet = ctDesc.get;
+        try {
+          Object.defineProperty(proto, 'currentTime', {
+            configurable: true,
+            get(this: HTMLMediaElement): number { return (origGet as () => number).call(this); },
+            set(this: HTMLMediaElement, value: number): void {
+              const prev = (origGet as () => number).call(this);
+              const stack = ((new Error().stack || '').split('\n').slice(1, 8).join(' | ')).substring(0, 500);
+              try {
+                plog.info('ctSet value={value} prev={prev} seeking={seeking} rs={rs} stack={stack}', {
+                  value, prev, seeking: this.seeking, rs: this.readyState, stack,
+                });
+              } catch (_e) { /* never break playback on log failure */ }
+              (origSet as (v: number) => void).call(this, value);
+            },
+          });
+          diagWin.__ctWrapDone = true;
+          plog.info('ctWrap installed on prototype');
+        } catch (e) {
+          plog.warn('ctWrap defineProperty failed error={error}', { error: String(e) });
+        }
+      }
     }
     this.progress.barValueEl = null;
     this.progress.barPctEl = null;
