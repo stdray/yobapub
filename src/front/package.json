@@ -4,6 +4,10 @@
   "description": "Клиент KinoPub для телевизоров Samsung (Tizen 2.3 / 3.0).",
   "main": "dist/app.js",
   "scripts": {
+    "patch-hls": "node scripts/patch-hls.js",
+    "predev": "npm run patch-hls",
+    "prebuild:dev": "npm run patch-hls",
+    "prebuild:release": "npm run patch-hls",
     "dev": "webpack serve --mode development",
     "build:dev": "webpack --mode development",
     "build:release": "webpack --mode production",
