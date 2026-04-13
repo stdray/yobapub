@@ -1,5 +1,8 @@
 import { apiClient } from '../../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle, MediaLinksResponse } from '../../types/api';
+import { Logger } from '../../utils/log';
+
+const subsDiagLog = new Logger('subs-diag');
 
 export interface MediaInfo {
   mid: number;
@@ -49,6 +52,10 @@ export const loadMediaLinks = (mid: number, cb: (files: VideoFile[], subs: Subti
     (res: MediaLinksResponse) => {
       const files: VideoFile[] = (res && res.files) || [];
       const subs: Subtitle[] = (res && res.subtitles) || [];
+      subsDiagLog.info('raw api count={count} json={json}', {
+        count: subs.length,
+        json: JSON.stringify(subs),
+      });
       cb(files, subs);
     },
     () => { cb([], []); }
