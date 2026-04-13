@@ -538,6 +538,18 @@ class PlayerController {
         });
       }
     });
+    hls.on(Hls.Events.FRAG_BUFFERED, (_e: string, data: { frag?: { sn: number; start: number; type?: string } }) => {
+      const frag = data.frag;
+      if (frag) {
+        const v = this.videoEl;
+        plog.info('hls FRAG_BUFFERED sn={sn} start={start} type={type} started={started} ct={ct} br={br}', {
+          sn: frag.sn, start: frag.start, type: frag.type || null,
+          started: this.playbackStarted,
+          ct: v ? v.currentTime : -1,
+          br: this.formatBuffered(v),
+        });
+      }
+    });
     hls.on(Hls.Events.LEVEL_SWITCHING, (_e: string, data: { level?: number; width?: number; height?: number; bitrate?: number; videoCodec?: string; audioCodec?: string }) => {
       plog.info('hls LEVEL_SWITCHING level={level} {w}x{h} bitrate={br} videoCodec={vc} audioCodec={ac}', {
         level: data.level, w: data.width, h: data.height,
@@ -573,27 +585,37 @@ class PlayerController {
           fragSn: data.frag ? data.frag.sn : null,
           fragStart: data.frag ? data.frag.start : null,
         });
+        const v = this.videoEl;
+        const diag = {
+          started: this.playbackStarted,
+          ct: v ? v.currentTime : -1,
+          rs: v ? v.readyState : -1,
+          paused: v ? v.paused : null,
+          br: this.formatBuffered(v),
+        };
         if (data.details === 'bufferFullError') {
           this.hadBufferFullError = true;
-          plog.warn('hls bufferFullError, flagged for immediate recovery on next append error');
+          plog.warn('hls bufferFullError flagged started={started} ct={ct} rs={rs} br={br}', diag);
         }
         if (data.details === 'bufferAppendingError') {
           this.appendErrorCount++;
+          plog.warn('hls bufferAppendingError count={count} hadFull={hadFull} started={started} ct={ct} rs={rs} br={br}', {
+            count: this.appendErrorCount, hadFull: this.hadBufferFullError, ...diag,
+          });
           if (this.appendErrorCount >= 2 || this.hadBufferFullError) {
-            plog.warn('hls recoverMediaError after bufferAppendingError (count={count}, hadBufferFull={hadBufferFull})', {
-              count: this.appendErrorCount, hadBufferFull: this.hadBufferFullError,
-            });
+            plog.warn('hls RECOVER via bufferAppendingError started={started} ct={ct} rs={rs} br={br}', diag);
             hls.recoverMediaError();
             if (this.videoEl) this.videoEl.play();
             this.appendErrorCount = 0;
             this.hadBufferFullError = false;
-          } else {
-            plog.warn('hls bufferAppendingError (count={count}, waiting for hls.js retry)', { count: this.appendErrorCount });
           }
         }
         if (data.details === 'bufferStalledError') {
+          plog.warn('hls bufferStalledError hadFull={hadFull} started={started} ct={ct} rs={rs} br={br}', {
+            hadFull: this.hadBufferFullError, ...diag,
+          });
           if (!this.nudgePastBufferGap() && this.hadBufferFullError) {
-            plog.warn('hls recoverMediaError after bufferStalledError (hadBufferFull=true, nudge failed)');
+            plog.warn('hls RECOVER via bufferStalledError started={started} ct={ct} rs={rs} br={br}', diag);
             hls.recoverMediaError();
             if (this.videoEl) this.videoEl.play();
             this.hadBufferFullError = false;
@@ -611,7 +633,13 @@ class PlayerController {
         error: data.error ? String(data.error).substring(0, 200) : null,
       });
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-        plog.warn('hls recoverMediaError');
+        const vf = this.videoEl;
+        plog.warn('hls RECOVER fatal MEDIA_ERROR started={started} ct={ct} rs={rs} br={br}', {
+          started: this.playbackStarted,
+          ct: vf ? vf.currentTime : -1,
+          rs: vf ? vf.readyState : -1,
+          br: this.formatBuffered(vf),
+        });
         hls.recoverMediaError();
         return;
       }
