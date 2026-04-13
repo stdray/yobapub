@@ -7,10 +7,7 @@ import { TvKey, platform } from '../utils/platform';
 import { apiClient } from '../api/client';
 import { PageKeys, PageUtils } from '../utils/page';
 
-const $root = $('#page-login');
-const keys = new PageKeys();
-let poller: { stop: () => void } | null = null;
-let countdownTimer: number | null = null;
+// --- templates ---
 
 const tplLoadingCompiled = doT.template(`
   <div class="login">
@@ -19,8 +16,7 @@ const tplLoadingCompiled = doT.template(`
   </div>
 `);
 
-export const tplLoading = (data: Record<string, never>): string =>
-  tplLoadingCompiled(data);
+export const tplLoading = (data: Record<string, never>): string => tplLoadingCompiled(data);
 
 const tplCodeCompiled = doT.template(`
   <div class="login">
@@ -43,8 +39,7 @@ const tplExpiredCompiled = doT.template(`
   </div>
 `);
 
-export const tplExpired = (data: Record<string, never>): string =>
-  tplExpiredCompiled(data);
+export const tplExpired = (data: Record<string, never>): string => tplExpiredCompiled(data);
 
 const tplErrorCompiled = doT.template(`
   <div class="login">
@@ -54,86 +49,98 @@ const tplErrorCompiled = doT.template(`
   </div>
 `);
 
-export const tplError = (data: { readonly message: string }): string =>
-  tplErrorCompiled(data);
+export const tplError = (data: { readonly message: string }): string => tplErrorCompiled(data);
 
-const cleanup = (): void => {
-  if (poller) {
-    poller.stop();
-    poller = null;
+// --- page ---
+
+class LoginPage implements Page {
+  private readonly $root = $('#page-login');
+  private readonly keys = new PageKeys();
+
+  private poller: { stop: () => void } | null = null;
+  private countdownTimer: number | null = null;
+
+  // --- auth flow ---
+
+  private cleanup(): void {
+    if (this.poller) { this.poller.stop(); this.poller = null; }
+    if (this.countdownTimer !== null) { clearInterval(this.countdownTimer); this.countdownTimer = null; }
   }
-  if (countdownTimer !== null) {
-    clearInterval(countdownTimer);
-    countdownTimer = null;
+
+  private startAuth(): void {
+    this.cleanup();
+    this.$root.html(tplLoading({}));
+
+    requestDeviceCode().then(
+      (data) => {
+        this.$root.html(tplCode({ code: data.user_code, uri: data.verification_uri, expires: data.expires_in }));
+
+        let remaining = data.expires_in;
+        this.countdownTimer = window.setInterval(() => {
+          remaining--;
+          const $el = $('#login-countdown');
+          if ($el.length) $el.text(String(remaining));
+          if (remaining <= 0 && this.countdownTimer !== null) clearInterval(this.countdownTimer);
+        }, 1000);
+
+        this.poller = pollDeviceToken({
+          code: data.code,
+          interval: data.interval,
+          expiresIn: data.expires_in,
+          onSuccess: () => {
+            this.cleanup();
+            const info = platform.getDeviceInfo();
+            apiClient.apiPost('/v1/device/notify', {
+              title: info.title, hardware: info.hardware, software: info.software,
+            });
+            router.navigateWatching();
+          },
+          onExpired: () => { this.cleanup(); this.$root.html(tplExpired({})); },
+          onError: (msg) => { this.cleanup(); this.$root.html(tplError({ message: msg })); },
+        });
+      },
+      (xhr: JQueryXHR) => {
+        let msg = 'Ошибка подключения к серверу';
+        try {
+          if (xhr && xhr.responseText) {
+            const body = JSON.parse(xhr.responseText);
+            msg = body.error_description || body.error || msg;
+          }
+          if (xhr && xhr.status) msg += ' (' + xhr.status + ')';
+        } catch { /* ignore */ }
+        this.$root.html(tplError({ message: msg }));
+      },
+    );
   }
-};
 
-const startAuth = (): void => {
-  cleanup();
-  $root.html(tplLoading({}));
+  // --- keys ---
 
-  requestDeviceCode().then(
-    (data) => {
-      $root.html(tplCode({ code: data.user_code, uri: data.verification_uri, expires: data.expires_in }));
-
-      let remaining = data.expires_in;
-      countdownTimer = window.setInterval(() => {
-        remaining--;
-        const $el = $('#login-countdown');
-        if ($el.length) { $el.text(String(remaining)); }
-        if (remaining <= 0 && countdownTimer !== null) { clearInterval(countdownTimer); }
-      }, 1000);
-
-      poller = pollDeviceToken({
-        code: data.code,
-        interval: data.interval,
-        expiresIn: data.expires_in,
-        onSuccess: () => {
-          cleanup();
-          const info = platform.getDeviceInfo();
-          apiClient.apiPost('/v1/device/notify', {
-            title: info.title, hardware: info.hardware, software: info.software,
-          });
-          router.navigateWatching();
-        },
-        onExpired: () => { cleanup(); $root.html(tplExpired({})); },
-        onError: (msg) => { cleanup(); $root.html(tplError({ message: msg })); },
-      });
-    },
-    (xhr: JQueryXHR) => {
-      let msg = 'Ошибка подключения к серверу';
-      try {
-        if (xhr && xhr.responseText) {
-          const body = JSON.parse(xhr.responseText);
-          msg = body.error_description || body.error || msg;
-        }
-        if (xhr && xhr.status) { msg += ' (' + xhr.status + ')'; }
-      } catch { /* ignore */ }
-      $root.html(tplError({ message: msg }));
+  private readonly handleKey = (e: JQuery.Event): void => {
+    switch (e.keyCode) {
+      case TvKey.Enter:
+        if (this.$root.find('.login__expired, .login__error').length > 0) this.startAuth();
+        break;
+      case TvKey.Return:
+      case TvKey.Backspace:
+      case TvKey.Escape:
+        router.goBack();
+        e.preventDefault();
+        break;
     }
-  );
-};
+  };
 
-export const loginPage: Page = {
-  mount(_params: RouteParams) {
-    startAuth();
-    keys.bind((e: JQuery.Event) => {
-      switch (e.keyCode) {
-        case TvKey.Enter:
-          if ($root.find('.login__expired, .login__error').length > 0) { startAuth(); }
-          break;
-        case TvKey.Return:
-        case TvKey.Backspace:
-        case TvKey.Escape:
-          router.goBack();
-          e.preventDefault();
-          break;
-      }
-    });
-  },
-  unmount() {
-    cleanup();
-    keys.unbind();
-    PageUtils.clearPage($root);
+  // --- Page ---
+
+  mount(_params: RouteParams): void {
+    this.startAuth();
+    this.keys.bind(this.handleKey);
   }
-};
+
+  unmount(): void {
+    this.cleanup();
+    this.keys.unbind();
+    PageUtils.clearPage(this.$root);
+  }
+}
+
+export const loginPage = new LoginPage();

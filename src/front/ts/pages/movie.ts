@@ -11,14 +11,7 @@ import { formatDuration } from '../utils/format';
 import { storage } from '../utils/storage';
 import { DetailControls } from '../utils/detail-controls';
 
-const $root = $('#page-movie');
-const keys = new PageKeys();
-const controls = new DetailControls($root);
-
-type FocusArea = 'bookmarks' | 'watchlist' | 'play';
-let focusArea: FocusArea = 'play';
-let currentItem: Item | null = null;
-let watchingInfo: WatchingInfoItem | null = null;
+// --- template ---
 
 const tplDetailCompiled = doT.template(`
   <div class="detail">
@@ -40,7 +33,7 @@ const tplDetailCompiled = doT.template(`
   </div>
 `);
 
-const tplDetail = (data: {
+interface DetailData {
   readonly poster: string;
   readonly titleRu: string;
   readonly titleEn: string;
@@ -55,116 +48,153 @@ const tplDetail = (data: {
   readonly bookmarksTpl: string;
   readonly watchlistTpl: string;
   readonly personnel: string;
-}): string =>
-  tplDetailCompiled(data);
+}
 
-const render = (item: Item): void => {
-  const title = item.title.split(' / ');
-  let resumeTime = 0;
-  if (watchingInfo && watchingInfo.videos && watchingInfo.videos.length > 0) {
-    const v = watchingInfo.videos[0];
-    if (v.status === 0 && v.time > 0 && v.time < v.duration - 10) { resumeTime = v.time; }
+const tplDetail = (data: DetailData): string => tplDetailCompiled(data);
+
+// --- page ---
+
+type FocusArea = 'bookmarks' | 'watchlist' | 'play';
+
+class MoviePage implements Page {
+  private readonly $root = $('#page-movie');
+  private readonly keys = new PageKeys();
+  private readonly controls = new DetailControls(this.$root);
+
+  private item: Item | null = null;
+  private watching: WatchingInfoItem | null = null;
+  private focusArea: FocusArea = 'play';
+
+  // --- render ---
+
+  private render(): void {
+    const item = this.item!;
+    const title = item.title.split(' / ');
+
+    let resumeTime = 0;
+    if (this.watching && this.watching.videos && this.watching.videos.length > 0) {
+      const v = this.watching.videos[0];
+      if (v.status === 0 && v.time > 0 && v.time < v.duration - 10) resumeTime = v.time;
+    }
+
+    const buttons = '<div class="btn" data-action="play">' +
+      (resumeTime > 0 ? 'Продолжить с ' + formatDuration(resumeTime) : 'Смотреть') + '</div>';
+
+    this.$root.html(tplDetail({
+      poster: storage.proxyPosterUrl(item.posters.big),
+      titleRu: title[0],
+      titleEn: title.length > 1 ? title[1] : '',
+      year: item.year,
+      countries: item.countries.map((c) => c.title).join(', '),
+      genres: item.genres.map((g) => g.title).join(', '),
+      duration: item.duration ? formatDuration(item.duration.average) : '',
+      quality: item.quality,
+      ratings: renderRatings(item),
+      buttons,
+      plot: item.plot || '',
+      bookmarksTpl: this.controls.bookmarksTpl(),
+      watchlistTpl: this.controls.watchlistTpl(item.in_watchlist),
+      personnel: renderPersonnel(item),
+    }));
+
+    this.focusArea = 'play';
+    this.updateFocus();
+    this.controls.loadBookmarks(item.id);
   }
 
-  const buttons = '<div class="btn" data-action="play">' +
-    (resumeTime > 0 ? 'Продолжить с ' + formatDuration(resumeTime) : 'Смотреть') + '</div>';
+  // --- focus ---
 
-  $root.html(tplDetail({
-    poster: storage.proxyPosterUrl(item.posters.big),
-    titleRu: title[0],
-    titleEn: title.length > 1 ? title[1] : '',
-    year: item.year,
-    countries: item.countries.map((c) => c.title).join(', '),
-    genres: item.genres.map((g) => g.title).join(', '),
-    duration: item.duration ? formatDuration(item.duration.average) : '',
-    quality: item.quality,
-    ratings: renderRatings(item),
-    buttons: buttons,
-    plot: item.plot || '',
-    bookmarksTpl: controls.bookmarksTpl(),
-    watchlistTpl: controls.watchlistTpl(item.in_watchlist),
-    personnel: renderPersonnel(item)
-  }));
+  private updateFocus(): void {
+    this.$root.find('.btn').removeClass('focused');
+    this.$root.find('.detail__rating.focusable').removeClass('focused');
 
-  focusArea = 'play';
-  updateFocus();
-  controls.loadBookmarks(item.id);
-};
-
-const updateFocus = (): void => {
-  $root.find('.btn').removeClass('focused');
-  $root.find('.detail__rating.focusable').removeClass('focused');
-
-  if (focusArea === 'bookmarks') {
-    $root.find('[data-action="bookmark"]').addClass('focused');
-  } else if (focusArea === 'watchlist') {
-    $root.find('[data-action="watchlist"]').addClass('focused');
-  } else {
-    $root.find('.btn').eq(0).addClass('focused');
+    if (this.focusArea === 'bookmarks') {
+      this.$root.find('[data-action="bookmark"]').addClass('focused');
+    } else if (this.focusArea === 'watchlist') {
+      this.$root.find('[data-action="watchlist"]').addClass('focused');
+    } else {
+      this.$root.find('.btn').eq(0).addClass('focused');
+    }
   }
-};
 
-const handleKey = (e: JQuery.Event): void => {
-  switch (e.keyCode) {
-    case TvKey.Return:
-    case TvKey.Backspace:
-    case TvKey.Escape:
-      if (focusArea === 'bookmarks') {
-        focusArea = 'play'; updateFocus();
+  // --- keys ---
+
+  private readonly handleKey = (e: JQuery.Event): void => {
+    if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace || e.keyCode === TvKey.Escape) {
+      if (this.focusArea === 'bookmarks') {
+        this.focusArea = 'play'; this.updateFocus();
       } else {
         router.goBack();
       }
-      e.preventDefault(); return;
+      e.preventDefault();
+      return;
+    }
+
+    switch (this.focusArea) {
+      case 'bookmarks': this.handleBookmarksKey(e); break;
+      case 'watchlist': this.handleWatchlistKey(e); break;
+      case 'play': this.handlePlayKey(e); break;
+    }
+  };
+
+  private handleBookmarksKey(e: JQuery.Event): void {
+    switch (e.keyCode) {
+      case TvKey.Left: this.controls.prevFolder(); e.preventDefault(); break;
+      case TvKey.Right: this.controls.nextFolder(); e.preventDefault(); break;
+      case TvKey.Down: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
+      case TvKey.Enter: this.controls.toggleBookmark(); e.preventDefault(); break;
+    }
   }
 
-  if (focusArea === 'bookmarks') {
+  private handleWatchlistKey(e: JQuery.Event): void {
     switch (e.keyCode) {
-      case TvKey.Left: controls.prevFolder(); e.preventDefault(); break;
-      case TvKey.Right: controls.nextFolder(); e.preventDefault(); break;
-      case TvKey.Down: focusArea = 'watchlist'; updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter: controls.toggleBookmark(); e.preventDefault(); break;
-    }
-  } else if (focusArea === 'watchlist') {
-    switch (e.keyCode) {
-      case TvKey.Up: focusArea = 'bookmarks'; updateFocus(); e.preventDefault(); break;
-      case TvKey.Down: focusArea = 'play'; updateFocus(); e.preventDefault(); break;
+      case TvKey.Up: this.focusArea = 'bookmarks'; this.updateFocus(); e.preventDefault(); break;
+      case TvKey.Down: this.focusArea = 'play'; this.updateFocus(); e.preventDefault(); break;
       case TvKey.Enter:
-        if (currentItem) { controls.toggleWatchlist(currentItem.id); }
-        e.preventDefault(); break;
-    }
-  } else if (focusArea === 'play') {
-    switch (e.keyCode) {
-      case TvKey.Up: focusArea = 'watchlist'; updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter:
-        if (currentItem) { router.navigateMoviePlayer(currentItem.id); }
+        if (this.item) this.controls.toggleWatchlist(this.item.id);
         e.preventDefault(); break;
     }
   }
-};
 
-export const moviePage: Page = {
-  mount(params: RouteParams) {
-    currentItem = null;
-    watchingInfo = null;
-    controls.reset();
-    PageUtils.showSpinnerIn($root);
+  private handlePlayKey(e: JQuery.Event): void {
+    switch (e.keyCode) {
+      case TvKey.Up: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
+      case TvKey.Enter:
+        if (this.item) router.navigateMoviePlayer(this.item.id);
+        e.preventDefault(); break;
+    }
+  }
+
+  // --- Page ---
+
+  mount(params: RouteParams): void {
+    this.item = null;
+    this.watching = null;
+    this.controls.reset();
+    PageUtils.showSpinnerIn(this.$root);
 
     loadItemWithWatching(params.id!,
       (item, watching) => {
-        currentItem = item;
-        watchingInfo = watching;
-        render(currentItem);
+        this.item = item;
+        this.watching = watching;
+        this.render();
       },
       () => {
-        $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');
-      }
+        this.$root.html(
+          '<div class="detail"><div class="detail__info">' +
+          '<div class="detail__title">Ошибка загрузки</div></div></div>',
+        );
+      },
     );
-    keys.bind(handleKey);
-  },
-  unmount() {
-    keys.unbind();
-    PageUtils.clearPage($root);
-    currentItem = null;
-    watchingInfo = null;
+    this.keys.bind(this.handleKey);
   }
-};
+
+  unmount(): void {
+    this.keys.unbind();
+    PageUtils.clearPage(this.$root);
+    this.item = null;
+    this.watching = null;
+  }
+}
+
+export const moviePage = new MoviePage();

@@ -11,17 +11,7 @@ import { formatTimeShort } from '../utils/format';
 import { storage } from '../utils/storage';
 import { DetailControls } from '../utils/detail-controls';
 
-const $root = $('#page-serial');
-const keys = new PageKeys();
-const controls = new DetailControls($root);
-let currentItem: Item | null = null;
-let watchingInfo: WatchingInfoItem | null = null;
-
-type FocusArea = 'bookmarks' | 'watchlist' | 'play' | 'seasons' | 'episodes';
-let focusArea: FocusArea = 'play';
-let selectedSeason = 0;
-let focusedEpisode = 0;
-let focusedSeasonTab = 0;
+// --- templates ---
 
 const tplDetailCompiled = doT.template(`
   <div class="detail">
@@ -47,7 +37,7 @@ const tplDetailCompiled = doT.template(`
   </div>
 `);
 
-const tplDetail = (data: {
+interface DetailData {
   readonly poster: string;
   readonly titleRu: string;
   readonly titleEn: string;
@@ -62,8 +52,9 @@ const tplDetail = (data: {
   readonly bookmarksTpl: string;
   readonly watchlistTpl: string;
   readonly personnel: string;
-}): string =>
-  tplDetailCompiled(data);
+}
+
+const tplDetail = (data: DetailData): string => tplDetailCompiled(data);
 
 const tplSeasonTabCompiled = doT.template(`
   <div class="episodes__season-tab{{?it.active}} active{{?}}" data-season="{{=it.idx}}">Сезон {{=it.num}}</div>
@@ -93,301 +84,363 @@ interface EpisodeData {
   readonly thumbnail: string;
 }
 
-const tplEpisode = (data: EpisodeData): string =>
-  tplEpisodeCompiled(data);
+const tplEpisode = (data: EpisodeData): string => tplEpisodeCompiled(data);
 
-const getEpisodeStatus = (seasonNum: number, epNum: number): { time: number; status: number } => {
-  if (!watchingInfo || !watchingInfo.seasons) return { time: 0, status: -1 };
-  for (let i = 0; i < watchingInfo.seasons.length; i++) {
-    const ws = watchingInfo.seasons[i];
-    if (ws.number === seasonNum) {
-      for (let j = 0; j < ws.episodes.length; j++) {
-        if (ws.episodes[j].number === epNum) {
-          return { time: ws.episodes[j].time, status: ws.episodes[j].status };
+// --- page ---
+
+type FocusArea = 'bookmarks' | 'watchlist' | 'play' | 'seasons' | 'episodes';
+
+class SerialPage implements Page {
+  private readonly $root = $('#page-serial');
+  private readonly keys = new PageKeys();
+  private readonly controls = new DetailControls(this.$root);
+
+  private item: Item | null = null;
+  private watching: WatchingInfoItem | null = null;
+  private focusArea: FocusArea = 'play';
+  private selectedSeason = 0;
+  private focusedEpisode = 0;
+  private focusedSeasonTab = 0;
+
+  // --- data helpers ---
+
+  private get seasons(): ReadonlyArray<Season> {
+    return (this.item && this.item.seasons) || [];
+  }
+
+  private getEpisodeStatus(seasonNum: number, epNum: number): { time: number; status: number } {
+    if (!this.watching || !this.watching.seasons) return { time: 0, status: -1 };
+    for (let i = 0; i < this.watching.seasons.length; i++) {
+      const ws = this.watching.seasons[i];
+      if (ws.number === seasonNum) {
+        for (let j = 0; j < ws.episodes.length; j++) {
+          if (ws.episodes[j].number === epNum) {
+            return { time: ws.episodes[j].time, status: ws.episodes[j].status };
+          }
         }
       }
     }
+    return { time: 0, status: -1 };
   }
-  return { time: 0, status: -1 };
-};
 
-const findEpisodeById = (episodeId: number): { seasonIdx: number; episodeIdx: number } | null => {
-  if (!currentItem || !currentItem.seasons) return null;
-  for (let i = 0; i < currentItem.seasons.length; i++) {
-    const s = currentItem.seasons[i];
-    for (let j = 0; j < s.episodes.length; j++) {
-      if (s.episodes[j].id === episodeId) {
-        return { seasonIdx: i, episodeIdx: j };
+  private findEpisodeById(episodeId: number): { seasonIdx: number; episodeIdx: number } | null {
+    if (!this.item || !this.item.seasons) return null;
+    for (let i = 0; i < this.item.seasons.length; i++) {
+      const s = this.item.seasons[i];
+      for (let j = 0; j < s.episodes.length; j++) {
+        if (s.episodes[j].id === episodeId) return { seasonIdx: i, episodeIdx: j };
       }
     }
+    return null;
   }
-  return null;
-};
 
-const findResumeEpisode = (): { season: number; episode: number; seasonIdx: number; episodeIdx: number } | null => {
-  if (!currentItem || !currentItem.seasons) return null;
-  for (let i = 0; i < currentItem.seasons.length; i++) {
-    const s = currentItem.seasons[i];
-    for (let j = 0; j < s.episodes.length; j++) {
-      const st = getEpisodeStatus(s.number, s.episodes[j].number);
-      if (st.status === 0 || st.status === -1) {
-        return { season: s.number, episode: s.episodes[j].number, seasonIdx: i, episodeIdx: j };
+  private findResumeEpisode(): {
+    season: number; episode: number; seasonIdx: number; episodeIdx: number;
+  } | null {
+    if (!this.item || !this.item.seasons) return null;
+    for (let i = 0; i < this.item.seasons.length; i++) {
+      const s = this.item.seasons[i];
+      for (let j = 0; j < s.episodes.length; j++) {
+        const st = this.getEpisodeStatus(s.number, s.episodes[j].number);
+        if (st.status === 0 || st.status === -1) {
+          return { season: s.number, episode: s.episodes[j].number, seasonIdx: i, episodeIdx: j };
+        }
       }
     }
-  }
-  return null;
-};
-
-const buildEpisodes = (season: Season | undefined): string => {
-  if (!season) return '';
-  let html = '';
-  for (let j = 0; j < season.episodes.length; j++) {
-    const ep = season.episodes[j];
-    const st = getEpisodeStatus(season.number, ep.number);
-    let statusText = '';
-    if (st.status === 1) statusText = '✓';
-    else if (st.status === 0 && st.time > 0) statusText = formatTimeShort(st.time);
-    html += tplEpisode({
-      idx: j, number: ep.number,
-      title: ep.title || 'Эпизод ' + ep.number,
-      status: statusText,
-      thumbnail: ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '',
-    });
-  }
-  return html;
-};
-
-const render = (item: Item): void => {
-  const title = item.title.split(' / ');
-  const seasons = item.seasons || [];
-
-  const resumeEp = findResumeEpisode();
-  const playLabel = resumeEp ? 'Продолжить S' + resumeEp.season + 'E' + resumeEp.episode : 'Смотреть';
-
-  if (resumeEp) {
-    selectedSeason = resumeEp.seasonIdx;
+    return null;
   }
 
-  let seasonTabs = '';
-  for (let i = 0; i < seasons.length; i++) {
-    seasonTabs += tplSeasonTab({ idx: i, num: seasons[i].number, active: i === selectedSeason });
-  }
+  // --- render ---
 
-  $root.html(tplDetail({
-    poster: storage.proxyPosterUrl(item.posters.big),
-    titleRu: title[0],
-    titleEn: title.length > 1 ? title[1] : '',
-    year: item.year,
-    countries: item.countries.map((c) => c.title).join(', '),
-    genres: item.genres.map((g) => g.title).join(', '),
-    ratings: renderRatings(item),
-    plot: item.plot || '',
-    playLabel: playLabel,
-    seasonTabs: seasonTabs,
-    episodes: buildEpisodes(seasons[selectedSeason]),
-    bookmarksTpl: controls.bookmarksTpl(),
-    watchlistTpl: controls.watchlistTpl(item.in_watchlist),
-    personnel: renderPersonnel(item)
-  }));
-
-  focusedSeasonTab = selectedSeason;
-  focusArea = 'play';
-  focusedEpisode = resumeEp ? resumeEp.episodeIdx : 0;
-
-  updateFocus();
-
-  if (resumeEp) {
-    $root.find('.episode').eq(resumeEp.episodeIdx).addClass('current');
-  }
-
-  controls.loadBookmarks(item.id);
-};
-
-const updateFocus = (): void => {
-  $root.find('.btn').removeClass('focused');
-  $root.find('.detail__rating.focusable').removeClass('focused');
-  $root.find('.episodes__season-tab').removeClass('focused');
-  $root.find('.episode').removeClass('focused');
-
-  const infoEl = $root.find('.detail__info')[0];
-
-  if (focusArea === 'bookmarks') {
-    const $el = $root.find('[data-action="bookmark"]');
-    $el.addClass('focused');
-    if (infoEl) infoEl.scrollTop = 0;
-  } else if (focusArea === 'watchlist') {
-    const $el = $root.find('[data-action="watchlist"]');
-    $el.addClass('focused');
-    if (infoEl) infoEl.scrollTop = 0;
-  } else if (focusArea === 'play') {
-    const $el = $root.find('.btn').eq(0);
-    $el.addClass('focused');
-    if (infoEl) infoEl.scrollTop = 0;
-  } else if (focusArea === 'seasons') {
-    const $el = $root.find('.episodes__season-tab').eq(focusedSeasonTab);
-    $el.addClass('focused');
-    if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
-  } else if (focusArea === 'episodes') {
-    const $eps = $root.find('.episode');
-    if ($eps.length > 0) {
-      const $ep = $eps.eq(focusedEpisode);
-      $ep.addClass('focused');
-      if (infoEl) PageUtils.scrollIntoView($ep[0], infoEl, 20);
+  private buildEpisodes(season: Season | undefined): string {
+    if (!season) return '';
+    let html = '';
+    for (let j = 0; j < season.episodes.length; j++) {
+      const ep = season.episodes[j];
+      const st = this.getEpisodeStatus(season.number, ep.number);
+      let statusText = '';
+      if (st.status === 1) statusText = '✓';
+      else if (st.status === 0 && st.time > 0) statusText = formatTimeShort(st.time);
+      html += tplEpisode({
+        idx: j, number: ep.number,
+        title: ep.title || 'Эпизод ' + ep.number,
+        status: statusText,
+        thumbnail: ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '',
+      });
     }
+    return html;
   }
 
-  // обновить превью эпизода под постером
-  const $preview = $root.find('.detail__ep-preview');
-  let previewThumb = '';
-  if (focusArea === 'episodes') {
-    previewThumb = $root.find('.episode').eq(focusedEpisode).attr('data-thumb') || '';
-  } else if (focusArea === 'play' && currentItem && currentItem.seasons) {
-    const resume = findResumeEpisode();
-    if (resume) {
-      const ep = currentItem.seasons[resume.seasonIdx].episodes[resume.episodeIdx];
-      previewThumb = ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '';
-    } else if (currentItem.seasons.length > 0 && currentItem.seasons[0].episodes.length > 0) {
-      const ep = currentItem.seasons[0].episodes[0];
-      previewThumb = ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '';
+  private render(): void {
+    const item = this.item!;
+    const title = item.title.split(' / ');
+    const seasons = this.seasons;
+
+    const resumeEp = this.findResumeEpisode();
+    const playLabel = resumeEp ? 'Продолжить S' + resumeEp.season + 'E' + resumeEp.episode : 'Смотреть';
+
+    if (resumeEp) this.selectedSeason = resumeEp.seasonIdx;
+
+    let seasonTabs = '';
+    for (let i = 0; i < seasons.length; i++) {
+      seasonTabs += tplSeasonTab({ idx: i, num: seasons[i].number, active: i === this.selectedSeason });
     }
+
+    this.$root.html(tplDetail({
+      poster: storage.proxyPosterUrl(item.posters.big),
+      titleRu: title[0],
+      titleEn: title.length > 1 ? title[1] : '',
+      year: item.year,
+      countries: item.countries.map((c) => c.title).join(', '),
+      genres: item.genres.map((g) => g.title).join(', '),
+      ratings: renderRatings(item),
+      plot: item.plot || '',
+      playLabel,
+      seasonTabs,
+      episodes: this.buildEpisodes(seasons[this.selectedSeason]),
+      bookmarksTpl: this.controls.bookmarksTpl(),
+      watchlistTpl: this.controls.watchlistTpl(item.in_watchlist),
+      personnel: renderPersonnel(item),
+    }));
+
+    this.focusedSeasonTab = this.selectedSeason;
+    this.focusArea = 'play';
+    this.focusedEpisode = resumeEp ? resumeEp.episodeIdx : 0;
+
+    this.updateFocus();
+
+    if (resumeEp) {
+      this.$root.find('.episode').eq(resumeEp.episodeIdx).addClass('current');
+    }
+
+    this.controls.loadBookmarks(item.id);
   }
-  if (previewThumb) {
-    $preview.html('<img src="' + previewThumb + '" alt="">');
-  } else {
-    $preview.html('');
+
+  // --- focus ---
+
+  private updateFocus(): void {
+    this.$root.find('.btn').removeClass('focused');
+    this.$root.find('.detail__rating.focusable').removeClass('focused');
+    this.$root.find('.episodes__season-tab').removeClass('focused');
+    this.$root.find('.episode').removeClass('focused');
+
+    const infoEl = this.$root.find('.detail__info')[0];
+
+    switch (this.focusArea) {
+      case 'bookmarks': {
+        this.$root.find('[data-action="bookmark"]').addClass('focused');
+        if (infoEl) infoEl.scrollTop = 0;
+        break;
+      }
+      case 'watchlist': {
+        this.$root.find('[data-action="watchlist"]').addClass('focused');
+        if (infoEl) infoEl.scrollTop = 0;
+        break;
+      }
+      case 'play': {
+        this.$root.find('.btn').eq(0).addClass('focused');
+        if (infoEl) infoEl.scrollTop = 0;
+        break;
+      }
+      case 'seasons': {
+        const $el = this.$root.find('.episodes__season-tab').eq(this.focusedSeasonTab);
+        $el.addClass('focused');
+        if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
+        break;
+      }
+      case 'episodes': {
+        const $eps = this.$root.find('.episode');
+        if ($eps.length > 0) {
+          const $ep = $eps.eq(this.focusedEpisode);
+          $ep.addClass('focused');
+          if (infoEl) PageUtils.scrollIntoView($ep[0], infoEl, 20);
+        }
+        break;
+      }
+    }
+
+    this.updateEpisodePreview();
   }
-};
 
-const switchSeason = (idx: number): void => {
-  if (!currentItem || !currentItem.seasons) return;
-  selectedSeason = idx;
-  focusedSeasonTab = idx;
-  $root.find('.episodes__season-tab').removeClass('active').eq(idx).addClass('active');
-  $root.find('.episodes__list').html(buildEpisodes(currentItem.seasons[idx]));
-  focusedEpisode = 0;
-  updateFocus();
-};
+  private updateEpisodePreview(): void {
+    const $preview = this.$root.find('.detail__ep-preview');
+    let thumb = '';
 
-const handleKey = (e: JQuery.Event): void => {
-  const seasons = (currentItem && currentItem.seasons) || [];
+    if (this.focusArea === 'episodes') {
+      thumb = this.$root.find('.episode').eq(this.focusedEpisode).attr('data-thumb') || '';
+    } else if (this.focusArea === 'play' && this.item && this.item.seasons) {
+      const resume = this.findResumeEpisode();
+      if (resume) {
+        const ep = this.item.seasons[resume.seasonIdx].episodes[resume.episodeIdx];
+        thumb = ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '';
+      } else if (this.item.seasons.length > 0 && this.item.seasons[0].episodes.length > 0) {
+        const ep = this.item.seasons[0].episodes[0];
+        thumb = ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '';
+      }
+    }
 
-  switch (e.keyCode) {
-    case TvKey.Return:
-    case TvKey.Backspace:
-    case TvKey.Escape:
-      if (focusArea === 'bookmarks') {
-        focusArea = 'play'; updateFocus();
+    $preview.html(thumb ? '<img src="' + thumb + '" alt="">' : '');
+  }
+
+  private switchSeason(idx: number): void {
+    this.selectedSeason = idx;
+    this.focusedSeasonTab = idx;
+    this.$root.find('.episodes__season-tab').removeClass('active').eq(idx).addClass('active');
+    this.$root.find('.episodes__list').html(this.buildEpisodes(this.seasons[idx]));
+    this.focusedEpisode = 0;
+    this.updateFocus();
+  }
+
+  // --- keys ---
+
+  private readonly handleKey = (e: JQuery.Event): void => {
+    if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace || e.keyCode === TvKey.Escape) {
+      if (this.focusArea === 'bookmarks') {
+        this.focusArea = 'play'; this.updateFocus();
       } else {
         router.goBack();
       }
-      e.preventDefault(); return;
+      e.preventDefault();
+      return;
+    }
+
+    switch (this.focusArea) {
+      case 'bookmarks': this.handleBookmarksKey(e); break;
+      case 'watchlist': this.handleWatchlistKey(e); break;
+      case 'play': this.handlePlayKey(e); break;
+      case 'seasons': this.handleSeasonsKey(e); break;
+      case 'episodes': this.handleEpisodesKey(e); break;
+    }
+  };
+
+  private handleBookmarksKey(e: JQuery.Event): void {
+    switch (e.keyCode) {
+      case TvKey.Left: this.controls.prevFolder(); e.preventDefault(); break;
+      case TvKey.Right: this.controls.nextFolder(); e.preventDefault(); break;
+      case TvKey.Down: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
+      case TvKey.Enter: this.controls.toggleBookmark(); e.preventDefault(); break;
+    }
   }
 
-  if (focusArea === 'bookmarks') {
+  private handleWatchlistKey(e: JQuery.Event): void {
     switch (e.keyCode) {
-      case TvKey.Left: controls.prevFolder(); e.preventDefault(); break;
-      case TvKey.Right: controls.nextFolder(); e.preventDefault(); break;
-      case TvKey.Down: focusArea = 'watchlist'; updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter: controls.toggleBookmark(); e.preventDefault(); break;
-    }
-  } else if (focusArea === 'watchlist') {
-    switch (e.keyCode) {
-      case TvKey.Up: focusArea = 'bookmarks'; updateFocus(); e.preventDefault(); break;
-      case TvKey.Down: focusArea = 'play'; updateFocus(); e.preventDefault(); break;
+      case TvKey.Up: this.focusArea = 'bookmarks'; this.updateFocus(); e.preventDefault(); break;
+      case TvKey.Down: this.focusArea = 'play'; this.updateFocus(); e.preventDefault(); break;
       case TvKey.Enter:
-        if (currentItem) { controls.toggleWatchlist(currentItem.id); }
+        if (this.item) this.controls.toggleWatchlist(this.item.id);
         e.preventDefault(); break;
     }
-  } else if (focusArea === 'play') {
+  }
+
+  private handlePlayKey(e: JQuery.Event): void {
     switch (e.keyCode) {
-      case TvKey.Up: focusArea = 'watchlist'; updateFocus(); e.preventDefault(); break;
+      case TvKey.Up: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
       case TvKey.Down:
-        if (seasons.length > 0) { focusArea = 'seasons'; updateFocus(); }
+        if (this.seasons.length > 0) { this.focusArea = 'seasons'; this.updateFocus(); }
         e.preventDefault(); break;
       case TvKey.Enter:
-        if (currentItem) {
-          const resume = findResumeEpisode();
-          if (resume) {
-            router.navigateSerialPlayer(currentItem.id, resume.season, resume.episode);
-          } else if (seasons.length > 0 && seasons[0].episodes.length > 0) {
-            const firstEp = seasons[0].episodes[0];
-            router.navigateSerialPlayer(currentItem.id, seasons[0].number, firstEp.number);
-          }
-        }
+        this.playResume();
         e.preventDefault(); break;
     }
-  } else if (focusArea === 'seasons') {
+  }
+
+  private handleSeasonsKey(e: JQuery.Event): void {
     switch (e.keyCode) {
       case TvKey.Left:
-        if (focusedSeasonTab > 0) { focusedSeasonTab--; switchSeason(focusedSeasonTab); }
+        if (this.focusedSeasonTab > 0) { this.focusedSeasonTab--; this.switchSeason(this.focusedSeasonTab); }
         e.preventDefault(); break;
       case TvKey.Right:
-        if (focusedSeasonTab < seasons.length - 1) { focusedSeasonTab++; switchSeason(focusedSeasonTab); }
-        e.preventDefault(); break;
-      case TvKey.Up:
-        focusArea = 'play'; updateFocus(); e.preventDefault(); break;
-      case TvKey.Down:
-        if (seasons[selectedSeason] && seasons[selectedSeason].episodes.length > 0) {
-          focusArea = 'episodes'; focusedEpisode = 0; updateFocus();
+        if (this.focusedSeasonTab < this.seasons.length - 1) {
+          this.focusedSeasonTab++; this.switchSeason(this.focusedSeasonTab);
         }
         e.preventDefault(); break;
-      case TvKey.Enter:
-        switchSeason(focusedSeasonTab); e.preventDefault(); break;
-    }
-  } else if (focusArea === 'episodes') {
-    const epCount = $root.find('.episode').length;
-    switch (e.keyCode) {
-      case TvKey.Down:
-        if (focusedEpisode < epCount - 1) { focusedEpisode++; updateFocus(); }
-        e.preventDefault(); break;
       case TvKey.Up:
-        if (focusedEpisode > 0) { focusedEpisode--; updateFocus(); }
-        else { focusArea = 'seasons'; updateFocus(); }
-        e.preventDefault(); break;
-      case TvKey.Enter:
-        if (currentItem && seasons[selectedSeason]) {
-          const ep = seasons[selectedSeason].episodes[focusedEpisode];
-          if (ep) { router.navigateSerialPlayer(currentItem.id, seasons[selectedSeason].number, ep.number); }
+        this.focusArea = 'play'; this.updateFocus(); e.preventDefault(); break;
+      case TvKey.Down: {
+        const s = this.seasons[this.selectedSeason];
+        if (s && s.episodes.length > 0) {
+          this.focusArea = 'episodes'; this.focusedEpisode = 0; this.updateFocus();
         }
         e.preventDefault(); break;
+      }
+      case TvKey.Enter:
+        this.switchSeason(this.focusedSeasonTab); e.preventDefault(); break;
     }
   }
-};
 
-export const serialPage: Page = {
-  mount(params: RouteParams) {
-    currentItem = null; watchingInfo = null; selectedSeason = 0;
-    controls.reset();
-    PageUtils.showSpinnerIn($root);
+  private handleEpisodesKey(e: JQuery.Event): void {
+    const epCount = this.$root.find('.episode').length;
+    switch (e.keyCode) {
+      case TvKey.Down:
+        if (this.focusedEpisode < epCount - 1) { this.focusedEpisode++; this.updateFocus(); }
+        e.preventDefault(); break;
+      case TvKey.Up:
+        if (this.focusedEpisode > 0) { this.focusedEpisode--; this.updateFocus(); }
+        else { this.focusArea = 'seasons'; this.updateFocus(); }
+        e.preventDefault(); break;
+      case TvKey.Enter: {
+        const s = this.seasons[this.selectedSeason];
+        if (this.item && s) {
+          const ep = s.episodes[this.focusedEpisode];
+          if (ep) router.navigateSerialPlayer(this.item.id, s.number, ep.number);
+        }
+        e.preventDefault(); break;
+      }
+    }
+  }
+
+  private playResume(): void {
+    if (!this.item) return;
+    const resume = this.findResumeEpisode();
+    if (resume) {
+      router.navigateSerialPlayer(this.item.id, resume.season, resume.episode);
+    } else if (this.seasons.length > 0 && this.seasons[0].episodes.length > 0) {
+      router.navigateSerialPlayer(this.item.id, this.seasons[0].number, this.seasons[0].episodes[0].number);
+    }
+  }
+
+  // --- Page ---
+
+  mount(params: RouteParams): void {
+    this.item = null;
+    this.watching = null;
+    this.selectedSeason = 0;
+    this.controls.reset();
+    PageUtils.showSpinnerIn(this.$root);
 
     const targetEpisodeId = params.episodeId;
 
     loadItemWithWatching(params.id!,
       (item, watching) => {
-        currentItem = item;
-        watchingInfo = watching;
-        render(currentItem);
+        this.item = item;
+        this.watching = watching;
+        this.render();
         if (targetEpisodeId) {
-          const found = findEpisodeById(targetEpisodeId);
+          const found = this.findEpisodeById(targetEpisodeId);
           if (found) {
-            if (found.seasonIdx !== selectedSeason) {
-              switchSeason(found.seasonIdx);
-            }
-            focusArea = 'episodes';
-            focusedEpisode = found.episodeIdx;
-            updateFocus();
+            if (found.seasonIdx !== this.selectedSeason) this.switchSeason(found.seasonIdx);
+            this.focusArea = 'episodes';
+            this.focusedEpisode = found.episodeIdx;
+            this.updateFocus();
           }
         }
       },
       () => {
-        $root.html('<div class="detail"><div class="detail__info"><div class="detail__title">Ошибка загрузки</div></div></div>');
-      }
+        this.$root.html(
+          '<div class="detail"><div class="detail__info">' +
+          '<div class="detail__title">Ошибка загрузки</div></div></div>',
+        );
+      },
     );
-    keys.bind(handleKey);
-  },
-  unmount() {
-    keys.unbind();
-    PageUtils.clearPage($root);
-    currentItem = null; watchingInfo = null;
+    this.keys.bind(this.handleKey);
   }
-};
+
+  unmount(): void {
+    this.keys.unbind();
+    PageUtils.clearPage(this.$root);
+    this.item = null;
+    this.watching = null;
+  }
+}
+
+export const serialPage = new SerialPage();
