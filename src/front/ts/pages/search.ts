@@ -423,7 +423,7 @@ class SearchPage implements Page {
       case TvKey.Return:
       case TvKey.Backspace:
       case TvKey.Escape:
-        router.goBack();
+        router.navigateToStartPage();
         e.preventDefault(); break;
     }
   }
@@ -472,7 +472,7 @@ class SearchPage implements Page {
       case TvKey.Return:
       case TvKey.Backspace:
       case TvKey.Escape:
-        router.goBack();
+        router.navigateToStartPage();
         e.preventDefault(); break;
     }
   }

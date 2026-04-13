@@ -1,14 +1,13 @@
 import $ from 'jquery';
 import * as doT from 'dot';
-import { RouteParams } from '../types/app';
+import { Page, RouteParams } from '../types/app';
 import { deviceApi } from '../api/device';
 import { DeviceSettingsResponse } from '../types/api';
 import { TvKey, platform } from '../utils/platform';
 import { storage, Storage, QualityId } from '../utils/storage';
-import { PageUtils } from '../utils/page';
+import { PageKeys, PageUtils } from '../utils/page';
 import { formatAppVersion } from '../utils/format';
-import { sidebar } from '../sidebar';
-import { SidebarPage } from './sidebar-page';
+import { router } from '../router';
 
 interface SettingOption {
   id: number;
@@ -178,21 +177,20 @@ const getDisplayValue = (item: SettingItem): string => {
   return item.value ? 'Вкл' : 'Выкл';
 };
 
-class SettingsPage extends SidebarPage {
+class SettingsPage implements Page {
+  private readonly $root = $('#page-settings');
+  private readonly keys = new PageKeys();
   private allSettings: SettingItem[] = [];
   private focusedIndex = 0;
   private focusedOptionIndex = 0;
   private optionsOpen = false;
   private vipUser = false;
 
-  constructor() { super('settings'); }
-
-  protected onUnfocus(): void { this.render(); }
-
-  protected onMount(_params: RouteParams): void {
+  mount(_params: RouteParams): void {
     this.allSettings = [];
     this.focusedIndex = 0;
     this.optionsOpen = false;
+    this.keys.bind((e) => this.handleKey(e));
     PageUtils.showSpinnerIn(this.$root);
 
     $.when(deviceApi.getDeviceSettings(), deviceApi.checkVip(true)).then(
@@ -214,7 +212,7 @@ class SettingsPage extends SidebarPage {
         this.allSettings.unshift(buildSubSizeSetting());
         this.allSettings.unshift(buildQualitySetting());
         this.allSettings.unshift(buildStartPageSetting());
-        this.allSettings.push(buildVersionSetting());
+        this.allSettings.unshift(buildVersionSetting());
         this.render();
       },
       () => {
@@ -223,11 +221,13 @@ class SettingsPage extends SidebarPage {
     );
   }
 
-  protected onUnmount(): void {
+  unmount(): void {
+    this.keys.unbind();
+    PageUtils.clearPage(this.$root);
     this.allSettings = [];
   }
 
-  protected handleKey(e: JQuery.Event): void {
+  private handleKey(e: JQuery.Event): void {
     if (this.optionsOpen) {
       this.handleOptionsKey(e);
       return;
@@ -237,7 +237,8 @@ class SettingsPage extends SidebarPage {
 
     switch (e.keyCode) {
       case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
-        sidebar.backOrFocus(e); break;
+        router.navigateToStartPage();
+        e.preventDefault(); break;
       case TvKey.Up:
         if (this.focusedIndex > 0) { this.focusedIndex--; this.render(); }
         e.preventDefault(); break;
@@ -247,12 +248,12 @@ class SettingsPage extends SidebarPage {
       case TvKey.Left:
         if (item && item.type === 'stepper') { this.stepSubSize(-1); e.preventDefault(); }
         else if (item && item.type === 'list') { this.cycleListOption(-1); e.preventDefault(); }
-        else { sidebar.focus(); e.preventDefault(); }
+        else { e.preventDefault(); }
         break;
       case TvKey.Right:
         if (item && item.type === 'stepper') { this.stepSubSize(1); e.preventDefault(); }
         else if (item && item.type === 'list') { this.cycleListOption(1); e.preventDefault(); }
-        else if (item && item.type === 'readonly') { e.preventDefault(); }
+        else { e.preventDefault(); }
         break;
       case TvKey.Enter:
         if (item && (item.type === 'stepper' || item.type === 'readonly')) { e.preventDefault(); break; }
@@ -272,6 +273,10 @@ class SettingsPage extends SidebarPage {
       });
     }
     this.$root.html(tplPage({ items: html }));
+    const $focused = this.$root.find('.sitem.focused');
+    if ($focused.length) {
+      PageUtils.scrollIntoView($focused[0], this.$root.find('.settings-page')[0]);
+    }
   }
 
   private renderOptions(): void {

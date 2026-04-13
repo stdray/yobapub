@@ -1,5 +1,6 @@
 import $ from 'jquery';
 import { RouteName, RouteParams, Page } from './types/app';
+import { storage } from './utils/storage';
 
 type AfterNavigateCallback = (route: RouteName) => void;
 
@@ -85,6 +86,18 @@ class Router {
   readonly navigateSettings = (): void => { this.navigate('settings'); };
 
   readonly navigateStartPage = (route: RouteName): void => { this.navigate(route); };
+
+  /** Navigate back to the user's start page, clearing intermediate history */
+  readonly navigateToStartPage = (): void => {
+    if (this.currentRoute) {
+      this.pages[this.currentRoute].unmount();
+      $('#page-' + this.currentRoute).addClass('hidden');
+    }
+    this.navHistory.length = 0;
+    this.currentRoute = null;
+    this.currentParams = {};
+    this.navigateStartPage(storage.getStartPage());
+  };
 
   // --- Parameterized navigation ---
 
