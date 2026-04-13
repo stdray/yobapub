@@ -51,13 +51,32 @@ class Platform {
           'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue',
           '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
         ];
+        const registered: string[] = [];
+        const failed: string[] = [];
         for (let i = 0; i < keysToRegister.length; i++) {
           try {
             tizen.tvinputdevice.registerKey(keysToRegister[i]);
+            registered.push(keysToRegister[i]);
           } catch (e) {
-            // key may not be supported on this device
+            failed.push(keysToRegister[i] + ':' + ((e && (e as Error).message) || 'err'));
           }
         }
+        console.log('[Platform] registerTizenKeys ok=' + registered.join(',') + ' failed=' + failed.join(','));
+        // diagnostic: dump supported keys list so we can see real keyCodes for this device
+        try {
+          if (tizen.tvinputdevice.getSupportedKeys) {
+            const supported = tizen.tvinputdevice.getSupportedKeys();
+            const dump: string[] = [];
+            for (let j = 0; j < supported.length; j++) {
+              dump.push(supported[j].name + '=' + supported[j].code);
+            }
+            console.log('[Platform] supportedKeys ' + dump.join(' '));
+          }
+        } catch (e) {
+          console.log('[Platform] getSupportedKeys failed', e);
+        }
+      } else {
+        console.log('[Platform] tizen.tvinputdevice not available');
       }
     } catch (e) {
       console.log('[Platform] Not running on Tizen');
