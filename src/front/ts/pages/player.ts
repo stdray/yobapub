@@ -810,10 +810,20 @@ class PlayerController {
       const v = this.videoEl;
       plog.debug('video canplay currentTime={currentTime}', { currentTime: v ? v.currentTime : -1 });
       this.hideSpinner();
-      if (this.pendingStartSeek > 0 && v) {
-        const target = this.pendingStartSeek;
-        this.pendingStartSeek = 0;
-        plog.info('startSeek target={target} from ct={ct}', { target, ct: v.currentTime });
+      if (!v) return;
+      let target = this.pendingStartSeek;
+      this.pendingStartSeek = 0;
+      // Fresh playback (pendingStartSeek==0): some HLS streams have first-segment PTS != 0,
+      // leaving the SourceBuffer starting at e.g. 10.0 while playhead sits at 0. Gap-controller
+      // won't close gaps > maxBufferHole. Snap once to the buffered start so playback can begin.
+      if (target <= 0 && !this.firstFragSnapped && v.buffered.length > 0 && v.currentTime < v.buffered.start(0)) {
+        target = v.buffered.start(0) + 0.05;
+      }
+      if (target > 0) {
+        this.firstFragSnapped = true;
+        plog.info('startSeek target={target} from ct={ct} br={br}', {
+          target, ct: v.currentTime, br: this.formatBuffered(v),
+        });
         v.currentTime = target;
       }
     });
