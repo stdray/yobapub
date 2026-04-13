@@ -63,6 +63,7 @@ version.properties
 old
 err/
 .claude
+.factory/
 *.tsv
 
 # Local keys/certs documentation (not for repo)
