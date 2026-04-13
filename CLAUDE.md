@@ -82,6 +82,10 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 - **Verbs**: `Add`, `Remove`, `Refactor`, `Fix`, `Reload`, `Restart`, etc. — action first, then object, then optional qualifier.
 - **No attribution trailers** (no `Co-Authored-By`, no `Generated with …`) unless the user explicitly asks for them.
 
+## Decision Log
+
+Веди `doc/decision-log.md` при любых нетривиальных технических решениях: откаты, изменение направления расследования, эксперименты, подтверждённые/опровергнутые гипотезы. Новая запись сверху, формат в начале файла. Фиксируй: время, решение, причину, связанные данные (логи, коммиты, диффы), результат (или "ждём проверки"). Это обязательно — журнал нужен чтобы не ходить по кругу в длинных расследованиях и помнить какие пути уже пройдены.
+
 ## Backend Proxy
 
 `src/back/YobaPub.Proxy/` — .NET reverse proxy with HLS manifest rewriting (`HlsRewriter.cs`). Rewrites m3u8 URLs for audio track selection. Config in `appsettings.json`.

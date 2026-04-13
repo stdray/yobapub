@@ -101,39 +101,11 @@ class LogShare {
     if (ttlDays > 0) data.append('ttlDays', String(ttlDays));
     fetch('/admin/logs/share', { method: 'POST', body: data })
       .then((r) => r.json())
-      .then((res) => { LogShare.showDialog(res.url); });
+      .then((res) => {
+        Clipboard.copy(`${res.url}/tsv`);
+        Clipboard.flashText(document.getElementById('status'), 'TSV-ссылка скопирована');
+      });
     return true;
-  }
-
-  static showDialog(url) {
-    const dlg = document.createElement('dialog');
-    dlg.className = 'share-dialog';
-    const tsvUrl = `${url}/tsv`;
-    const htmlUrl = url;
-    dlg.innerHTML = `
-      <div class="share-dialog-body">
-        <div class="share-url">${htmlUrl}</div>
-        <div class="share-label">Копировать ссылку</div>
-        <div class="share-actions">
-          <button type="button" data-share-copy="html">на HTML</button>
-          <button type="button" data-share-copy="tsv">на TSV</button>
-          <button type="button" data-share-close>Закрыть</button>
-        </div>
-      </div>
-    `;
-    dlg.addEventListener('click', (e) => {
-      const copyBtn = e.target.closest('[data-share-copy]');
-      if (copyBtn) {
-        const which = copyBtn.dataset.shareCopy;
-        Clipboard.copy(which === 'tsv' ? tsvUrl : htmlUrl);
-        dlg.close();
-        return;
-      }
-      if (e.target.closest('[data-share-close]')) dlg.close();
-    });
-    dlg.addEventListener('close', () => dlg.remove());
-    document.body.appendChild(dlg);
-    dlg.showModal();
   }
 }
 

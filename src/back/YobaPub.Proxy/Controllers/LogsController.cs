@@ -79,8 +79,9 @@ public class LogsController(LogStore store, LogShareStore shares) : Controller
     {
         TimeSpan? ttl = ttlDays is > 0 ? TimeSpan.FromDays(ttlDays.Value) : null;
         var share = shares.Create(query, ttl, User.Identity?.Name ?? "");
-        var url = $"{Request.Scheme}://{Request.Host}/s/logs/{share.Id}";
-        return Json(new { token = share.Id, url, expiresAt = share.ExpiresAt });
+        var token = new ShortGuid(share.Id);
+        var url = $"{Request.Scheme}://{Request.Host}/s/logs/{token}";
+        return Json(new { token = token.ToString(), url, expiresAt = share.ExpiresAt });
     }
 
     [HttpPost("clear")]

@@ -17,7 +17,8 @@ public class SharedLogsViewModel
 {
     public required LogEntry[] Entries { get; init; }
     public required LogsQuery Query { get; init; }
-    public required Guid Token { get; init; }
+    public required ShortGuid Token { get; init; }
     public DateTimeOffset? ExpiresAt { get; init; }
     public bool HasMore { get; init; }
 }
+

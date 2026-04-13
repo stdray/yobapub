@@ -8,8 +8,8 @@ namespace YobaPub.Proxy.Controllers;
 [AllowAnonymous]
 public class SharedLogsController(LogStore store, LogShareStore shares) : Controller
 {
-    [HttpGet("{token:guid}")]
-    public IActionResult Index(Guid token)
+    [HttpGet("{token}")]
+    public IActionResult Index(ShortGuid token)
     {
         var share = shares.Get(token);
         if (share == null) return NotFound();
@@ -25,8 +25,8 @@ public class SharedLogsController(LogStore store, LogShareStore shares) : Contro
         });
     }
 
-    [HttpGet("{token:guid}/tsv")]
-    public IActionResult Tsv(Guid token, int? limit)
+    [HttpGet("{token}/tsv")]
+    public IActionResult Tsv(ShortGuid token, int? limit)
     {
         var share = shares.Get(token);
         if (share == null) return NotFound();
