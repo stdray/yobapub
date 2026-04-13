@@ -193,20 +193,30 @@ const updateFocus = (): void => {
   $root.find('.episodes__season-tab').removeClass('focused');
   $root.find('.episode').removeClass('focused');
 
+  const infoEl = $root.find('.detail__info')[0];
+
   if (focusArea === 'bookmarks') {
-    $root.find('[data-action="bookmark"]').addClass('focused');
+    const $el = $root.find('[data-action="bookmark"]');
+    $el.addClass('focused');
+    if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
   } else if (focusArea === 'watchlist') {
-    $root.find('[data-action="watchlist"]').addClass('focused');
+    const $el = $root.find('[data-action="watchlist"]');
+    $el.addClass('focused');
+    if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
   } else if (focusArea === 'play') {
-    $root.find('.btn').eq(0).addClass('focused');
+    const $el = $root.find('.btn').eq(0);
+    $el.addClass('focused');
+    if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
   } else if (focusArea === 'seasons') {
-    $root.find('.episodes__season-tab').eq(focusedSeasonTab).addClass('focused');
+    const $el = $root.find('.episodes__season-tab').eq(focusedSeasonTab);
+    $el.addClass('focused');
+    if ($el[0] && infoEl) PageUtils.scrollIntoView($el[0], infoEl, 20);
   } else if (focusArea === 'episodes') {
     const $eps = $root.find('.episode');
     if ($eps.length > 0) {
       const $ep = $eps.eq(focusedEpisode);
       $ep.addClass('focused');
-      PageUtils.scrollIntoView($ep[0], $root.find('.detail__info')[0], 20);
+      if (infoEl) PageUtils.scrollIntoView($ep[0], infoEl, 20);
     }
   }
 };
