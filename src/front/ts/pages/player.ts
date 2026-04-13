@@ -102,6 +102,7 @@ class PlayerController {
   private appendErrorCount = 0;
   private hadBufferFullError = false;
   private playbackStarted = false;
+  private firstFragSnapped = false;
   private markedWatched = false;
   private wasWatched = false;
   private playSourceDebug = '';
@@ -468,6 +469,7 @@ class PlayerController {
   private buildHlsConfig(): HlsConfig {
     const cfg = buildBaseHlsConfig();
     if (this.state.position > 0) cfg.startPosition = this.state.position;
+    cfg.autoStartLoad = false;
     cfg.maxBufferHole = 1.0;
     cfg.highBufferWatchdogPeriod = 10;
     cfg.nudgeMaxRetry = 3;
@@ -512,6 +514,7 @@ class PlayerController {
     if (!this.videoEl) return;
     this.media.hlsUrl = url;
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
+    this.firstFragSnapped = false;
     this.playSourceDebug = 'url=' + url.substring(0, 120);
     plog.newTraceId();
     const cfg = this.buildHlsConfig();
@@ -540,14 +543,28 @@ class PlayerController {
     });
     hls.on(Hls.Events.FRAG_BUFFERED, (_e: string, data: { frag?: { sn: number; start: number; type?: string } }) => {
       const frag = data.frag;
-      if (frag) {
-        const v = this.videoEl;
-        plog.info('hls FRAG_BUFFERED sn={sn} start={start} type={type} started={started} ct={ct} br={br}', {
-          sn: frag.sn, start: frag.start, type: frag.type || null,
-          started: this.playbackStarted,
-          ct: v ? v.currentTime : -1,
-          br: this.formatBuffered(v),
-        });
+      if (!frag) return;
+      const v = this.videoEl;
+      plog.info('hls FRAG_BUFFERED sn={sn} start={start} type={type} started={started} ct={ct} br={br}', {
+        sn: frag.sn, start: frag.start, type: frag.type || null,
+        started: this.playbackStarted,
+        ct: v ? v.currentTime : -1,
+        br: this.formatBuffered(v),
+      });
+      // Tizen 2.3: hls.js seeks video to startPosition with float drift (e.g. 283.2 -> 283.1999),
+      // landing just before the buffered range. Gap-controller then nudges by nudgeOffset (0.1),
+      // causing a second seek mid-playback that desyncs audio on Chromium 28 MSE.
+      // Pre-empt: snap currentTime just inside the first buffered range before gap-controller runs.
+      if (!this.firstFragSnapped && v && v.buffered.length > 0) {
+        this.firstFragSnapped = true;
+        const bStart = v.buffered.start(0);
+        if (v.currentTime < bStart) {
+          const target = bStart + 0.05;
+          plog.info('firstFragSnap ct={ct} bStart={bStart} -> {target}', {
+            ct: v.currentTime, bStart, target,
+          });
+          v.currentTime = target;
+        }
       }
     });
     hls.on(Hls.Events.LEVEL_SWITCHING, (_e: string, data: { level?: number; width?: number; height?: number; bitrate?: number; videoCodec?: string; audioCodec?: string }) => {
@@ -573,6 +590,10 @@ class PlayerController {
         details: lvls.map((l) => l.width + 'x' + l.height + '@' + l.bitrate + ' vc=' + (l.videoCodec || '?') + ' ac=' + (l.audioCodec || '?')).join(', '),
       });
       this.pinQualityLevel(hls);
+      // autoStartLoad is disabled in config — start loading only after pin to avoid
+      // hls.js kicking off a load on level 0/auto and then switching (double LEVEL_SWITCHING).
+      const startPos = this.state.position > 0 ? this.state.position : -1;
+      hls.startLoad(startPos);
       this.onSourceReady();
     });
     hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; error?: unknown; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {
