@@ -2,6 +2,8 @@ import $ from 'jquery';
 import { storage } from '../utils/storage';
 import { TokenResponse } from '../types/api';
 
+type QueryParams = Record<string, string | number | boolean>;
+
 export class ApiClient {
   private clientId = '';
   private clientSecret = '';
@@ -37,9 +39,9 @@ export class ApiClient {
     });
   };
 
-  readonly apiGet = (path: string, params?: Record<string, string | number | boolean>): JQueryXHR => {
+  readonly apiGet = <P extends QueryParams = QueryParams>(path: string, params?: P): JQueryXHR => {
     const token = storage.getAccessToken();
-    const data: Record<string, string | number | boolean> = params ? $.extend({}, params) : {};
+    const data: QueryParams = params ? $.extend({}, params) : {};
     if (token) {
       data['access_token'] = token;
     }
@@ -47,11 +49,11 @@ export class ApiClient {
       url: path,
       method: 'GET',
       data: data,
-      dataType: 'json'
+      dataType: 'json',
     });
   };
 
-  readonly apiPost = (path: string, data?: Record<string, unknown>): JQueryXHR => {
+  readonly apiPost = <D extends object = Record<string, unknown>>(path: string, data?: D): JQueryXHR => {
     const token = storage.getAccessToken();
     let url = path;
     if (token) {
@@ -65,7 +67,9 @@ export class ApiClient {
     });
   };
 
-  readonly apiGetWithRefresh = <T = unknown>(path: string, params?: Record<string, string | number | boolean>): JQueryDeferred<T> => {
+  readonly apiGetWithRefresh = <T = unknown, P extends QueryParams = QueryParams>(
+    path: string, params?: P,
+  ): JQueryDeferred<T> => {
     const d = $.Deferred<T>();
 
     const doRequest = (): void => {
@@ -97,7 +101,9 @@ export class ApiClient {
     return d;
   };
 
-  readonly apiPostWithRefresh = <T = unknown>(path: string, data?: Record<string, unknown>): JQueryDeferred<T> => {
+  readonly apiPostWithRefresh = <T = unknown, D extends object = Record<string, unknown>>(
+    path: string, data?: D,
+  ): JQueryDeferred<T> => {
     const d = $.Deferred<T>();
 
     const doRequest = (): void => {

@@ -269,7 +269,7 @@ class PlayerController {
   }
 
   private showOsd(icon: 'play' | 'pause' | 'rw' | 'ff'): void {
-    const symbols = { play: '\u25B6', pause: '\u275A\u275A', rw: '\u25C0\u25C0', ff: '\u25B6\u25B6' };
+    const symbols = { play: '▶', pause: '❚❚', rw: '◀◀', ff: '▶▶' };
     this.$root.find('.player__osd').text(symbols[icon] || icon).removeClass('hidden');
     if (this.osdTimer) clearTimeout(this.osdTimer);
     this.osdTimer = window.setTimeout(() => {
