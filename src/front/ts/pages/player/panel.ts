@@ -197,9 +197,9 @@ export const closePanel = ($root: JQuery, state: PanelState, cbs: PanelCallbacks
     closePanelList($root, state, cbs);
     return;
   }
+  state.open = false;
   $root.find('.ppanel__buttons').removeClass('active');
   setTimeout(() => {
-    state.open = false;
     $root.find('.player__panel').addClass('hidden');
     cbs.onAfterClose();
   }, 200);
@@ -224,9 +224,9 @@ export const openPanelList = ($root: JQuery, state: PanelState, cbs: PanelCallba
 };
 
 export const closePanelList = ($root: JQuery, state: PanelState, cbs: PanelCallbacks): void => {
+  state.listOpen = false;
   $root.find('.ppanel__list').removeClass('active');
   setTimeout(() => {
-    state.listOpen = false;
     $root.find('.ppanel__list').addClass('hidden');
     $root.find('.ppanel__buttons').addClass('active');
     updatePanelButtons($root, state, cbs.getData());
