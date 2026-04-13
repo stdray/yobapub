@@ -139,6 +139,7 @@ class PlayerController {
   // Panel callbacks
   private readonly panelCallbacks: PanelCallbacks = {
     onShowInfo: () => { this.info.show(); },
+    onAfterClose: () => { this.showBar(); },
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
     onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
     onApplyQuality: (idx) => { if (idx !== this.state.quality) this.continueWith({ quality: idx }); },

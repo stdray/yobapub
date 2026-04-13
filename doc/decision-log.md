@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-04-13 23:10 — info-панель зависала после закрытия settings-панели
+
+**Решение:** добавил `onAfterClose` в `PanelCallbacks` (`pages/player/panel.ts`), вызываю его в `forceClosePanel` и по окончании анимации `closePanel`. В `player.ts` колбэк зовёт `showBar()`.
+
+**Причина:** `openPanel` показывает `.player__info` через `onShowInfo`, при этом ставит `panel.open = true`. `showBar()` при открытой панели намеренно не взводит `barTimer` (иначе бар пропадёт во время выбора). После `closePanel`/idle-таймаута никто не перезапускал `showBar`, поэтому `barTimer` оставался `null`, `hideBar` не срабатывал и `.player__info` висел навсегда.
+
+**Данные:** `src/front/ts/pages/player.ts:448-463` (`showBar`/`hideBar`, условие `!this.panel.open && !this.seek.active`), `src/front/ts/pages/player/panel.ts:166-203` (close paths).
+
+**Результат:** ждём проверки на ТВ — typecheck проходит.
+
+---
+
 ## 2026-04-13 22:00 — загружать с начала, seek на canplay вместо `cfg.startPosition`
 
 **Решение:** в `pages/player.ts` убрать `cfg.startPosition` из `buildHlsConfig`. В `MANIFEST_PARSED` звать `hls.startLoad(0)` вместо `startLoad(pos)`. В playSource сохранять `this.pendingStartSeek = state.position`. В обработчике `video canplay` один раз выполнять `videoEl.currentTime = pendingStartSeek` и обнулять флаг.

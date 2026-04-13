@@ -141,6 +141,7 @@ const scrollToFocused = ($list: JQuery): void => {
 
 export interface PanelCallbacks {
   onShowInfo: () => void;
+  onAfterClose: () => void;
   onApplyAudio: (idx: number) => void;
   onApplySub: (menuIdx: number) => void;
   onApplyQuality: (idx: number) => void;
@@ -170,6 +171,7 @@ const forceClosePanel = ($root: JQuery, state: PanelState, cbs: PanelCallbacks):
   $root.find('.ppanel__list').removeClass('active').addClass('hidden');
   $root.find('.ppanel__buttons').removeClass('active');
   $root.find('.player__panel').addClass('hidden');
+  cbs.onAfterClose();
 };
 
 export const openPanel = ($root: JQuery, state: PanelState, cbs: PanelCallbacks): void => {
@@ -199,6 +201,7 @@ export const closePanel = ($root: JQuery, state: PanelState, cbs: PanelCallbacks
   setTimeout(() => {
     state.open = false;
     $root.find('.player__panel').addClass('hidden');
+    cbs.onAfterClose();
   }, 200);
 };
 
