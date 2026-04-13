@@ -103,6 +103,7 @@ class PlayerController {
   private hadBufferFullError = false;
   private playbackStarted = false;
   private firstFragSnapped = false;
+  private healingSeekDone = false;
   private markedWatched = false;
   private wasWatched = false;
   private playSourceDebug = '';
@@ -509,6 +510,7 @@ class PlayerController {
     this.media.hlsUrl = originalUrl;
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
     this.firstFragSnapped = false;
+    this.healingSeekDone = false;
     this.playSourceDebug = 'url=' + originalUrl.substring(0, 120);
     plog.newTraceId();
     const cfg = this.buildHlsConfig();
@@ -797,6 +799,13 @@ class PlayerController {
         br: this.formatBuffered(this.videoEl),
       });
       this.hideSpinner();
+      if (!this.healingSeekDone && this.videoEl) {
+        this.healingSeekDone = true;
+        const ct = this.videoEl.currentTime;
+        const target = ct + 0.1;
+        plog.info('healingSeek ct={ct} -> {target}', { ct, target });
+        this.videoEl.currentTime = target;
+      }
     });
     this.videoEl.addEventListener('seeked', () => {
       plog.debug('video seeked ct={ct} readyState={rs} buffered={br}', {

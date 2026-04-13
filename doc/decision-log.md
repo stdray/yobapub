@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-04-13 18:30 — healing seek на первом `video playing`
+
+**Решение:** на первом событии `video playing` после инициализации плеера делаем `videoEl.currentTime += 0.1`. Флаг `healingSeekDone` — one-shot, сбрасывается в `playSource` вместе с `firstFragSnapped`.
+
+**Причина:** лог `dylDjDFiz069HEn32j8F0g` подтвердил, что ручная перемотка через `videoEl.currentTime = pos` на существующем hls.js-инстансе "лечит" рассинхрон, возникающий при `new Hls + loadSource` на Tizen 2.3. Эмулируем этот эффект в самом мягком виде — no-op seek на +0.1с сразу после старта воспроизведения, чтобы hls.js flush'нул SourceBuffers и переappend'нул фрагменты, ресетя decoder state.
+
+**Данные:** правка в `src/front/ts/pages/player.ts` (listener на `playing`), флаг добавлен рядом с `firstFragSnapped`.
+
+**Результат:** ждём проверки на ТВ.
+
+---
+
 ## 2026-04-13 17:55 — откатить seek-reload и починить abrEwmaFastVoD
 
 **Решение:** (1) вернуть `abrEwmaFastVoD`/`abrEwmaSlowVoD` с capital-D (были "исправлены" на lowercase). (2) откатить коммиты `100bb18` и `2c9d705` — перемотка снова через `stopLoad + startLoad(pos) + currentTime=pos` на существующем hls.js-инстансе, без пересоздания.
@@ -26,4 +38,10 @@
 - коммиты под откат: `100bb18` "Restart HLS buffer on seek to avoid bufferStalledError", `2c9d705` "Reload HLS stream on seek with playSource instead of stopLoad/startLoad"
 - опровергнутые гипотезы: recoverMediaError (не срабатывал ни в одном логе), gap-controller nudge (не срабатывал после правильного `startupSeekSnap`), двойной `LEVEL_SWITCHING` (починен через `autoStartLoad: false`).
 
-**Результат:** ждём проверки на устройстве. Если после отката перемотка перестанет давать рассинхрон — гипотеза "пересоздание hls.js на Tizen 2.3 ломает A/V sync" подтверждена, копать в процедуру reload. Если рассинхрон останется — bisect между `e1cdc8f` (2 апреля, работает) и текущим HEAD.
+**Результат:** **гипотеза подтверждена.** Лог `dylDjDFiz069HEn32j8F0g` (2026-04-13 15:04):
+- Начальный resume через `playSource` (destroy + new Hls + loadSource) — рассинхрон звука **есть**. Три `video playing` события и болтанка `seeking/seeked` вокруг startPosition.
+- Сразу после — ручная перемотка `applySeek pos=2462.81` через простое `videoEl.currentTime = pos` на существующем hls.js. Один чистый seek, один FRAG_BUFFERED, одно `video seeked` — рассинхрон **пропал**.
+
+Вывод: проблема — в инициализации MSE при `new Hls + loadSource` на Tizen 2.3 Chromium 28. Обычный seek её "чинит" потому что flush'ит старые SourceBuffers и делает append заново, ресетя decoder state.
+
+Следующий шаг: эмулировать эффект "лечебного seek" сразу после первого `video playing`/`FRAG_BUFFERED` на старте. Варианты — no-op seek на `ct+0.1`, seek на начало следующего фрагмента, принудительный flush через `hls.stopLoad()+startLoad()`. Эксперимент.
