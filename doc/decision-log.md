@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-04-13 21:00 — fix скролла списка сабов/аудио в панели плеера (issue #10)
+
+**Решение:** в `scrollToFocused` (`pages/player/panel.ts`) использовать `el.offsetTop` напрямую вместо `el.offsetTop - container.offsetTop`. Плюс поднять `max-height` `.ppanel__list` c 600px до 900px.
+
+**Причина:** `.ppanel__list` имеет `position: absolute`, значит он сам — offsetParent для своих `.ppanel__list-item`. `el.offsetTop` уже отсчитывается от списка, а вычитание `container.offsetTop` (смещение списка внутри `.player__panel`) давало произвольную константу: для верхних элементов получалось отрицательное число, scrollTop прыгал некорректно, и при большом числе дорожек прокрутка "работала неправильно" — элементы не доскролливались до видимой области. 900px даёт ~15 пунктов до появления скролла на 1080p.
+
+**Данные:** issue #10, `src/front/ts/pages/player/panel.ts:128-140`, `src/front/css/app.css:754`.
+
+**Результат:** ждём проверки на ТВ.
+
+---
+
 ## 2026-04-13 19:45 — откат healing seek (он оказался причиной, а не фиксом)
 
 **Решение:** удалить healing seek целиком — и startup (`playing` handler), и stall (`bufferStalledError` handler). Возврат обработчика stall к варианту "только `nudgePastBufferGap` + `recoverMediaError` при `hadBufferFullError`".

@@ -130,7 +130,7 @@ const scrollToFocused = ($list: JQuery): void => {
   if (!el) return;
   const container = $list[0];
   if (!container) return;
-  const top = el.offsetTop - container.offsetTop;
+  const top = el.offsetTop;
   const bot = top + el.offsetHeight;
   if (top < container.scrollTop) {
     container.scrollTop = top;
