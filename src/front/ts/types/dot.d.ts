@@ -13,7 +13,7 @@ declare module 'dot' {
   }
   interface DoT {
     templateSettings: TemplateSettings;
-    template(tmpl: string, c?: Partial<TemplateSettings>, def?: any): (data: any) => string;
+    template(tmpl: string, c?: Partial<TemplateSettings>, def?: Record<string, unknown>): (data: unknown) => string;
   }
   const doT: DoT;
   export = doT;

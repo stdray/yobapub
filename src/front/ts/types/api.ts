@@ -304,8 +304,21 @@ export interface DeviceInfoResponse {
   };
 }
 
+export interface DeviceSettingOption {
+  readonly id: number | string;
+  readonly label: string;
+  readonly description?: string;
+  readonly selected: boolean;
+}
+
+export interface DeviceSetting {
+  readonly label?: string;
+  readonly type: string;
+  readonly value: boolean | ReadonlyArray<DeviceSettingOption>;
+}
+
 export interface DeviceSettingsResponse {
-  readonly settings: Record<string, any>;
+  readonly settings: Record<string, DeviceSetting>;
 }
 
 export interface UserResponse {

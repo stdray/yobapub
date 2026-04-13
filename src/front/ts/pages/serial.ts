@@ -85,7 +85,15 @@ const tplEpisodeCompiled = doT.template(`
   </div>
 `);
 
-const tplEpisode = (data: { readonly idx: number; readonly number: number; readonly title: string; readonly status: string; readonly thumbnail: string }): string =>
+interface EpisodeData {
+  readonly idx: number;
+  readonly number: number;
+  readonly title: string;
+  readonly status: string;
+  readonly thumbnail: string;
+}
+
+const tplEpisode = (data: EpisodeData): string =>
   tplEpisodeCompiled(data);
 
 const getEpisodeStatus = (seasonNum: number, epNum: number): { time: number; status: number } => {
@@ -139,7 +147,12 @@ const buildEpisodes = (season: Season | undefined): string => {
     let statusText = '';
     if (st.status === 1) statusText = '\u2713';
     else if (st.status === 0 && st.time > 0) statusText = formatTimeShort(st.time);
-    html += tplEpisode({ idx: j, number: ep.number, title: ep.title || 'Эпизод ' + ep.number, status: statusText, thumbnail: ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '' });
+    html += tplEpisode({
+      idx: j, number: ep.number,
+      title: ep.title || 'Эпизод ' + ep.number,
+      status: statusText,
+      thumbnail: ep.thumbnail ? storage.proxyPosterUrl(ep.thumbnail) : '',
+    });
   }
   return html;
 };

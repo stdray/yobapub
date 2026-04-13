@@ -13,6 +13,43 @@ import { Logger } from '../utils/log';
 
 const plog = new Logger('player');
 
+interface HlsLevel {
+  readonly height?: number;
+  readonly width?: number;
+  readonly bitrate?: number;
+  readonly videoCodec?: string;
+  readonly audioCodec?: string;
+}
+
+interface HlsInternals {
+  readonly currentLevel?: number;
+  readonly levels?: ReadonlyArray<HlsLevel>;
+}
+
+interface HlsFragData {
+  frag?: { sn: number; start: number; duration: number };
+  stats?: { total: number; trequest: number; tfirst: number; tload: number };
+}
+
+interface HlsLevelSwitchData {
+  level?: number;
+  width?: number;
+  height?: number;
+  bitrate?: number;
+  videoCodec?: string;
+  audioCodec?: string;
+}
+
+interface HlsErrorData {
+  fatal: boolean;
+  type: string;
+  details: string;
+  reason?: string;
+  error?: unknown;
+  response?: { code: number };
+  frag?: { url?: string; sn?: number; start?: number };
+}
+
 // DIAGNOSTIC: expose a global logging function so patched hls.js source files in
 // node_modules (stream-controller, gap-controller, audio-stream-controller) can log
 // every `media.currentTime = X` assignment via our backend-bound Logger. Tizen 2.3
@@ -31,11 +68,16 @@ interface CtLogWindow extends Window {
 
 import Hls from 'hls.js';
 import { tplPlayer } from './player/template';
-import { MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks, getResumeTime, isEpisodeWatched, isVideoWatched } from './player/media';
+import {
+  MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks,
+  getResumeTime, isEpisodeWatched, isVideoWatched,
+} from './player/media';
 import { getRewrittenHlsUrl } from './player/hls';
 import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
 import { ProgressState, getVideoDuration, updateProgress } from './player/progress';
-import { PanelState, PanelCallbacks, PanelData, getAudioItems, getSubItems, getQualityItems, openPanel as panelOpen_, handlePanelKey, clearPanelIdle } from './player/panel';
+import {
+  Panel, PanelData, getAudioItems, getSubItems, getQualityItems,
+} from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
 import { PlayerInfo } from './player/info';
 
@@ -85,10 +127,6 @@ const defaultSeekState = (): SeekState => ({
   pos: -1, count: 0, dir: '', active: false, applyTimer: null,
 });
 
-const defaultPanelState = (): PanelState => ({
-  open: false, btnIndex: 0, listOpen: false, listIndex: 0, listSection: 0,
-});
-
 // --- PlayerController ---
 
 class PlayerController {
@@ -101,7 +139,7 @@ class PlayerController {
   private media = defaultMedia();
   private state = defaultPlayState();
   private seek = defaultSeekState();
-  private panel = defaultPanelState();
+  private panel = this.initPanel();
   private progress: ProgressState = {
     videoEl: null, currentDuration: 0, seeking: false, seekPos: -1,
     barValueEl: null, barPctEl: null, barDurationEl: null, barSeekEl: null,
@@ -136,16 +174,19 @@ class PlayerController {
     videoEl: () => this.videoEl,
   });
 
-  // Panel callbacks
-  private readonly panelCallbacks: PanelCallbacks = {
-    onShowInfo: () => { this.info.show(); },
-    onAfterClose: () => { this.showBar(); },
-    onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
-    onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
-    onApplyQuality: (idx) => { if (idx !== this.state.quality) this.continueWith({ quality: idx }); },
-    onSavePrefs: () => { this.doSavePrefs(); },
-    getData: () => this.getPanelData(),
-  };
+  private initPanel(): Panel {
+    return new Panel(this.$root, {
+      onShowInfo: () => { this.info.show(); },
+      onAfterClose: () => { this.showBar(); },
+      onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
+      onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
+      onApplyQuality: (idx) => {
+        if (idx !== this.state.quality) this.continueWith({ quality: idx });
+      },
+      onSavePrefs: () => { this.doSavePrefs(); },
+      getData: () => this.getPanelData(),
+    });
+  }
 
   // --- Helpers ---
 
@@ -413,7 +454,7 @@ class PlayerController {
     if (needSource) {
       if (this.media.files.length === 0) return;
       const f = this.media.files[this.state.quality];
-      let hlsUrl = this.getHlsUrl(f);
+      const hlsUrl = this.getHlsUrl(f);
       if (!hlsUrl) return;
       if (!this.videoEl) {
         this.playUrl(hlsUrl, title || this.media.title);
@@ -471,7 +512,10 @@ class PlayerController {
 
   private doSavePrefs(): void {
     if (!this.media.item) return;
-    saveCurrentPrefs(this.media.item.id, this.media.files, this.media.audios, this.media.subs, this.state.quality, this.state.audio, this.state.sub);
+    saveCurrentPrefs(
+      this.media.item.id, this.media.files, this.media.audios, this.media.subs,
+      this.state.quality, this.state.audio, this.state.sub,
+    );
   }
 
   // --- Playback ---
@@ -496,7 +540,7 @@ class PlayerController {
   }
 
   private pinQualityLevel(hls: Hls): void {
-    const hlsAny = hls as unknown as { levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number }>; currentLevel: number };
+    const hlsAny = hls as unknown as HlsInternals & { currentLevel: number };
     const levels = hlsAny.levels;
     if (!levels || levels.length <= 1) return;
 
@@ -552,7 +596,7 @@ class PlayerController {
         });
       }
     });
-    hls.on(Hls.Events.FRAG_LOADED, (_e: string, data: { frag?: { sn: number; start: number; duration: number }; stats?: { total: number; trequest: number; tfirst: number; tload: number } }) => {
+    hls.on(Hls.Events.FRAG_LOADED, (_e: string, data: HlsFragData) => {
       const frag = data.frag;
       const stats = data.stats;
       if (frag && stats) {
@@ -588,14 +632,14 @@ class PlayerController {
         v.currentTime = target;
       }
     });
-    hls.on(Hls.Events.LEVEL_SWITCHING, (_e: string, data: { level?: number; width?: number; height?: number; bitrate?: number; videoCodec?: string; audioCodec?: string }) => {
+    hls.on(Hls.Events.LEVEL_SWITCHING, (_e: string, data: HlsLevelSwitchData) => {
       plog.info('hls LEVEL_SWITCHING level={level} {w}x{h} bitrate={br} videoCodec={vc} audioCodec={ac}', {
         level: data.level, w: data.width, h: data.height,
         br: data.bitrate, vc: data.videoCodec || null, ac: data.audioCodec || null,
       });
     });
     hls.on(Hls.Events.LEVEL_SWITCHED, (_e: string, data: { level?: number }) => {
-      const hlsAny = hls as unknown as { readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number; readonly videoCodec?: string; readonly audioCodec?: string }> };
+      const hlsAny = hls as unknown as HlsInternals;
       const lvl = hlsAny.levels && data.level !== undefined ? hlsAny.levels[data.level] : undefined;
       plog.info('hls LEVEL_SWITCHED level={level} {w}x{h} bitrate={br} videoCodec={vc} audioCodec={ac}', {
         level: data.level,
@@ -604,11 +648,14 @@ class PlayerController {
       });
     });
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      const hlsAny = hls as unknown as { readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number; readonly videoCodec?: string; readonly audioCodec?: string }> };
+      const hlsAny = hls as unknown as HlsInternals;
       const lvls = hlsAny.levels || [];
       plog.info('hls MANIFEST_PARSED levels={count} details={details}', {
         count: lvls.length,
-        details: lvls.map((l) => l.width + 'x' + l.height + '@' + l.bitrate + ' vc=' + (l.videoCodec || '?') + ' ac=' + (l.audioCodec || '?')).join(', '),
+        details: lvls.map((l) =>
+          l.width + 'x' + l.height + '@' + l.bitrate
+          + ' vc=' + (l.videoCodec || '?') + ' ac=' + (l.audioCodec || '?'),
+        ).join(', '),
       });
       this.pinQualityLevel(hls);
       // autoStartLoad is disabled in config — start loading only after pin to avoid
@@ -617,7 +664,7 @@ class PlayerController {
       hls.startLoad(0);
       this.onSourceReady();
     });
-    hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; error?: unknown; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {
+    hls.on(Hls.Events.ERROR, (_e: string, data: HlsErrorData) => {
       if (!data.fatal) {
         plog.warn('hls error (non-fatal) {type} {details} {reason} {error} {fragUrl}', {
           type: data.type, details: data.details,
@@ -702,7 +749,9 @@ class PlayerController {
 
   private onSourceReady(): void {
     if (!this.videoEl) return;
-    plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', { pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime });
+    plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', {
+      pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime,
+    });
     if (!this.state.paused) this.videoEl.play();
     this.playbackStarted = true;
     if (this.state.sub >= 0 && this.videoEl) {
@@ -747,7 +796,7 @@ class PlayerController {
     const code = error ? error.code : 0;
     const detail = error && (error as { message?: string }).message ? (error as { message?: string }).message : '';
     const domain = this.getHlsDomain();
-    const hlsAny = this.hlsInstance as unknown as { readonly currentLevel?: number; readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number; readonly videoCodec?: string; readonly audioCodec?: string }> } | null;
+    const hlsAny = this.hlsInstance as unknown as HlsInternals | null;
     const curLevel = hlsAny && hlsAny.currentLevel !== undefined && hlsAny.currentLevel >= 0 && hlsAny.levels
       ? hlsAny.levels[hlsAny.currentLevel] : undefined;
     const devInfo = platform.getDeviceInfo();
@@ -858,10 +907,11 @@ class PlayerController {
     this.videoEl.addEventListener('error', () => {
       const v = this.videoEl;
       const err2 = v ? v.error : null;
-      const hlsAny = this.hlsInstance as unknown as { readonly currentLevel?: number; readonly levels?: ReadonlyArray<{ readonly height?: number; readonly width?: number; readonly bitrate?: number; readonly videoCodec?: string; readonly audioCodec?: string }> } | null;
+      const hlsAny = this.hlsInstance as unknown as HlsInternals | null;
       const curLevel = hlsAny && hlsAny.currentLevel !== undefined && hlsAny.currentLevel >= 0 && hlsAny.levels
         ? hlsAny.levels[hlsAny.currentLevel] : undefined;
-      plog.error('video error code={code} message={message} ct={ct} readyState={rs} buffered={br} hlsLevel={hlsLevel} videoCodec={vc} audioCodec={ac} hlsBitrate={hlsBitrate}', {
+      plog.error('video error code={code} message={message} ct={ct} readyState={rs}'
+        + ' buffered={br} hlsLevel={hlsLevel} videoCodec={vc} audioCodec={ac} hlsBitrate={hlsBitrate}', {
         code: err2 ? err2.code : null,
         message: err2 ? (err2 as { message?: string }).message || null : null,
         ct: v ? v.currentTime : null,
@@ -933,14 +983,14 @@ class PlayerController {
     this.stopMarkTimer();
     this.stopProgressTimer();
     this.clearBarTimer();
-    clearPanelIdle();
+    this.panel.clearIdle();
     this.resetSeek();
     if (this.osdTimer) { clearTimeout(this.osdTimer); this.osdTimer = null; }
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
     if (this.videoEl) {
-      try { this.videoEl.pause(); } catch (e) { /* ignore */ }
+      try { this.videoEl.pause(); } catch { /* ignore */ }
       this.videoEl.removeAttribute('src');
-      try { this.videoEl.load(); } catch (e) { /* ignore */ }
+      try { this.videoEl.load(); } catch { /* ignore */ }
       this.videoEl = null;
     }
     this.progress.barValueEl = null;
@@ -954,7 +1004,7 @@ class PlayerController {
     this.media = defaultMedia();
     this.state = defaultPlayState();
     this.seek = defaultSeekState();
-    this.panel = defaultPanelState();
+    this.panel = this.initPanel();
     this.progress = {
       videoEl: null, currentDuration: 0, seeking: false, seekPos: -1,
       barValueEl: null, barPctEl: null, barDurationEl: null, barSeekEl: null,
@@ -982,7 +1032,7 @@ class PlayerController {
     }
 
     if (this.panel.open) {
-      handlePanelKey(e, kc, this.$root, this.panel, this.panelCallbacks);
+      this.panel.handleKey(e, kc);
       return;
     }
 
@@ -1026,7 +1076,7 @@ class PlayerController {
       case TvKey.Up:
         this.showBar(); break;
       case TvKey.Down:
-        panelOpen_(this.$root, this.panel, this.panelCallbacks); break;
+        this.panel.show(); break;
 
       case TvKey.Green:
         changeSubSize(1, (text) => this.showToast(text)); break;

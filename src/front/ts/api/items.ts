@@ -1,4 +1,3 @@
-import $ from 'jquery';
 import { apiClient } from './client';
 import { Item, ItemResponse, ItemsResponse, WatchingInfoItem, WatchingInfoResponse } from '../types/api';
 import { getWatchingInfo } from './watching';
@@ -24,14 +23,17 @@ export const loadItemWithWatching = (
   onSuccess: (item: Item, watching: WatchingInfoItem | null) => void,
   onError: () => void
 ): void => {
-  $.when(getItem(id), getWatchingInfo(id)).then(
-    (itemRes: any, watchRes: any) => {
-      const iData = Array.isArray(itemRes) ? itemRes[0] : itemRes;
-      const wData = Array.isArray(watchRes) ? watchRes[0] : watchRes;
-      const item: Item = iData.item;
-      const watching: WatchingInfoItem | null = (wData && wData.item) || null;
-      if (item) { onSuccess(item, watching); }
-      else { onError(); }
+  getItem(id).then(
+    (itemData: ItemResponse) => {
+      const item = itemData.item;
+      if (!item) { onError(); return; }
+      getWatchingInfo(id).then(
+        (watchData: WatchingInfoResponse) => {
+          const watching: WatchingInfoItem | null = (watchData && watchData.item) || null;
+          onSuccess(item, watching);
+        },
+        () => { onSuccess(item, null); }
+      );
     },
     () => { onError(); }
   );

@@ -31,13 +31,6 @@ export enum TvKey {
   Key9 = 57
 }
 
-/* eslint-disable no-var -- ambient declarations require var */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Tizen SDK global, no typings
-declare var tizen: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Tizen SDK global, no typings
-declare var webapis: any;
-/* eslint-enable no-var */
-
 export interface DeviceInfo {
   readonly title: string;
   readonly hardware: string;
@@ -132,8 +125,7 @@ class Platform {
   };
 
   isAndroidWebView = (): boolean => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped native bridge
-    return typeof (window as any).NativeApp !== 'undefined' || /Android.*wv\b/.test(navigator.userAgent);
+    return window.NativeApp !== undefined || /Android.*wv\b/.test(navigator.userAgent);
   };
 
   exitApp = (): void => {

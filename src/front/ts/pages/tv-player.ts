@@ -7,11 +7,12 @@ import { Logger } from '../utils/log';
 import { buildBaseHlsConfig, logPlaybackStart } from '../utils/hls-proxy';
 import { storage } from '../utils/storage';
 import { showHlsError } from '../utils/hls-error';
+import Hls from 'hls.js';
 
 const $root = $('#page-tv-player');
 const keys = new PageKeys();
 const plog = new Logger('tv-player');
-let hls: any = null;
+let hls: Hls | null = null;
 let video: HTMLVideoElement | null = null;
 let overlayTimer: number | null = null;
 
@@ -57,7 +58,7 @@ const render = (title: string): void => {
       showOverlay(false);
     });
     video.addEventListener('ended', () => plog.debug('video: ended'));
-    video.addEventListener('error', (e) => {
+    video.addEventListener('error', () => {
       const err = video?.error;
       const devInfo = platform.getDeviceInfo();
       plog.error('video: error', {
@@ -99,14 +100,13 @@ const startPlayback = (streamUrl: string): void => {
     plog.error('video element not found');
     return;
   }
-  const HlsCtor = (window as any).Hls;
-  plog.debug('HLS check', { hlsExists: !!HlsCtor, hlsSupported: HlsCtor && HlsCtor.isSupported() });
-  if (HlsCtor && HlsCtor.isSupported()) {
+  plog.debug('HLS check', { hlsExists: !!Hls, hlsSupported: Hls && Hls.isSupported() });
+  if (Hls && Hls.isSupported()) {
     plog.info('Using HLS.js');
 
     const hlsConfig = buildBaseHlsConfig();
 
-    hls = new HlsCtor(hlsConfig);
+    hls = new Hls(hlsConfig);
     plog.newTraceId();
     logPlaybackStart(plog, streamUrl);
 
@@ -116,26 +116,26 @@ const startPlayback = (streamUrl: string): void => {
     }
 
     // Register all events before loadSource/attachMedia
-    hls.on(HlsCtor.Events.MANIFEST_LOADING, (_e: unknown, data: { url?: string }) => {
+    hls.on(Hls.Events.MANIFEST_LOADING, (_e: unknown, data: { url?: string }) => {
       plog.debug('HLS MANIFEST_LOADING', { url: data?.url ? data.url.substring(0, 120) : null });
     });
-    hls.on(HlsCtor.Events.MANIFEST_LOADED, (_e: unknown, data: { levels?: unknown[] }) => {
+    hls.on(Hls.Events.MANIFEST_LOADED, (_e: unknown, data: { levels?: unknown[] }) => {
       plog.debug('HLS MANIFEST_LOADED', { levels: data?.levels ? data.levels.length : 0 });
     });
-    hls.on(HlsCtor.Events.LEVEL_LOADING, (_e: unknown, data: { url?: string; level?: number }) => {
+    hls.on(Hls.Events.LEVEL_LOADING, (_e: unknown, data: { url?: string; level?: number }) => {
       plog.debug('HLS LEVEL_LOADING', { level: data?.level, url: data?.url ? data.url.substring(0, 120) : null });
     });
-    hls.on(HlsCtor.Events.LEVEL_LOADED, (_e: unknown, data: { level?: number; details?: { fragments?: unknown[] } }) => {
+    hls.on(Hls.Events.LEVEL_LOADED, (_e: unknown, data: { level?: number; details?: { fragments?: unknown[] } }) => {
       plog.debug('HLS LEVEL_LOADED', { level: data?.level, frags: data?.details?.fragments ? data.details.fragments.length : 0 });
     });
-    hls.on(HlsCtor.Events.FRAG_LOADING, (_e: unknown, data: { frag?: { sn: number; url?: string } }) => {
+    hls.on(Hls.Events.FRAG_LOADING, (_e: unknown, data: { frag?: { sn: number; url?: string } }) => {
       plog.debug('HLS FRAG_LOADING', { sn: data?.frag?.sn, url: data?.frag?.url ? data.frag.url.substring(0, 120) : null });
     });
-    hls.on(HlsCtor.Events.FRAG_LOADED, (_e: unknown, data: { frag?: { sn: number } }) => {
+    hls.on(Hls.Events.FRAG_LOADED, (_e: unknown, data: { frag?: { sn: number } }) => {
       plog.debug('HLS FRAG_LOADED', { sn: data?.frag?.sn });
     });
 
-    hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
       plog.debug('HLS MANIFEST_PARSED');
       if (video) {
         video.play().catch((err: unknown) => {
@@ -150,7 +150,7 @@ const startPlayback = (streamUrl: string): void => {
       }
     });
 
-    hls.on(HlsCtor.Events.ERROR, (event: unknown, data: {
+    hls.on(Hls.Events.ERROR, (event: unknown, data: {
       fatal: boolean; type: string; details: string; error?: unknown; reason?: string;
       response?: { code: number; text?: string }; url?: string;
       frag?: { sn: number; url?: string; level?: number };
@@ -189,10 +189,10 @@ const startPlayback = (streamUrl: string): void => {
       plog.error('HLS error', errorInfo);
 
       if (data && data.fatal) {
-        if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
           plog.warn('Media error, attempting recovery');
           try {
-            hls.recoverMediaError();
+            hls?.recoverMediaError();
           } catch (e) {
             plog.error('Recovery failed', { error: String(e) });
           }

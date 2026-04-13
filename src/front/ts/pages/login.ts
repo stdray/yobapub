@@ -106,7 +106,7 @@ const startAuth = (): void => {
           msg = body.error_description || body.error || msg;
         }
         if (xhr && xhr.status) { msg += ' (' + xhr.status + ')'; }
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
       $root.html(tplError({ message: msg }));
     }
   );

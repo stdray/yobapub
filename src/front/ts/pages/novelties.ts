@@ -69,7 +69,8 @@ class NoveltiesPage extends SidebarPage {
       requests.push(getItems(SECTIONS_CONFIG[i].type, 'created-'));
     }
 
-    ($.when as any).apply($, requests).then((...args: any[]) => {
+    ($.when as (...d: JQuery.Deferred<unknown>[]) => JQuery.Promise<unknown>)
+      .apply($, requests).then((...args: unknown[]) => {
       this.sections = [];
       const n = SECTIONS_CONFIG.length;
       for (let i = 0; i < n; i++) {

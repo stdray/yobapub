@@ -1,4 +1,3 @@
-import $ from 'jquery';
 import * as doT from 'dot';
 import { RouteParams } from '../types/app';
 import { HistoryEntry, HistoryResponse } from '../types/api';

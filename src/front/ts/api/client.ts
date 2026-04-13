@@ -15,13 +15,13 @@ export class ApiClient {
 
   readonly getClientSecret = (): string => this.clientSecret;
 
-  private readonly refreshToken = (): JQueryXHR => {
+  private readonly refreshToken = (): JQuery.Thenable<TokenResponse> => {
     const rt = storage.getRefreshToken();
     if (!rt) {
       storage.clearTokens();
-      const d = $.Deferred();
+      const d = $.Deferred<TokenResponse>();
       d.reject(null, 'error', 'no_refresh_token');
-      return d.promise() as any as JQueryXHR;
+      return d.promise();
     }
 
     return $.ajax({

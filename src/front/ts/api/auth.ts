@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import { apiClient } from './client';
-import { DeviceCodeResponse, TokenResponse, AuthErrorResponse } from '../types/api';
+import { TokenResponse, AuthErrorResponse } from '../types/api';
 import { storage } from '../utils/storage';
 
 export const requestDeviceCode = (): JQueryXHR =>
@@ -60,7 +60,7 @@ export const pollDeviceToken = (
           } else {
             onError(body.error_description || body.error);
           }
-        } catch (e) {
+        } catch {
           onError('Network error');
           elapsed += interval;
           timerId = window.setTimeout(poll, interval * 1000);

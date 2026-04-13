@@ -1,4 +1,3 @@
-import $ from 'jquery';
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
 import Hls from 'hls.js';
 

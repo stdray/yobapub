@@ -49,7 +49,9 @@ class WatchingPage extends SidebarPage {
     PageUtils.showSpinnerIn(this.$root);
 
     $.when(getWatchingSerials(), getWatchingMovies()).then(
-      (serialsRes: any, moviesRes: any) => {
+      (...args: unknown[]) => {
+        const serialsRes = args[0] as [WatchingSerialsResponse, string, JQueryXHR] | WatchingSerialsResponse;
+        const moviesRes = args[1] as [WatchingMoviesResponse, string, JQueryXHR] | WatchingMoviesResponse;
         const sData: WatchingSerialsResponse = Array.isArray(serialsRes) ? serialsRes[0] : serialsRes;
         const mData: WatchingMoviesResponse = Array.isArray(moviesRes) ? moviesRes[0] : moviesRes;
         this.serialsData = (sData && sData.items) || [];

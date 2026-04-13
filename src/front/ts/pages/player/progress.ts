@@ -1,4 +1,3 @@
-import $ from 'jquery';
 import { formatTimecode } from '../../utils/format';
 
 export interface ProgressState {

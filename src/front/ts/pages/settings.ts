@@ -2,7 +2,7 @@ import $ from 'jquery';
 import * as doT from 'dot';
 import { Page, RouteParams } from '../types/app';
 import { deviceApi } from '../api/device';
-import { DeviceSettingsResponse } from '../types/api';
+import { DeviceSetting, DeviceSettingsResponse } from '../types/api';
 import { TvKey, platform } from '../utils/platform';
 import { storage, Storage, QualityId } from '../utils/storage';
 import { PageKeys, PageUtils } from '../utils/page';
@@ -20,7 +20,7 @@ interface SettingItem {
   key: string;
   label: string;
   type: string;
-  value: number | string | null;
+  value: number | string | boolean | null;
   options?: SettingOption[];
 }
 
@@ -69,7 +69,15 @@ const tplSettingItemCompiled = doT.template(`
   </div>
 `);
 
-const tplSettingItem = (data: { readonly idx: number; readonly label: string; readonly value: string; readonly focused: boolean; readonly stepper: boolean }): string =>
+interface SettingItemData {
+  readonly idx: number;
+  readonly label: string;
+  readonly value: string;
+  readonly focused: boolean;
+  readonly stepper: boolean;
+}
+
+const tplSettingItem = (data: SettingItemData): string =>
   tplSettingItemCompiled(data);
 
 const tplOptionsCompiled = doT.template(`
@@ -81,10 +89,16 @@ const tplOptionsCompiled = doT.template(`
   </div>
 `);
 
-const tplOptions = (data: { readonly title: string; readonly options: Array<{ readonly label: string; readonly selected: boolean }>; readonly focused: number }): string =>
+interface OptionsData {
+  readonly title: string;
+  readonly options: ReadonlyArray<{ readonly label: string; readonly selected: boolean }>;
+  readonly focused: number;
+}
+
+const tplOptions = (data: OptionsData): string =>
   tplOptionsCompiled(data);
 
-const parseSettings = (raw: Record<string, any>): SettingItem[] => {
+const parseSettings = (raw: Record<string, DeviceSetting>): SettingItem[] => {
   const items: SettingItem[] = [];
   for (const key of Object.keys(raw)) {
     if (!DISPLAY_KEYS[key]) continue;
@@ -109,7 +123,7 @@ const parseSettings = (raw: Record<string, any>): SettingItem[] => {
       }
       items.push({ key: key, label: label, type: 'list', value: null, options: opts });
     } else {
-      items.push({ key: key, label: label, type: 'checkbox', value: setting.value });
+      items.push({ key: key, label: label, type: 'checkbox', value: typeof setting.value === 'boolean' ? setting.value : null });
     }
   }
   return items;
@@ -193,12 +207,14 @@ class SettingsPage implements Page {
     PageUtils.showSpinnerIn(this.$root);
 
     $.when(deviceApi.getDeviceSettings(), deviceApi.checkVip(true)).then(
-      (res: any, isVip: any) => {
+      (...args: unknown[]) => {
+        const res = args[0] as [DeviceSettingsResponse, string, JQueryXHR] | DeviceSettingsResponse;
+        const isVip = args[1] as [boolean, string, JQueryXHR] | boolean;
         const data: DeviceSettingsResponse = Array.isArray(res) ? res[0] : res;
         const vip: boolean = Array.isArray(isVip) ? isVip[0] : isVip;
         if (data && data.settings) {
           this.allSettings = parseSettings(data.settings);
-          if (data.settings.streamingType && data.settings.streamingType.value) {
+          if (data.settings.streamingType && Array.isArray(data.settings.streamingType.value)) {
             const stValues = data.settings.streamingType.value;
             for (let si = 0; si < stValues.length; si++) {
               if (stValues[si].selected) { storage.setStreamingType(String(stValues[si].label || stValues[si].id).toLowerCase()); break; }
