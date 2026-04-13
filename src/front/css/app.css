@@ -1024,9 +1024,9 @@ video::cue {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,0.1);
-  border-radius: 8px;
-  font-size: 26px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 12px;
+  font-size: 32px;
   color: #fff;
   flex-shrink: 0;
 }
