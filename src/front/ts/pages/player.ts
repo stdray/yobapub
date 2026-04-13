@@ -472,8 +472,10 @@ class PlayerController {
     cfg.nudgeMaxRetry = 3;
     cfg.abrEwmaFastLive = 5.0;
     cfg.abrEwmaSlowLive = 10.0;
-    cfg.abrEwmaFastVod = 5.0;
-    cfg.abrEwmaSlowVod = 10.0;
+    // hls.js 0.14.x uses capital-D (see node_modules/hls.js/src/config.ts).
+    // Partial<Hls.Config> from @types accepts lowercase variant too — runtime would silently ignore.
+    (cfg as unknown as { abrEwmaFastVoD: number }).abrEwmaFastVoD = 5.0;
+    (cfg as unknown as { abrEwmaSlowVoD: number }).abrEwmaSlowVoD = 10.0;
     return cfg;
   }
 
