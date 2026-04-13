@@ -1,6 +1,9 @@
 import $ from 'jquery';
 import { Subtitle } from '../../types/api';
 import { storage, Storage } from '../../utils/storage';
+import { Logger } from '../../utils/log';
+
+const log = new Logger('subs-diag');
 
 let subStyleEl: HTMLStyleElement | null = null;
 
@@ -53,6 +56,16 @@ export const loadSubtitleTrack = (videoEl: HTMLVideoElement, $root: JQuery, subs
   const sub = subs[subIdx];
   const v = videoEl;
 
+  const dumpTracks = (tag: string): void => {
+    const tt = v.textTracks;
+    const parts: string[] = [];
+    for (let i = 0; i < tt.length; i++) {
+      const cues = tt[i].cues;
+      parts.push(i + ':mode=' + tt[i].mode + ',lang=' + tt[i].language + ',cues=' + (cues ? cues.length : -1));
+    }
+    log.info('tracks tag={tag} count={count} items={items}', { tag, count: tt.length, items: parts.join(' | ') });
+  };
+
   const addTrackFromUrl = (src: string): void => {
     const track = document.createElement('track');
     track.kind = 'subtitles';
@@ -60,25 +73,43 @@ export const loadSubtitleTrack = (videoEl: HTMLVideoElement, $root: JQuery, subs
     track.srclang = sub.lang;
     track.src = src;
     track.setAttribute('default', '');
+    track.addEventListener('load', () => {
+      dumpTracks('track-load');
+      const idx = v.textTracks.length - 1;
+      if (idx >= 0) {
+        v.textTracks[idx].mode = 'showing';
+        log.info('forced showing idx={idx}', { idx });
+        dumpTracks('after-force-showing');
+      }
+    });
+    track.addEventListener('error', () => {
+      log.warn('track element error event', {});
+    });
     v.appendChild(track);
+    dumpTracks('after-append');
     if (v.textTracks.length > 0) {
       v.textTracks[v.textTracks.length - 1].mode = 'showing';
     }
+    dumpTracks('after-initial-showing');
   };
 
   const subUrl = storage.proxyUrl(sub.url);
+  log.info('loading idx={idx} lang={lang} url={url}', { idx: subIdx, lang: sub.lang, url: subUrl });
 
   $.ajax({
     url: subUrl,
     dataType: 'text',
     success: (data: string) => {
       if (!v || !v.parentNode) return;
+      log.info('ajax ok len={len} head={head}', { len: data.length, head: data.substring(0, 120) });
       const vtt = srtToVtt(data);
+      log.info('vtt head={head}', { head: vtt.substring(0, 200) });
       const blob = new Blob([vtt], { type: 'text/vtt' });
       addTrackFromUrl(URL.createObjectURL(blob));
     },
-    error: () => {
+    error: (_xhr, status, err) => {
       if (!v || !v.parentNode) return;
+      log.warn('ajax error status={status} err={err}', { status: String(status), err: String(err) });
       addTrackFromUrl(subUrl);
     }
   });
