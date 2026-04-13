@@ -53,7 +53,7 @@ export class ApiClient {
     });
   };
 
-  readonly apiPost = <D extends object = Record<string, unknown>>(path: string, data?: D): JQueryXHR => {
+  readonly apiPost = <D extends object>(path: string, data?: D): JQueryXHR => {
     const token = storage.getAccessToken();
     let url = path;
     if (token) {
@@ -67,7 +67,7 @@ export class ApiClient {
     });
   };
 
-  readonly apiGetWithRefresh = <T = unknown, P extends QueryParams = QueryParams>(
+  readonly apiGetWithRefresh = <T, P extends QueryParams = QueryParams>(
     path: string, params?: P,
   ): JQueryDeferred<T> => {
     const d = $.Deferred<T>();
@@ -101,7 +101,7 @@ export class ApiClient {
     return d;
   };
 
-  readonly apiPostWithRefresh = <T = unknown, D extends object = Record<string, unknown>>(
+  readonly apiPostWithRefresh = <T, D extends object>(
     path: string, data?: D,
   ): JQueryDeferred<T> => {
     const d = $.Deferred<T>();
