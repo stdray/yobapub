@@ -751,6 +751,27 @@ class PlayerController {
     const epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
     this.$root.html(tplPlayer({ title: itemTitle, episode: epTitle }));
     this.videoEl = this.$root.find('video')[0] as HTMLVideoElement;
+    // DIAGNOSTIC: wrap currentTime setter to log every assignment with stack trace.
+    // Tracking who really seeks at startup on Tizen 2.3 (multiple seeking events observed
+    // despite no explicit seek in our code). Remove after the source is identified.
+    const mediaProto = HTMLMediaElement.prototype;
+    const ctDesc = Object.getOwnPropertyDescriptor(mediaProto, 'currentTime');
+    if (ctDesc && typeof ctDesc.set === 'function' && typeof ctDesc.get === 'function') {
+      const origSet = ctDesc.set;
+      const origGet = ctDesc.get;
+      Object.defineProperty(this.videoEl, 'currentTime', {
+        configurable: true,
+        get(this: HTMLMediaElement): number { return (origGet as () => number).call(this); },
+        set(this: HTMLMediaElement, value: number): void {
+          const prev = (origGet as () => number).call(this);
+          const stack = ((new Error().stack || '').split('\n').slice(1, 7).join(' | ')).substring(0, 400);
+          plog.info('ctSet value={value} prev={prev} seeking={seeking} rs={rs} stack={stack}', {
+            value, prev, seeking: this.seeking, rs: this.readyState, stack,
+          });
+          (origSet as (v: number) => void).call(this, value);
+        },
+      });
+    }
     this.progress.barValueEl = null;
     this.progress.barPctEl = null;
     this.progress.barDurationEl = null;
