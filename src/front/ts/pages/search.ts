@@ -69,11 +69,11 @@ const tplKeyboard = (data: { readonly rows: Array<{ readonly label: string; read
 const tplLayoutCompiled = doT.template(`
   <div class="search">
     <div class="search__left">
-      <div class="search__preview"></div>
       <div class="search__input-area">
         <div class="search-input"><span class="search-input__text"></span><span class="search-input__cursor">|</span></div>
         <div class="search__keyboard"></div>
       </div>
+      <div class="search__preview"></div>
     </div>
     <div class="search__results"></div>
   </div>
@@ -84,20 +84,16 @@ const tplLayout = (data: Record<string, never>): string =>
 
 const tplPreviewCompiled = doT.template(`
   <div class="search-preview">
-    <div class="search-preview__poster"><img src="{{=it.poster}}" alt=""></div>
-    <div class="search-preview__info">
-      <div class="search-preview__title">{{=it.title}}</div>
-      {{?it.titleEn}}<div class="search-preview__title-en">{{=it.titleEn}}</div>{{?}}
-      <div class="search-preview__meta">{{=it.year}}{{?it.countries}} &bull; {{=it.countries}}{{?}}</div>
-      {{?it.genres}}<div class="search-preview__meta">{{=it.genres}}</div>{{?}}
-      {{?it.ratings}}<div class="search-preview__ratings">{{=it.ratings}}</div>{{?}}
-      {{?it.plot}}<div class="search-preview__plot">{{=it.plot}}</div>{{?}}
-    </div>
+    <div class="search-preview__title">{{=it.title}}</div>
+    {{?it.titleEn}}<div class="search-preview__title-en">{{=it.titleEn}}</div>{{?}}
+    <div class="search-preview__meta">{{=it.year}}{{?it.countries}} &bull; {{=it.countries}}{{?}}</div>
+    {{?it.genres}}<div class="search-preview__meta">{{=it.genres}}</div>{{?}}
+    {{?it.ratings}}<div class="search-preview__ratings">{{=it.ratings}}</div>{{?}}
+    {{?it.plot}}<div class="search-preview__plot">{{=it.plot}}</div>{{?}}
   </div>
 `);
 
 const tplPreview = (data: {
-  readonly poster: string;
   readonly title: string;
   readonly titleEn: string;
   readonly year: number;
@@ -263,7 +259,6 @@ class SearchPage implements Page {
     }
     const titles = item.title.split(' / ');
     $el.html(tplPreview({
-      poster: storage.proxyPosterUrl(item.posters.big),
       title: titles[0],
       titleEn: titles.length > 1 ? titles[1] : '',
       year: item.year,
