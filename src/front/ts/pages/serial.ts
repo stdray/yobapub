@@ -25,7 +25,10 @@ let focusedSeasonTab = 0;
 
 const tplDetailCompiled = doT.template(`
   <div class="detail">
-    <div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>
+    <div class="detail__left">
+      <div class="detail__poster"><img src="{{=it.poster}}" alt=""></div>
+      <div class="detail__ep-preview"></div>
+    </div>
     <div class="detail__info">
       <div class="detail__title">{{=it.titleRu}}</div>
       {{?it.titleEn}}<div class="detail__original-title">{{=it.titleEn}}</div>{{?}}
@@ -70,7 +73,7 @@ const tplSeasonTab = (data: { readonly idx: number; readonly num: number; readon
   tplSeasonTabCompiled(data);
 
 const tplEpisodeCompiled = doT.template(`
-  <div class="episode" data-ep="{{=it.idx}}">
+  <div class="episode" data-ep="{{=it.idx}}" data-thumb="{{=it.thumbnail}}">
     <div class="episode__thumb{{?!it.thumbnail}} episode__thumb--empty{{?}}">
       {{?it.thumbnail}}<img src="{{=it.thumbnail}}" alt="" loading="lazy">{{??}}&#9654;{{?}}
     </div>
@@ -216,11 +219,21 @@ const updateFocus = (): void => {
     if ($eps.length > 0) {
       const $ep = $eps.eq(focusedEpisode);
       $ep.addClass('focused');
-      if (infoEl) {
-        PageUtils.scrollIntoView($ep[0], infoEl, 20);
-        setTimeout(() => PageUtils.scrollIntoView($ep[0], infoEl, 20), 220);
-      }
+      if (infoEl) PageUtils.scrollIntoView($ep[0], infoEl, 20);
     }
+  }
+
+  // обновить превью эпизода под постером
+  const $preview = $root.find('.detail__ep-preview');
+  if (focusArea === 'episodes') {
+    const thumb = $root.find('.episode').eq(focusedEpisode).attr('data-thumb') || '';
+    if (thumb) {
+      $preview.html('<img src="' + thumb + '" alt="">');
+    } else {
+      $preview.html('');
+    }
+  } else {
+    $preview.html('');
   }
 };
 
