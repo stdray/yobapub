@@ -85,6 +85,31 @@ class LogCopy {
   }
 }
 
+/* ── Log share ───────────────────────────────────── */
+
+class LogShare {
+  static handleClick(e) {
+    const link = e.target.closest('[data-share-logs]');
+    if (!link) return false;
+    e.preventDefault();
+    Dropdowns.closeAll();
+    const ttlDays = parseInt(link.dataset.shareLogs, 10);
+    const form = document.getElementById('log-filter-form');
+    const data = new FormData(form);
+    const sel = document.getElementById('level-select');
+    Array.from(sel.selectedOptions).forEach((o) => data.append('level', o.value));
+    if (ttlDays > 0) data.append('ttlDays', String(ttlDays));
+    fetch('/admin/logs/share', { method: 'POST', body: data })
+      .then((r) => r.json())
+      .then((res) => {
+        Clipboard.copy(res.url);
+        Clipboard.flashText(document.getElementById('status'), 'Ссылка скопирована');
+        window.prompt('Ссылка для агентов (JSON: +/json, текст: +/text):', res.url);
+      });
+    return true;
+  }
+}
+
 /* ── Level filter ────────────────────────────────── */
 
 class LevelFilter {
@@ -141,6 +166,7 @@ document.addEventListener('click', (e) => {
   if (LogCopy.handleRowCopy(e)) return;
   if (LogCopy.handleBulkCopy(e)) return;
   if (LogCopy.handleEntryCopy(e)) return;
+  if (LogShare.handleClick(e)) return;
   LevelFilter.handleClick(e);
 });
 

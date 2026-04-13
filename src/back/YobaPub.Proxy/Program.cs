@@ -13,12 +13,13 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(
         builder.Configuration["DataProtection:KeysPath"] ?? "/keys/dataprotection"));
 builder.Services.AddSingleton<LogStore>();
+builder.Services.AddSingleton<LogShareStore>();
 builder.Services.AddSingleton<PlaybackErrorStore>();
 builder.Services.AddSingleton<MainDb>();
 builder.Services.AddSingleton<VipLoginStore>();
 builder.Services.AddSingleton<DebugSettingsStore>();
 builder.Services.AddSingleton<UserSettingsStore>();
-builder.Services.AddHostedService<LogRetentionService>();
+builder.Services.AddHostedService<RetentionService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
     {

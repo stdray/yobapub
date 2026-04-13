@@ -73,6 +73,15 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 - **Modern TypeScript syntax** — use `const`/`let` instead of `var`, template literals, destructuring, etc. SWC handles ES5 transpilation, so all modern syntax is fine.
 - **Classes over factory functions** — prefer `class Foo { ... }` over `function makeFoo()` / object literals when defining reusable stateful objects.
 
+## Commit Messages
+
+- **Language**: English only, even though the UI and discussions are in Russian.
+- **Format**: single-line subject, imperative mood, capitalized first word, no trailing period. No Conventional Commits prefixes (`feat:`, `fix:`, etc.) — this repo doesn't use them.
+- **Length**: aim for ≤72 characters. Omit a body unless the *why* is non-obvious from the diff.
+- **Content**: describe the change and, when useful, the mechanism or reason in the same line (e.g. `Reload HLS stream on seek with playSource instead of stopLoad/startLoad`, `Restart HLS buffer on seek to avoid bufferStalledError`).
+- **Verbs**: `Add`, `Remove`, `Refactor`, `Fix`, `Reload`, `Restart`, etc. — action first, then object, then optional qualifier.
+- **No attribution trailers** (no `Co-Authored-By`, no `Generated with …`) unless the user explicitly asks for them.
+
 ## Backend Proxy
 
 `src/back/YobaPub.Proxy/` — .NET reverse proxy with HLS manifest rewriting (`HlsRewriter.cs`). Rewrites m3u8 URLs for audio track selection. Config in `appsettings.json`.

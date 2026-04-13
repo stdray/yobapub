@@ -2,11 +2,12 @@ using Microsoft.Extensions.Options;
 
 namespace YobaPub.Proxy;
 
-public class LogRetentionService(
+public class RetentionService(
     LogStore store,
     PlaybackErrorStore errorStore,
+    LogShareStore shareStore,
     IOptions<AdminOptions> options,
-    ILogger<LogRetentionService> logger) : BackgroundService
+    ILogger<RetentionService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -20,6 +21,10 @@ public class LogRetentionService(
             var deletedErrors = errorStore.DeleteOlderThan(cutoff);
             if (deletedErrors > 0)
                 logger.LogInformation("Playback error retention: deleted {count} entries older than {cutoff:O}", deletedErrors, cutoff);
+
+            var deletedShares = shareStore.DeleteExpired();
+            if (deletedShares > 0)
+                logger.LogInformation("Log share retention: deleted {count} expired shares", deletedShares);
 
             await Task.Delay(TimeSpan.FromDays(1), ct).ConfigureAwait(false);
         }

@@ -6,7 +6,7 @@ namespace YobaPub.Proxy.Controllers;
 
 [Route("admin/logs")]
 [Authorize]
-public class LogsController(LogStore store) : Controller
+public class LogsController(LogStore store, LogShareStore shares) : Controller
 {
     [HttpGet("")]
     public IActionResult Index(LogsQuery query)
@@ -72,6 +72,15 @@ public class LogsController(LogStore store) : Controller
         if (limit is > 0)
             entries = entries.Take(limit.Value).ToArray();
         return Content(FormatTsv(entries), "text/plain; charset=utf-8");
+    }
+
+    [HttpPost("share")]
+    public IActionResult Share(LogsQuery query, int? ttlDays)
+    {
+        TimeSpan? ttl = ttlDays is > 0 ? TimeSpan.FromDays(ttlDays.Value) : null;
+        var share = shares.Create(query, ttl, User.Identity?.Name ?? "");
+        var url = $"{Request.Scheme}://{Request.Host}/s/logs/{share.Id}";
+        return Json(new { token = share.Id, url, expiresAt = share.ExpiresAt });
     }
 
     [HttpPost("clear")]

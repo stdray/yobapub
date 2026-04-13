@@ -63,6 +63,15 @@
       <a href="#" data-copy-logs="0">Копировать все</a>
     </div>
   </div>
+  <div class="dropdown">
+    <button type="button" class="dropdown-toggle">Поделиться &#x25BE;</button>
+    <div class="dropdown-menu">
+      <a href="#" data-share-logs="1">На 1 день</a>
+      <a href="#" data-share-logs="7">На 7 дней</a>
+      <a href="#" data-share-logs="30">На 30 дней</a>
+      <a href="#" data-share-logs="0">Без срока</a>
+    </div>
+  </div>
   <form class="form-inline"
         hx-post="/admin/logs/clear"
         hx-target="#page-content"

@@ -1,0 +1,74 @@
+@model SharedLogsViewModel
+@{
+    ViewData["Title"] = "Shared logs";
+    var q = Model.Query;
+}
+<div id="page-content" class="shared-logs">
+<header>
+  <h1>Shared logs</h1>
+  <div class="shared-meta">
+    @if (!string.IsNullOrEmpty(q.Device))
+    {
+      <span class="active-filter">device: @q.Device</span>
+    }
+    @if (!string.IsNullOrEmpty(q.TraceId))
+    {
+      <span class="active-filter">trace: @q.TraceId</span>
+    }
+    @if (!string.IsNullOrEmpty(q.Search))
+    {
+      <span class="active-filter">search: @q.Search</span>
+    }
+    @foreach (var lvl in q.Level ?? [])
+    {
+      <span class="active-filter">level: @lvl</span>
+    }
+    @if (Model.ExpiresAt.HasValue)
+    {
+      <span class="active-filter">expires: @Model.ExpiresAt.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</span>
+    }
+  </div>
+  <div class="shared-links">
+    <a href="/s/logs/@Model.Token/json">JSON</a>
+    <a href="/s/logs/@Model.Token/text">Text</a>
+  </div>
+</header>
+<table>
+  <thead>
+    <tr>
+      <th class="ts">Time (UTC)</th>
+      <th class="dev">Device</th>
+      <th class="trace">Trace</th>
+      <th class="lvl">Lvl</th>
+      <th class="cat">Category</th>
+      <th class="msg">Message</th>
+    </tr>
+  </thead>
+  <tbody>
+    @if (Model.Entries.Length == 0)
+    {
+      <tr><td colspan="6" class="empty">Записей нет</td></tr>
+    }
+    @foreach (var e in Model.Entries)
+    {
+      var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
+      var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
+      var cat = e.Category ?? "";
+      <tr class="@cls">
+        <td class="ts">@e.ServerTs.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+        <td class="dev" title="@e.DeviceId">@devPrefix</td>
+        <td class="trace">@e.TraceId</td>
+        <td class="lvl lvl-@e.Level">@e.Level.LevelAbbr()</td>
+        <td class="cat" title="@cat">@cat.ShortName()</td>
+        <td class="msg">
+          @e.Message
+          @if (!string.IsNullOrEmpty(e.StackTrace))
+          {
+            <pre class="stack">@e.StackTrace</pre>
+          }
+        </td>
+      </tr>
+    }
+  </tbody>
+</table>
+</div>
