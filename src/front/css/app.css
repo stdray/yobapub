@@ -1050,7 +1050,7 @@ video::cue {
   padding: 30px;
   display: flex;
   height: 100%;
-  gap: 30px;
+  gap: 60px;
 }
 
 .search__left {
