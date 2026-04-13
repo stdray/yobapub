@@ -13,6 +13,27 @@
 
 ---
 
+## 2026-04-13 19:10 — healing nudge на `bufferStalledError` без gap'а
+
+**Решение:** в обработчике `bufferStalledError` в `src/front/ts/pages/player.ts` при `!nudgePastBufferGap() && !hadBufferFullError` делаем свой `videoEl.currentTime += 0.1` (лог `hls stallHealSeek`). Раньше в этой ветке мы не делали ничего — ждали, пока hls.js сам разберётся.
+
+**Причина:** лог `2xJFWM3AHEunGvsCI5LLqQ`, момент 15:18:31:
+- `bufferStalledError` ct=2794.005, buffered=2784.0-2812.8. Playhead **внутри** буфера, 18 секунд вперёд.
+- `nudgePastBufferGap` ничего не нашёл (нет gap'а впереди), `hadBufferFullError=false` — наш handler no-op.
+- **10 секунд тишины.**
+- 15:18:41: hls.js сам фиксит — `bufferNudgeOnStall`, seek на +0.1, playback продолжается мгновенно.
+
+Вывод: Chromium 28 MSE decoder застревает внутри буфера (Tizen 2.3 quirk). Ровно тот же механизм, что и при старте — decoder state не синхронизирован, `currentTime += 0.1` flush'ит SourceBuffers и decoder оживает. hls.js это умеет через `bufferNudgeOnStall`, но тормозит ~10с. Делаем то же самое сами сразу при первом событии.
+
+**Данные:**
+- лог `2xJFWM3AHEunGvsCI5LLqQ`, диапазон 15:18:31 → 15:18:41
+- правка в `src/front/ts/pages/player.ts` в ветке `bufferStalledError` (рядом с `nudgePastBufferGap`)
+- связанная запись: 2026-04-13 18:30 (healing seek на старте — та же механика)
+
+**Результат:** ждём проверки. Следующий лог должен показать `hls stallHealSeek` в пределах ~1с после `bufferStalledError` вместо 10-секундной паузы.
+
+---
+
 ## 2026-04-13 18:30 — healing seek на первом `video playing`
 
 **Решение:** на первом событии `video playing` после инициализации плеера делаем `videoEl.currentTime += 0.1`. Флаг `healingSeekDone` — one-shot, сбрасывается в `playSource` вместе с `firstFragSnapped`.

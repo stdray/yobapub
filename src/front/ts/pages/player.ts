@@ -623,12 +623,22 @@ class PlayerController {
           plog.warn('hls bufferStalledError hadFull={hadFull} started={started} ct={ct} rs={rs} br={br}', {
             hadFull: this.hadBufferFullError, ...diag,
           });
-          if (!this.nudgePastBufferGap() && this.hadBufferFullError) {
-            plog.warn('hls RECOVER via bufferStalledError started={started} ct={ct} rs={rs} br={br}', diag);
-            hls.recoverMediaError();
-            if (this.videoEl) this.videoEl.play();
-            this.hadBufferFullError = false;
-            this.appendErrorCount = 0;
+          if (!this.nudgePastBufferGap()) {
+            if (this.hadBufferFullError) {
+              plog.warn('hls RECOVER via bufferStalledError started={started} ct={ct} rs={rs} br={br}', diag);
+              hls.recoverMediaError();
+              if (this.videoEl) this.videoEl.play();
+              this.hadBufferFullError = false;
+              this.appendErrorCount = 0;
+            } else if (this.videoEl) {
+              // Playhead is inside a buffered range but decoder stalled (Tizen 2.3 MSE quirk).
+              // Same fix as the startup healing seek: nudge currentTime +0.1 to flush the decoder.
+              // Without this, hls.js's own bufferNudgeOnStall takes ~10s to fire.
+              const ct = this.videoEl.currentTime;
+              const target = ct + 0.1;
+              plog.warn('hls stallHealSeek ct={ct} -> {target}', { ct, target });
+              this.videoEl.currentTime = target;
+            }
           }
         }
         return;
