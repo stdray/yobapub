@@ -15,7 +15,9 @@ npm run dev          # webpack-dev-server on 0.0.0.0:8080
 npm run build:dev    # development build
 npm run build:release # production build (minified)
 npm run typecheck    # TypeScript check (tsc --noEmit)
-npm run release      # typecheck + production build
+npm run csslint      # check CSS for unsupported features (doiuse vs Chrome >= 28)
+npm run escheck      # verify built JS is ES5-compatible (es-check on dist/release)
+npm run release      # typecheck + csslint + build:release + escheck
 ```
 
 Backend (.NET proxy) is in `src/back/YobaPub.Proxy/`. No frontend tests exist.
@@ -23,6 +25,40 @@ Backend (.NET proxy) is in `src/back/YobaPub.Proxy/`. No frontend tests exist.
 ## Build Target
 
 Runtime target is Chromium 28 (Tizen 2.3), ES5 only. SWC transpiles all source code (including node_modules) to strict ES5 automatically — modern TypeScript syntax is fine. `core-js@3` polyfills (`Promise`, `Object.assign`, etc.) are injected by SWC via `mode: 'usage'`.
+
+### CSS Tooling
+
+`postcss-preset-env` (stage 2) is configured in `postcss.config.js` with `browserslist: Chrome >= 28`. It provides autoprefixer and CSS nesting (`& .child {}` syntax). It does **not** polyfill `gap` in flexbox.
+
+### CSS Restrictions
+
+Chromium 28 lacks many modern CSS features. **Do not use:**
+
+- **`gap` in flexbox** — supported only from Chrome 84. **Not polyfilled by postcss-preset-env.** Use `margin` on children instead (e.g. negative margin on container + positive margin on items, or the owl selector `> * + *`).
+- **CSS Grid (`display: grid`)** — supported only from Chrome 57. Use flexbox with wrapping.
+- **CSS custom properties (`var(--*)`)** — supported only from Chrome 49. Hardcode values or use preprocessor variables.
+- **`position: sticky`** — supported only from Chrome 56. Use fixed or absolute positioning.
+- **`object-fit`** — polyfilled via `object-fit-images` (already included), but only for `<img>` tags.
+- **`:is()`, `:where()`, `:has()` selectors** — not available. Use explicit selectors.
+- **`aspect-ratio`** — not available. Use the padding-bottom percentage hack.
+
+**Safe to use** (transpiled by postcss-preset-env):
+- CSS nesting (`& .child {}`) — flattened to plain selectors.
+- Autoprefixed properties (`-webkit-` added automatically).
+
+### CSS Lint (`npm run csslint`)
+
+`doiuse` checks `css/app.css` against `Chrome >= 28` on every `npm run release`. The following doiuse feature IDs are ignored because they are safe in this project:
+
+- `css-overflow` — `overflow: hidden/auto/scroll` works fine; doiuse flags partial support for `overflow` shorthand with two values, which we don't use.
+- `object-fit` — polyfilled for `<img>` via `object-fit-images`; `<video>` uses native Tizen rendering.
+- `css-letter-spacing` — partial support means trailing space accounting; our decorative usage is unaffected.
+- `word-break` — partial support is about `break-word` value; we only use `break-all` which works.
+- `css-nesting` — postcss-preset-env flattens nesting before build; doiuse sees source CSS.
+
+When adding a new ignore, document the reason here.
+
+When in doubt, check https://caniuse.com against Chrome 28.
 
 ## Architecture
 

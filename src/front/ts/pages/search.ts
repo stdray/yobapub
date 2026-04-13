@@ -244,7 +244,7 @@ class SearchPage implements Page {
         extra: ''
       });
     }
-    $el.html('<div class="search-grid">' + html + '</div>');
+    $el.html('<div class="watching__grid search-grid">' + html + '</div>');
     if (this.focusArea === 'results') {
       this.updateResultsFocus();
     }
