@@ -1006,12 +1006,17 @@ video::cue {
 
 .search__body { display: flex; gap: 40px; flex: 1; overflow: hidden; }
 
-.search__keyboard { flex: 0 0 auto; }
+.search__keyboard {
+  flex: 0 0 auto;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 16px;
+}
 
 .search__results { flex: 1; overflow-y: auto; }
 
 /* Keyboard */
-.kb__row { display: flex; gap: 6px; margin-bottom: 6px; }
+.kb__row { display: flex; gap: 6px; margin-bottom: 6px; justify-content: center; }
 
 .kb__key {
   width: 64px;

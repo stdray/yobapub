@@ -24,14 +24,14 @@ const KB_LAYOUTS: Record<'ru' | 'en', string[][]> = {
     ['й','ц','у','к','е','н','г','ш','щ','з','х','ъ'],
     ['ф','ы','в','а','п','р','о','л','д','ж','э'],
     ['я','ч','с','м','и','т','ь','б','ю','⌫'],
-    ['EN','✕','⎵','⎵','⎵','⎵','⎵','⎵','OK']
+    ['EN','⎵','⎵','⎵','⎵','⎵','⎵','⎵','⎵']
   ],
   en: [
     ['1','2','3','4','5','6','7','8','9','0'],
     ['q','w','e','r','t','y','u','i','o','p'],
     ['a','s','d','f','g','h','j','k','l'],
     ['z','x','c','v','b','n','m','⌫'],
-    ['RU','✕','⎵','⎵','⎵','⎵','⎵','⎵','OK']
+    ['RU','⎵','⎵','⎵','⎵','⎵','⎵','⎵','⎵']
   ]
 };
 
@@ -174,7 +174,7 @@ class SearchPage extends SidebarPage {
         const char = rowChars[ci];
         rowKeys.push({
           char: char,
-          label: char === '⎵' ? ' ' : char,
+          label: char === '⌫' ? 'Del' : char === '⎵' ? ' ' : char,
           wide: char === '⎵'
         });
       }
@@ -320,8 +320,6 @@ class SearchPage extends SidebarPage {
   private pressKey(char: string): void {
     if (char === '⌫') {
       this.query = this.query.slice(0, -1);
-    } else if (char === '✕') {
-      this.query = '';
     } else if (char === '⎵') {
       this.query += ' ';
     } else if (char === 'EN') {
@@ -331,9 +329,6 @@ class SearchPage extends SidebarPage {
     } else if (char === 'RU') {
       this.currentLayout = 'ru';
       this.renderKeyboard();
-      return;
-    } else if (char === 'OK') {
-      if (this.results.length > 0) { this.switchToResults(); }
       return;
     } else {
       this.query += char;
