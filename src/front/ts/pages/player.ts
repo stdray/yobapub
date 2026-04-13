@@ -119,6 +119,7 @@ class PlayerController {
   private hadBufferFullError = false;
   private playbackStarted = false;
   private firstFragSnapped = false;
+  private pendingStartSeek = 0;
   private markedWatched = false;
   private wasWatched = false;
   private playSourceDebug = '';
@@ -476,7 +477,10 @@ class PlayerController {
 
   private buildHlsConfig(): HlsConfig {
     const cfg = buildBaseHlsConfig();
-    if (this.state.position > 0) cfg.startPosition = this.state.position;
+    // Do NOT set cfg.startPosition: hls.js _seekToStartPos fires that seek during decoder
+    // warmup on Tizen 2.3 WebKit, which corrupts A/V sync. We start from 0 and perform a
+    // manual "user-style" seek on canplay — that path is verified to heal (see decision log
+    // 2026-04-13 19:45 and 17:55). Bandwidth cost: one fragment from the beginning.
     cfg.autoStartLoad = false;
     cfg.maxBufferHole = 1.0;
     cfg.highBufferWatchdogPeriod = 10;
@@ -525,6 +529,7 @@ class PlayerController {
     this.media.hlsUrl = originalUrl;
     if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
     this.firstFragSnapped = false;
+    this.pendingStartSeek = this.state.position > 0 ? this.state.position : 0;
     this.playSourceDebug = 'url=' + originalUrl.substring(0, 120);
     plog.newTraceId();
     const cfg = this.buildHlsConfig();
@@ -594,8 +599,8 @@ class PlayerController {
       this.pinQualityLevel(hls);
       // autoStartLoad is disabled in config — start loading only after pin to avoid
       // hls.js kicking off a load on level 0/auto and then switching (double LEVEL_SWITCHING).
-      const startPos = this.state.position > 0 ? this.state.position : -1;
-      hls.startLoad(startPos);
+      // Always load from the beginning; real start position is applied as a runtime seek in canplay.
+      hls.startLoad(0);
       this.onSourceReady();
     });
     hls.on(Hls.Events.ERROR, (_e: string, data: { fatal: boolean; type: string; details: string; reason?: string; error?: unknown; response?: { code: number }; frag?: { url?: string; sn?: number; start?: number } }) => {
@@ -801,8 +806,15 @@ class PlayerController {
       }
     });
     this.videoEl.addEventListener('canplay', () => {
-      plog.debug('video canplay currentTime={currentTime}', { currentTime: this.videoEl ? this.videoEl.currentTime : -1 });
+      const v = this.videoEl;
+      plog.debug('video canplay currentTime={currentTime}', { currentTime: v ? v.currentTime : -1 });
       this.hideSpinner();
+      if (this.pendingStartSeek > 0 && v) {
+        const target = this.pendingStartSeek;
+        this.pendingStartSeek = 0;
+        plog.info('startSeek target={target} from ct={ct}', { target, ct: v.currentTime });
+        v.currentTime = target;
+      }
     });
     this.videoEl.addEventListener('playing', () => {
       this.appendErrorCount = 0;

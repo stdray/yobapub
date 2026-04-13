@@ -13,6 +13,39 @@
 
 ---
 
+## 2026-04-13 22:00 — загружать с начала, seek на canplay вместо `cfg.startPosition`
+
+**Решение:** в `pages/player.ts` убрать `cfg.startPosition` из `buildHlsConfig`. В `MANIFEST_PARSED` звать `hls.startLoad(0)` вместо `startLoad(pos)`. В playSource сохранять `this.pendingStartSeek = state.position`. В обработчике `video canplay` один раз выполнять `videoEl.currentTime = pendingStartSeek` и обнулять флаг.
+
+**Причина:** диагностический патч `__ctLog` в `node_modules/hls.js/dist/hls.js` (5 сайтов записи `media.currentTime`) + свежий запуск 2.0.1-96 (`96105f9`) в логе `-2vdGUOuJEac9TRUyc6LUw` дали финальную картину старта:
+
+```
+ctwrap _seekToStartPos value=3857 prev=0    ← единственный JS seek
+video seeking ct=3856.9999
+video seeked  ct=3857      rs=3
+video seeking ct=3856.9999                  ← второй seek, НЕ из JS
+video playing ct=3856.9999 rs=3
+video seeked  ct=3857.0297 rs=3
+video playing ct=3857.0400 rs=3
+video playing ct=3857.0928 rs=4             ← реальный старт
+```
+
+За весь запуск из JS происходит **ровно один** seek — `hls.js stream-controller._seekToStartPos`. Второй `seeking/seeked` и тройное `playing` с нарастанием `readyState` 3→3→4 никем в JS не инициированы — это нативное поведение декодера Tizen 2.3 WebKit во время startup-alignment (подстройка к I-frame). Именно в этом окне возникает A/V рассинхрон.
+
+Ранее (см. `17:55` и `19:45`) уже установлено: ручной seek через `videoEl.currentTime = pos` на живом hls.js-инстансе десинк НЕ даёт. Разница между "хороший" и "плохой" seek — момент: `_seekToStartPos` выполняется на `loadedmetadata`, когда декодер ещё не прогрет; обычный runtime seek — на работающем инстансе. Переносим startup-seek в runtime: пусть hls.js грузит с самого начала (fragment 0), на `canplay` делаем обычный user-style seek. hls.js сам выполнит `stopLoad`+`startLoad(target)`+flush SourceBuffer и поднимет декодер заново — тот же путь, что и в нормальном ручном seek.
+
+Цена: один лишний фрагмент (~5с) с начала видео перед seek'ом. Приемлемо в обмен на устранение рассинхрона.
+
+**Данные:**
+- лог `-2vdGUOuJEac9TRUyc6LUw` на версии `96105f9` — один `ctwrap _seekToStartPos`, далее natively-fired seeking/playing pairs без JS-источника.
+- патч-скрипт `src/front/scripts/patch-hls.js` + `prebuild:release` hook + `Dockerfile` переведён на `npm run build:release` — гарантируют применение диагностики на CI.
+- `Error().stack` на Chromium 28 V8 пустой без `throw` — подтверждено, это ожидаемо; для наших целей достаточно `site`.
+- патчи в `pages/player.ts`: `buildHlsConfig`, `playSource`, `MANIFEST_PARSED` handler, `canplay` handler + новое поле `pendingStartSeek`.
+
+**Результат:** ждём проверки. Ожидаемая картина нового лога: один `startSeek target=X from ct=Y` из нашего кода на `canplay`, далее обычная пара `seeking`→`seeked` и `playing` rs=4 без рассинхрона.
+
+---
+
 ## 2026-04-13 21:00 — fix скролла списка сабов/аудио в панели плеера (issue #10)
 
 **Решение:** в `scrollToFocused` (`pages/player/panel.ts`) использовать `el.offsetTop` напрямую вместо `el.offsetTop - container.offsetTop`. Плюс поднять `max-height` `.ppanel__list` c 600px до 900px.
