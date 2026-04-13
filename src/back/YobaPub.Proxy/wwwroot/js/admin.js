@@ -113,9 +113,10 @@ class LogShare {
     dlg.innerHTML = `
       <div class="share-dialog-body">
         <div class="share-url">${htmlUrl}</div>
+        <div class="share-label">Копировать ссылку</div>
         <div class="share-actions">
-          <button type="button" data-share-copy="html">Копировать ссылку на HTML</button>
-          <button type="button" data-share-copy="tsv">Копировать ссылку на TSV</button>
+          <button type="button" data-share-copy="html">на HTML</button>
+          <button type="button" data-share-copy="tsv">на TSV</button>
           <button type="button" data-share-close>Закрыть</button>
         </div>
       </div>

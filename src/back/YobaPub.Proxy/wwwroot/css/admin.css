@@ -257,6 +257,7 @@ tr.row-old td { animation: row-old 4s ease-out; }
 .share-dialog {
   border: 1px solid #555; background: #1e1e1e; color: #eee;
   border-radius: 6px; padding: 0; min-width: 420px;
+  margin: auto;
 }
 .share-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 .share-dialog-body { padding: 16px; }
@@ -265,5 +266,6 @@ tr.row-old td { animation: row-old 4s ease-out; }
   background: #111; border: 1px solid #333; border-radius: 4px;
   word-break: break-all; margin-bottom: 12px;
 }
+.share-label { color: #888; font-size: 12px; margin-bottom: 6px; }
 .share-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .share-actions button { padding: 6px 12px; }
