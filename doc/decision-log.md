@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-04-14 11:23 — stall watchdog: force restart loading after 3 consecutive bufferStalledError
+
+**Решение:** в `hls-engine.ts` добавлен счётчик `stallCount`, инкрементируется на каждый `bufferStalledError`. Если nudge не помог и `hadBufferFullError=false`, после 3-х подряд stall'ов вызываем `hls.stopLoad()` + `hls.startLoad(ct)` — заставляем hls.js перезагрузить фрагменты с текущей позиции. Счётчик сбрасывается при `video playing`, после recovery, и при `load`/`destroy`.
+
+**Причина:** лог `dAdtrAF23UadcsOjCfGI3w` — при длительном воспроизведении 720p (эпизод 6, ~29 мин) hls.js загрузил фрагменты sn=175–177 (ahead buffer), но SourceBuffer (Chromium 28) тихо отбросил их (не появились в `video.buffered`). hls.js считал их загруженными и прекратил загрузку. Playhead дошёл до конца буфера (ct=1740.047, br=1646.6–1740.1), получил один `bufferStalledError`, и воспроизведение зависло навсегда — 4 минуты без движения, пользователь безуспешно жал play/pause.
+
+**Данные:** лог https://yobapub.3po.su/s/logs/dAdtrAF23UadcsOjCfGI3w/tsv
+
+**Результат:** ждём проверки
+
+---
+
 ## 2026-04-14 06:38 — stopLoad/startLoad around pendingStartSeek
 
 **Решение:** в `hls-engine.ts` перед выполнением `pendingStartSeek` (seek на сохранённую позицию после загрузки первого фрагмента) вызываем `hls.stopLoad()`, а после `v.currentTime = target` — `hls.startLoad(target)`. Это предотвращает загрузку ненужного следующего фрагмента (sn=2) с начала файла.

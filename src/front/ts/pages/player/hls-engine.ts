@@ -67,6 +67,7 @@ export class HlsEngine {
   private hadBufferFullError = false;
   private firstFragSnapped = false;
   private pendingStartSeek = 0;
+  private stallCount = 0;
 
   constructor(private readonly deps: HlsEngineDeps) {}
 
@@ -88,6 +89,7 @@ export class HlsEngine {
     this.pendingStartSeek = 0;
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
+    this.stallCount = 0;
   }
 
   load(videoEl: HTMLVideoElement, originalUrl: string, ctx: HlsLoadContext): void {
@@ -97,6 +99,7 @@ export class HlsEngine {
     this.pendingStartSeek = ctx.startPosition > 0 ? ctx.startPosition : 0;
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
+    this.stallCount = 0;
 
     const log = this.deps.log;
     log.newTraceId();
@@ -145,6 +148,7 @@ export class HlsEngine {
   onVideoPlaying(): void {
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
+    this.stallCount = 0;
   }
 
   tryRecoverVideoError(): boolean {
@@ -355,16 +359,33 @@ export class HlsEngine {
       }
     }
     if (data.details === 'bufferStalledError') {
-      log.warn('hls bufferStalledError hadFull={hadFull} started={started} ct={ct} rs={rs} br={br}', {
+      this.stallCount++;
+      log.warn('hls bufferStalledError hadFull={hadFull} started={started} ct={ct} rs={rs} br={br} stallCount={sc}', {
         hadFull: this.hadBufferFullError,
         started: diag.started, ct: diag.ct, rs: diag.rs, paused: diag.paused, br: diag.br,
+        sc: this.stallCount,
       });
-      if (!this.nudgePastBufferGap() && this.hadBufferFullError) {
+      if (this.nudgePastBufferGap()) return;
+      if (this.hadBufferFullError) {
         log.warn('hls RECOVER via bufferStalledError started={started} ct={ct} rs={rs} br={br}', diag);
         hls.recoverMediaError();
         if (v) v.play();
         this.hadBufferFullError = false;
         this.appendErrorCount = 0;
+        this.stallCount = 0;
+        return;
+      }
+      // If stall persists for several cycles without bufferFullError, hls.js likely
+      // thinks fragments are loaded but they were silently evicted from SourceBuffer
+      // (common on Chromium 28 / Tizen 2.3 with limited memory). Force-restart
+      // loading from current position so hls.js re-fetches the needed fragments.
+      if (this.stallCount >= 3 && v) {
+        log.warn('hls RECOVER via stallCount={sc} stopLoad+startLoad ct={ct} br={br}', {
+          sc: this.stallCount, ct: diag.ct, br: diag.br,
+        });
+        hls.stopLoad();
+        hls.startLoad(v.currentTime);
+        this.stallCount = 0;
       }
     }
   }
