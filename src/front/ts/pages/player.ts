@@ -227,13 +227,43 @@ class PlayerController {
   }
 
   private sendMarkTime(): void {
-    if (!this.videoEl || !this.media.item) return;
+    if (!this.videoEl || !this.media.item) {
+      plog.warn('sendMarkTime skip hasVideo={hv} hasItem={hi}', {
+        hv: !!this.videoEl, hi: !!this.media.item,
+      });
+      return;
+    }
     const time = Math.floor(this.videoEl.currentTime);
-    if (time <= 0) return;
+    if (time <= 0) {
+      plog.warn('sendMarkTime skip time<=0 ct={ct}', { ct: this.videoEl.currentTime });
+      return;
+    }
     if (this.media.season !== undefined && this.media.episode !== undefined) {
-      markTime(this.media.item.id, this.media.episode, time, this.media.season);
+      plog.info('sendMarkTime serial id={id} season={s} episode={e} time={t}', {
+        id: this.media.item.id, s: this.media.season, e: this.media.episode, t: time,
+      });
+      markTime(this.media.item.id, this.media.episode, time, this.media.season).then(
+        () => plog.info('markTime ok id={id} time={t}', { id: this.media.item ? this.media.item.id : -1, t: time }),
+        (xhr: JQueryXHR) => plog.error('markTime failed status={s} text={txt} resp={r}', {
+          s: xhr ? xhr.status : -1,
+          txt: xhr ? String(xhr.statusText || '') : '',
+          r: xhr ? String(xhr.responseText || '').substring(0, 200) : '',
+        })
+      );
     } else if (this.media.video !== undefined) {
-      markTime(this.media.item.id, this.media.video, time);
+      plog.info('sendMarkTime movie id={id} video={v} time={t}', {
+        id: this.media.item.id, v: this.media.video, t: time,
+      });
+      markTime(this.media.item.id, this.media.video, time).then(
+        () => plog.info('markTime ok id={id} time={t}', { id: this.media.item ? this.media.item.id : -1, t: time }),
+        (xhr: JQueryXHR) => plog.error('markTime failed status={s} text={txt} resp={r}', {
+          s: xhr ? xhr.status : -1,
+          txt: xhr ? String(xhr.statusText || '') : '',
+          r: xhr ? String(xhr.responseText || '').substring(0, 200) : '',
+        })
+      );
+    } else {
+      plog.warn('sendMarkTime skip no season/episode/video', {});
     }
   }
 
@@ -979,7 +1009,9 @@ class PlayerController {
   private startMarkTimer(): void {
     this.stopMarkTimer();
     this.markedWatched = false;
+    plog.info('startMarkTimer interval=30000', {});
     this.markTimer = window.setInterval(() => {
+      plog.info('markTimer tick', {});
       this.sendMarkTime();
       this.logPlaybackQuality();
       if (this.wasWatched) {
@@ -1012,7 +1044,11 @@ class PlayerController {
   }
 
   private stopMarkTimer(): void {
-    if (this.markTimer !== null) { clearInterval(this.markTimer); this.markTimer = null; }
+    if (this.markTimer !== null) {
+      plog.info('stopMarkTimer', {});
+      clearInterval(this.markTimer);
+      this.markTimer = null;
+    }
   }
 
   private destroyPlayer(): void {
