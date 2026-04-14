@@ -137,7 +137,7 @@ class PlayerController {
     canAutoHide: () => !this.panel.focused && !this.seek.active,
   });
   private readonly panel = new Panel(this.$root, {
-    onAfterClose: () => { this.overlay.showBar(); },
+    onAfterClose: () => { this.overlay.hideBar(); },
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
     onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
     onApplyQuality: (idx) => {
