@@ -29,6 +29,7 @@ export class WatchProgressTracker {
   private timer: number | null = null;
   private marked = false;
   private wasWatched = false;
+  private lastSentTime = -1;
 
   constructor(private readonly deps: WatchTrackerDeps) {}
 
@@ -39,6 +40,7 @@ export class WatchProgressTracker {
   start(): void {
     this.stop();
     this.marked = false;
+    this.lastSentTime = -1;
     this.deps.log.info('startMarkTimer interval={ms}', { ms: TICK_MS });
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
   }
@@ -64,6 +66,8 @@ export class WatchProgressTracker {
       log.warn('sendMarkTime skip time<=0 ct={ct}', { ct: v.currentTime });
       return;
     }
+    if (time === this.lastSentTime) return;
+    this.lastSentTime = time;
     let promise: JQueryDeferred<void>;
     if (ctx.season !== undefined && ctx.episode !== undefined) {
       log.info('sendMarkTime serial id={id} season={s} episode={e} time={t}', {
