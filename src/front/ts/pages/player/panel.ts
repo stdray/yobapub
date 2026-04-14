@@ -66,6 +66,14 @@ export const getAudioItems = (
   return items;
 };
 
+const buildSubLabel = (sub: Subtitle, idx: number): string => {
+  const num = idx + 1;
+  const pad = num < 10 ? '0' + num : String(num);
+  let label = sub.lang.toUpperCase() + ' #' + pad;
+  if (sub.forced) label += ' Forced';
+  return label;
+};
+
 export const getSubItems = (
   subs: ReadonlyArray<Subtitle>,
   selectedSub: number
@@ -74,7 +82,7 @@ export const getSubItems = (
   if (subs.length > 0) {
     items.push({ label: 'Выкл', selected: selectedSub === -1 });
     for (let j = 0; j < subs.length; j++) {
-      items.push({ label: subs[j].lang.toUpperCase(), selected: j === selectedSub });
+      items.push({ label: buildSubLabel(subs[j], j), selected: j === selectedSub });
     }
     return items;
   }

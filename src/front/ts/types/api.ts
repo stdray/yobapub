@@ -69,6 +69,7 @@ export interface Subtitle {
   lang: string;
   shift: number;
   embed: boolean;
+  forced?: boolean;
   url: string;
 }
 
