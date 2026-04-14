@@ -30,6 +30,7 @@ export class WatchProgressTracker {
   private marked = false;
   private wasWatched = false;
   private lastSentTime = -1;
+  private staleTicks = 0;
 
   constructor(private readonly deps: WatchTrackerDeps) {}
 
@@ -41,6 +42,7 @@ export class WatchProgressTracker {
     this.stop();
     this.marked = false;
     this.lastSentTime = -1;
+    this.staleTicks = 0;
     this.deps.log.info('startMarkTimer interval={ms}', { ms: TICK_MS });
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
   }
@@ -106,6 +108,18 @@ export class WatchProgressTracker {
   }
 
   private tick(): void {
+    const vel = this.deps.getVideoEl();
+    const ct = vel ? vel.currentTime : 0;
+    if (ct <= 0) {
+      this.staleTicks++;
+      if (this.staleTicks >= 3) {
+        this.deps.log.warn('markTimer stopped after {n} stale ticks (ct=0)', { n: this.staleTicks });
+        this.stop();
+        return;
+      }
+    } else {
+      this.staleTicks = 0;
+    }
     this.deps.log.info('markTimer tick', {});
     this.sendMarkTime();
     this.logPlaybackQuality();
