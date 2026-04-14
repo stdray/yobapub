@@ -42,6 +42,8 @@ export interface TitlePrefs {
   audioLang?: string;
   audioAuthorId?: number;
   subLang?: string;
+  subForced?: boolean;
+  subShift?: number;
 }
 
 interface QualityOption {

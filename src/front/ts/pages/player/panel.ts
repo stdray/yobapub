@@ -66,7 +66,7 @@ export const getAudioItems = (
   return items;
 };
 
-const buildSubLabel = (sub: Subtitle, idx: number): string => {
+export const buildSubLabel = (sub: Subtitle, idx: number): string => {
   const num = idx + 1;
   const pad = num < 10 ? '0' + num : String(num);
   let label = sub.lang.toUpperCase() + ' #' + pad;

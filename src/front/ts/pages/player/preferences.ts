@@ -45,6 +45,20 @@ export const restoreAudioIndex = (audios: AudioTrack[], prefs: TitlePrefs | null
 
 export const restoreSubIndex = (subs: Subtitle[], prefs: TitlePrefs | null): number => {
   if (!prefs || !prefs.subLang || subs.length === 0) return -1;
+  const wantForced = prefs.subForced === true;
+  // exact match: lang + forced + shift
+  if (prefs.subShift !== undefined) {
+    for (let i = 0; i < subs.length; i++) {
+      const s = subs[i];
+      if (s.lang === prefs.subLang && (s.forced === true) === wantForced && s.shift === prefs.subShift) return i;
+    }
+  }
+  // relaxed: lang + forced
+  for (let i = 0; i < subs.length; i++) {
+    const s = subs[i];
+    if (s.lang === prefs.subLang && (s.forced === true) === wantForced) return i;
+  }
+  // last resort: lang only
   for (let i = 0; i < subs.length; i++) {
     if (subs[i].lang === prefs.subLang) return i;
   }
@@ -73,7 +87,10 @@ export const saveCurrentPrefs = (opts: SavePrefsOpts): void => {
     if (a.author) prefs.audioAuthorId = a.author.id;
   }
   if (selectedSub >= 0 && selectedSub < subs.length) {
-    prefs.subLang = subs[selectedSub].lang;
+    const s = subs[selectedSub];
+    prefs.subLang = s.lang;
+    prefs.subForced = s.forced === true;
+    prefs.subShift = s.shift;
   }
   storage.saveTitlePrefs(prefs);
 };

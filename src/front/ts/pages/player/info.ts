@@ -1,4 +1,5 @@
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
+import { buildSubLabel } from './panel';
 import Hls from 'hls.js';
 
 export interface InfoDataSource {
@@ -101,7 +102,7 @@ export class PlayerInfo {
     const subs = this.src.subs();
     const ss = this.src.selectedSub();
     if (ss >= 0 && ss < subs.length) {
-      line1.push('Sub: ' + subs[ss].lang.toUpperCase());
+      line1.push('Sub: ' + buildSubLabel(subs[ss], ss));
     } else {
       line1.push('Sub: Выкл');
     }
