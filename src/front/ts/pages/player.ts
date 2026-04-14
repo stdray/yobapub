@@ -1,8 +1,8 @@
 import $ from 'jquery';
 import { Page, RouteParams } from '../types/app';
-import { getItem } from '../api/items';
+import { loadItemWithWatching } from '../api/items';
 import { markTime, toggleWatched } from '../api/watching';
-import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
+import { Item, VideoFile, AudioTrack, Subtitle, WatchingInfoItem } from '../types/api';
 import { router } from '../router';
 import { TvKey, platform } from '../utils/platform';
 import { storage, ProxyCategory } from '../utils/storage';
@@ -82,6 +82,7 @@ interface PlayState {
 
 interface MediaContext {
   item: Item | null;
+  watching: WatchingInfoItem | null;
   season: number | undefined;
   episode: number | undefined;
   video: number | undefined;
@@ -104,7 +105,7 @@ interface SeekState {
 // --- Defaults ---
 
 const defaultMedia = (): MediaContext => ({
-  item: null, season: undefined, episode: undefined, video: undefined,
+  item: null, watching: null, season: undefined, episode: undefined, video: undefined,
   files: [], audios: [], subs: [], title: '', duration: 0, hlsUrl: '',
 });
 
@@ -428,7 +429,7 @@ class PlayerController {
         plog.info('calling findEpisodeMedia');
         found = findEpisodeMedia(this.media.item, this.media.season, this.media.episode);
         plog.info('findEpisodeMedia ok found={f}', { f: !!found });
-        pos = getResumeTime(this.media.item, this.media.season, this.media.episode);
+        pos = getResumeTime(this.media.item, this.media.watching, this.media.season, this.media.episode);
         plog.info('getResumeTime ok pos={pos}', { pos });
         this.wasWatched = isEpisodeWatched(this.media.item, this.media.season, this.media.episode);
         plog.info('isEpisodeWatched ok');
@@ -436,7 +437,7 @@ class PlayerController {
         plog.info('calling findVideoMedia');
         found = findVideoMedia(this.media.item, this.media.video);
         plog.info('findVideoMedia ok found={f}', { f: !!found });
-        pos = getResumeTime(this.media.item, undefined, undefined, this.media.video);
+        pos = getResumeTime(this.media.item, this.media.watching, undefined, undefined, this.media.video);
         this.wasWatched = isVideoWatched(this.media.item, this.media.video);
       }
     } catch (e) {
@@ -1179,19 +1180,14 @@ class PlayerController {
       id, s: params.season, e: params.episode, v: params.video,
     });
 
-    getItem(id).then(
-      (itemRes: { item: Item }) => {
+    loadItemWithWatching(id,
+      (item, watching) => {
         try {
-          const data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
-          this.media.item = data.item;
-          plog.info('mount getItem ok hasItem={hasItem} title={title}', {
-            hasItem: !!this.media.item,
-            title: this.media.item ? this.media.item.title : null,
+          this.media.item = item;
+          this.media.watching = watching;
+          plog.info('mount loadItemWithWatching ok title={title} hasWatching={hw}', {
+            title: item.title, hw: !!watching,
           });
-          if (!this.media.item) {
-            plog.error('mount getItem returned no item — leaving spinner visible');
-            return;
-          }
           this.loadAndPlay();
         } catch (e) {
           const err = e as Error;
@@ -1202,12 +1198,8 @@ class PlayerController {
           this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка инициализации плеера</div></div>');
         }
       },
-      (xhr: JQueryXHR) => {
-        plog.error('mount getItem failed status={status} text={text} resp={resp}', {
-          status: xhr ? xhr.status : -1,
-          text: xhr ? String(xhr.statusText || '') : '',
-          resp: xhr ? String(xhr.responseText || '').substring(0, 200) : '',
-        });
+      () => {
+        plog.error('mount loadItemWithWatching failed');
         this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка загрузки</div></div>');
       }
     );

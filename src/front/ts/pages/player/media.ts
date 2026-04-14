@@ -1,5 +1,5 @@
 import { apiClient } from '../../api/client';
-import { Item, VideoFile, AudioTrack, Subtitle, MediaLinksResponse } from '../../types/api';
+import { Item, VideoFile, AudioTrack, Subtitle, MediaLinksResponse, WatchingInfoItem } from '../../types/api';
 import { Logger } from '../../utils/log';
 import { arrayFind } from '../../utils/array';
 
@@ -90,27 +90,62 @@ export const isVideoWatched = (item: Item, videoNum: number): boolean => {
 const isValidResume = (time: number, duration?: number): boolean =>
   time > 0 && duration !== undefined && time < duration - 10;
 
-export const getResumeTime = (item: Item, seasonNum?: number, epNum?: number, videoNum?: number): number => {
-  if (seasonNum !== undefined && epNum !== undefined && item.seasons) {
-    const found = findEpisode(item, seasonNum, epNum);
-    const ep = found && found.episode;
-    mediaLog.info('getResumeTime serial s={s} e={e} epFound={ef} hasWatching={hw} wTime={wt} wStatus={ws} dur={dur}', {
-      s: seasonNum, e: epNum, ef: !!ep,
-      hw: !!(ep && ep.watching),
-      wt: ep && ep.watching ? ep.watching.time : -1,
-      ws: ep && ep.watching ? ep.watching.status : -1,
-      dur: ep ? ep.duration : -1,
-    });
-    if (ep && ep.watching && isValidResume(ep.watching.time, ep.duration)) return ep.watching.time;
-  } else if (videoNum !== undefined && item.videos) {
-    const v = item.videos[videoNum - 1];
-    mediaLog.info('getResumeTime movie v={v} vFound={vf} hasWatching={hw} wTime={wt} dur={dur}', {
-      v: videoNum, vf: !!v,
-      hw: !!(v && v.watching),
-      wt: v && v.watching ? v.watching.time : -1,
-      dur: v ? v.duration : -1,
-    });
-    if (v && v.watching && isValidResume(v.watching.time, v.duration)) return v.watching.time;
+const findWatchingEpisode = (
+  watching: WatchingInfoItem, seasonNum: number, epNum: number,
+): { time: number; status: number; duration: number } | null => {
+  if (!watching.seasons) return null;
+  const ws = arrayFind(watching.seasons, (s) => s.number === seasonNum);
+  if (!ws) return null;
+  const we = arrayFind(ws.episodes, (e) => e.number === epNum);
+  return we ? { time: we.time, status: we.status, duration: we.duration } : null;
+};
+
+// /v1/watching?id= is the authoritative source for fresh time/status (the nested
+// /v1/items/{id}.seasons[].episodes[].watching is cached server-side and can lag
+// minutes behind marktime calls). Prefer watching when available, fall back to
+// the item's embedded state otherwise.
+export const getResumeTime = (
+  item: Item, watching: WatchingInfoItem | null,
+  seasonNum?: number, epNum?: number, videoNum?: number,
+): number => {
+  if (seasonNum !== undefined && epNum !== undefined) {
+    const we = watching ? findWatchingEpisode(watching, seasonNum, epNum) : null;
+    if (we) {
+      mediaLog.info('getResumeTime serial(watching) s={s} e={e} time={t} status={st} dur={d}', {
+        s: seasonNum, e: epNum, t: we.time, st: we.status, d: we.duration,
+      });
+      return isValidResume(we.time, we.duration) ? we.time : 0;
+    }
+    if (item.seasons) {
+      const found = findEpisode(item, seasonNum, epNum);
+      const ep = found && found.episode;
+      mediaLog.info('getResumeTime serial(item) s={s} e={e} epFound={ef} wTime={wt} dur={d}', {
+        s: seasonNum, e: epNum, ef: !!ep,
+        wt: ep && ep.watching ? ep.watching.time : -1,
+        d: ep ? ep.duration : -1,
+      });
+      if (ep && ep.watching && isValidResume(ep.watching.time, ep.duration)) return ep.watching.time;
+    }
+  } else if (videoNum !== undefined) {
+    if (watching && watching.videos) {
+      const wv = watching.videos[videoNum - 1];
+      if (wv) {
+        mediaLog.info('getResumeTime movie(watching) v={v} time={t} dur={d}', {
+          v: videoNum, t: wv.time, d: wv.duration,
+        });
+        if (isValidResume(wv.time, wv.duration)) return wv.time;
+        return 0;
+      }
+    }
+    if (item.videos) {
+      const v = item.videos[videoNum - 1];
+      mediaLog.info('getResumeTime movie(item) v={v} wTime={wt} dur={d}', {
+        v: videoNum,
+        wt: v && v.watching ? v.watching.time : -1,
+        d: v ? v.duration : -1,
+      });
+      if (v && v.watching && isValidResume(v.watching.time, v.duration)) return v.watching.time;
+    }
   }
   return 0;
 };
