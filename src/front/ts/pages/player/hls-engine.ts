@@ -265,7 +265,13 @@ export class HlsEngine {
         log.info('startSeek target={target} from ct={ct} br={br}', {
           target, ct: v.currentTime, br: formatBuffered(v),
         });
+        // Stop loading before seek to prevent hls.js from continuing to fetch
+        // the next sequential fragment (e.g. sn=2) which would waste bandwidth.
+        // After currentTime assignment hls.js will restart loading around the
+        // seek target automatically.
+        hls.stopLoad();
         v.currentTime = target;
+        hls.startLoad(target);
       }
     });
 
