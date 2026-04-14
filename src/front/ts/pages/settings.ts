@@ -9,6 +9,7 @@ import { PageKeys, PageUtils } from '../utils/page';
 import { formatAppVersion } from '../utils/format';
 import { router } from '../router';
 import { Logger } from '../utils/log';
+import { arrayFind } from '../utils/array';
 
 const slog = new Logger('settings-diag');
 
@@ -119,6 +120,14 @@ const parseListOptions = (key: string, setting: DeviceSetting): SettingOption[] 
 };
 
 const isSettingKey = (key: string): key is SettingKey => key in DISPLAY_KEYS;
+
+const persistStreamingType = (settings: Record<string, DeviceSetting>): void => {
+  const st = settings.streamingType;
+  if (!st || !Array.isArray(st.value)) return;
+  const sel = arrayFind(st.value, (v) => !!v.selected);
+  if (!sel) return;
+  storage.setStreamingType(String(sel.label || sel.id).toLowerCase());
+};
 
 const parseSettings = (raw: Record<string, DeviceSetting>): SettingItem[] => {
   const items: SettingItem[] = [];
@@ -231,12 +240,7 @@ class SettingsPage implements Page {
             slog.info('before parseSettings');
             this.allSettings = parseSettings(data.settings);
             slog.info('parseSettings ok count={n}', { n: this.allSettings.length });
-            if (data.settings.streamingType && Array.isArray(data.settings.streamingType.value)) {
-              const stValues = data.settings.streamingType.value;
-              for (let si = 0; si < stValues.length; si++) {
-                if (stValues[si].selected) { storage.setStreamingType(String(stValues[si].label || stValues[si].id).toLowerCase()); break; }
-              }
-            }
+            persistStreamingType(data.settings);
           }
           this.vipUser = vip;
           if (!vip) storage.downgradeProxyForNonVip();
