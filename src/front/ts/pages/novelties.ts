@@ -284,11 +284,13 @@ class NoveltiesPage extends SidebarPage {
       case FocusLevel.TypeTabs: {
         const $items = this.$root.find('.novelties-tabs[data-level="type"] .novelties-tabs__item');
         $items.eq(this.typeTab).addClass('focused');
+        this.$root.find('.watching').scrollTop(0);
         break;
       }
       case FocusLevel.CategoryTabs: {
         const $items = this.$root.find('.novelties-tabs[data-level="category"] .novelties-tabs__item');
         $items.eq(this.categoryTab).addClass('focused');
+        this.$root.find('.watching').scrollTop(0);
         break;
       }
       case FocusLevel.Grid: {
