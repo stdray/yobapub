@@ -20,6 +20,9 @@ import { historyPage } from './pages/history';
 import { deviceApi } from './api/device';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
 import { sidebar } from './sidebar';
+import { Logger } from './utils/log';
+
+const initLog = new Logger('init-diag');
 
 objectFitImages();
 
@@ -50,20 +53,28 @@ router.onAfterNavigate((route) => {
 
 const notifyDevice = (): void => {
   const info = platform.getDeviceInfo();
-  console.log('[notify] title:', info.title, 'hw:', info.hardware, 'sw:', info.software);
+  initLog.info('notify start title={title} hw={hw} sw={sw}', { title: info.title, hw: info.hardware, sw: info.software });
   apiClient.apiPostWithRefresh('/v1/device/notify', {
     title: info.title,
     hardware: info.hardware,
     software: info.software
   }).then(
-    (res: unknown) => { console.log('[notify] response:', JSON.stringify(res)); },
-    (err: JQueryXHR) => { console.log('[notify] error:', err && err.status, err && err.responseText); }
+    (res: unknown) => { initLog.info('notify ok resp={resp}', { resp: JSON.stringify(res).substring(0, 200) }); },
+    (err: JQueryXHR) => {
+      initLog.error('notify failed status={status} text={text} resp={resp}', {
+        status: err ? err.status : -1,
+        text: err ? String(err.statusText || '') : '',
+        resp: err ? String(err.responseText || '').substring(0, 200) : '',
+      });
+    }
   );
 };
 
+initLog.info('main init hasToken={ht}', { ht: !!storage.getAccessToken() });
 if (storage.getAccessToken()) {
   notifyDevice();
   deviceApi.checkVip().then((isVip: boolean) => {
+    initLog.info('initial checkVip resolved vip={vip}', { vip: isVip });
     if (!isVip) storage.downgradeProxyForNonVip();
     sidebar.refresh();
   });

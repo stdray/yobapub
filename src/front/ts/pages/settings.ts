@@ -8,6 +8,9 @@ import { storage, Storage, QualityId } from '../utils/storage';
 import { PageKeys, PageUtils } from '../utils/page';
 import { formatAppVersion } from '../utils/format';
 import { router } from '../router';
+import { Logger } from '../utils/log';
+
+const slog = new Logger('settings-diag');
 
 interface SettingOption {
   id: number;
@@ -210,12 +213,17 @@ class SettingsPage implements Page {
     this.keys.bind((e) => this.handleKey(e));
     PageUtils.showSpinnerIn(this.$root);
 
+    slog.info('mount start');
     $.when(deviceApi.getDeviceSettings(), deviceApi.checkVip(true)).then(
       (...args: unknown[]) => {
+        slog.info('settings+vip resolved argsLen={n}', { n: args.length });
         const res = args[0] as [DeviceSettingsResponse, string, JQueryXHR] | DeviceSettingsResponse;
         const isVip = args[1] as [boolean, string, JQueryXHR] | boolean;
         const data: DeviceSettingsResponse = Array.isArray(res) ? res[0] : res;
         const vip: boolean = Array.isArray(isVip) ? isVip[0] : isVip;
+        slog.info('parsed hasData={hd} hasSettings={hs} vip={vip}', {
+          hd: !!data, hs: !!(data && data.settings), vip,
+        });
         if (data && data.settings) {
           this.allSettings = parseSettings(data.settings);
           if (data.settings.streamingType && Array.isArray(data.settings.streamingType.value)) {
@@ -234,7 +242,13 @@ class SettingsPage implements Page {
         this.allSettings.unshift(buildVersionSetting());
         this.render();
       },
-      () => {
+      (...errArgs: unknown[]) => {
+        const xhr = errArgs[0] as JQueryXHR | undefined;
+        slog.error('settings+vip failed status={status} text={text} resp={resp}', {
+          status: xhr && xhr.status !== undefined ? xhr.status : -1,
+          text: xhr && xhr.statusText ? String(xhr.statusText) : '',
+          resp: xhr && xhr.responseText ? String(xhr.responseText).substring(0, 200) : '',
+        });
         this.$root.html('<div class="settings-page"><div class="settings-page__title">Ошибка загрузки настроек</div></div>');
       }
     );

@@ -3,6 +3,7 @@ import { Item, VideoFile, AudioTrack, Subtitle, MediaLinksResponse } from '../..
 import { Logger } from '../../utils/log';
 
 const subsDiagLog = new Logger('subs-diag');
+const mediaLog = new Logger('media-diag');
 
 export interface MediaInfo {
   mid: number;
@@ -48,17 +49,26 @@ export const findVideoMedia = (item: Item, videoNum: number): MediaInfo | null =
 };
 
 export const loadMediaLinks = (mid: number, cb: (files: VideoFile[], subs: Subtitle[]) => void): void => {
+  mediaLog.info('loadMediaLinks start mid={mid}', { mid });
   apiClient.apiGet('/v1/items/media-links', { mid: mid }).then(
     (res: MediaLinksResponse) => {
       const files: VideoFile[] = (res && res.files) || [];
       const subs: Subtitle[] = (res && res.subtitles) || [];
+      mediaLog.info('loadMediaLinks ok files={files} subs={subs}', { files: files.length, subs: subs.length });
       subsDiagLog.info('raw api count={count} json={json}', {
         count: subs.length,
         json: JSON.stringify(subs),
       });
       cb(files, subs);
     },
-    () => { cb([], []); }
+    (xhr: JQueryXHR) => {
+      mediaLog.error('loadMediaLinks failed status={status} text={text} resp={resp}', {
+        status: xhr ? xhr.status : -1,
+        text: xhr ? String(xhr.statusText || '') : '',
+        resp: xhr ? String(xhr.responseText || '').substring(0, 200) : '',
+      });
+      cb([], []);
+    }
   );
 };
 

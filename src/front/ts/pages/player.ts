@@ -374,7 +374,13 @@ class PlayerController {
   }
 
   private loadAndPlay(): void {
-    if (!this.media.item) return;
+    if (!this.media.item) {
+      plog.error('loadAndPlay: no item — leaving spinner visible');
+      return;
+    }
+    plog.info('loadAndPlay start season={s} episode={e} video={v}', {
+      s: this.media.season, e: this.media.episode, v: this.media.video,
+    });
     let found: MediaInfo | null = null;
     let pos = 0;
 
@@ -389,9 +395,13 @@ class PlayerController {
     }
 
     if (!found) {
+      plog.error('loadAndPlay: findEpisode/findVideo returned null');
       this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
       return;
     }
+    plog.info('loadAndPlay found mid={mid} title={title} audios={audios}', {
+      mid: found.mid, title: found.title, audios: found.audios.length,
+    });
 
     const itemTitle = this.media.item.title.split(' / ')[0];
     this.media.title = found.title;
@@ -400,6 +410,7 @@ class PlayerController {
     const prefs = getTitlePrefs(this.media.item.id);
 
     loadMediaLinks(found.mid, (files, subs) => {
+      plog.info('loadMediaLinks cb files={files} subs={subs}', { files: files.length, subs: subs.length });
       this.media.files = files.slice().sort((a, b) => b.w - a.w);
       this.media.subs = subs.filter((s) => s.url && !s.embed);
       const q = restoreQualityIndex(this.media.files, prefs);
@@ -407,9 +418,11 @@ class PlayerController {
       const sub = restoreSubIndex(this.media.subs, prefs);
 
       if (this.media.files.length === 0) {
+        plog.error('loadAndPlay: no files — showing Видео не найдено');
         this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Видео не найдено</div></div>');
         return;
       }
+      plog.info('calling continuePlaying q={q} a={a} sub={sub} pos={pos}', { q, a, sub, pos });
       this.continuePlaying({ quality: q, audio: a, sub, position: pos, paused: false }, itemTitle + ' - ' + this.media.title);
     });
   }
@@ -1090,15 +1103,30 @@ class PlayerController {
 
     PageUtils.showSpinnerIn(this.$root);
     const id = params.id!;
+    plog.info('mount start id={id} season={s} episode={e} video={v}', {
+      id, s: params.season, e: params.episode, v: params.video,
+    });
 
     getItem(id).then(
       (itemRes: { item: Item }) => {
         const data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
         this.media.item = data.item;
-        if (!this.media.item) return;
+        plog.info('mount getItem ok hasItem={hasItem} title={title}', {
+          hasItem: !!this.media.item,
+          title: this.media.item ? this.media.item.title : null,
+        });
+        if (!this.media.item) {
+          plog.error('mount getItem returned no item — leaving spinner visible');
+          return;
+        }
         this.loadAndPlay();
       },
-      () => {
+      (xhr: JQueryXHR) => {
+        plog.error('mount getItem failed status={status} text={text} resp={resp}', {
+          status: xhr ? xhr.status : -1,
+          text: xhr ? String(xhr.statusText || '') : '',
+          resp: xhr ? String(xhr.responseText || '').substring(0, 200) : '',
+        });
         this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка загрузки</div></div>');
       }
     );
