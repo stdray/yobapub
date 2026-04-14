@@ -5,7 +5,7 @@ import { markTime, toggleWatched } from '../api/watching';
 import { Item, VideoFile, AudioTrack, Subtitle } from '../types/api';
 import { router } from '../router';
 import { TvKey, platform } from '../utils/platform';
-import { storage } from '../utils/storage';
+import { storage, ProxyCategory } from '../utils/storage';
 import { buildBaseHlsConfig, HlsConfig, logPlaybackStart } from '../utils/hls-proxy';
 import { showHlsError } from '../utils/hls-error';
 import { PageKeys, PageUtils } from '../utils/page';
@@ -243,7 +243,10 @@ class PlayerController {
         id: this.media.item.id, s: this.media.season, e: this.media.episode, t: time,
       });
       markTime(this.media.item.id, this.media.episode, time, this.media.season).then(
-        () => plog.info('markTime ok id={id} time={t}', { id: this.media.item ? this.media.item.id : -1, t: time }),
+        (res: unknown) => plog.info('markTime resp id={id} time={t} body={b}', {
+          id: this.media.item ? this.media.item.id : -1, t: time,
+          b: JSON.stringify(res).substring(0, 300),
+        }),
         (xhr: JQueryXHR) => plog.error('markTime failed status={s} text={txt} resp={r}', {
           s: xhr ? xhr.status : -1,
           txt: xhr ? String(xhr.statusText || '') : '',
@@ -255,7 +258,10 @@ class PlayerController {
         id: this.media.item.id, v: this.media.video, t: time,
       });
       markTime(this.media.item.id, this.media.video, time).then(
-        () => plog.info('markTime ok id={id} time={t}', { id: this.media.item ? this.media.item.id : -1, t: time }),
+        (res: unknown) => plog.info('markTime resp id={id} time={t} body={b}', {
+          id: this.media.item ? this.media.item.id : -1, t: time,
+          b: JSON.stringify(res).substring(0, 300),
+        }),
         (xhr: JQueryXHR) => plog.error('markTime failed status={s} text={txt} resp={r}', {
           s: xhr ? xhr.status : -1,
           txt: xhr ? String(xhr.statusText || '') : '',
@@ -641,7 +647,7 @@ class PlayerController {
       sub: this.state.sub,
     });
     const audioIndex = this.media.audios.length > 0 ? this.media.audios[this.state.audio].index : 1;
-    const url = getRewrittenHlsUrl(originalUrl, audioIndex);
+    const url = getRewrittenHlsUrl(originalUrl, audioIndex, ProxyCategory.Media);
     const hls = new Hls(cfg);
     this.hlsInstance = hls;
     hls.on(Hls.Events.FRAG_LOADING, (_e: string, data: { frag?: { sn: number; start: number; duration: number } }) => {
