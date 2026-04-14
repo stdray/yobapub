@@ -23,6 +23,25 @@ import { sidebar } from './sidebar';
 import { Logger } from './utils/log';
 
 const initLog = new Logger('init-diag');
+const crashLog = new Logger('crash');
+
+window.onerror = (message, source, lineno, colno, error): void => {
+  crashLog.error('window.onerror {msg} at {src}:{line}:{col} stack={stack}', {
+    msg: String(message),
+    src: String(source || ''),
+    line: lineno || 0,
+    col: colno || 0,
+    stack: error && error.stack ? error.stack.substring(0, 800) : '',
+  });
+};
+
+window.onunhandledrejection = (ev): void => {
+  const reason = ev.reason as { message?: string; stack?: string } | undefined;
+  crashLog.error('unhandledrejection {msg} stack={stack}', {
+    msg: reason && reason.message ? reason.message : String(ev.reason),
+    stack: reason && reason.stack ? reason.stack.substring(0, 800) : '',
+  });
+};
 
 objectFitImages();
 
