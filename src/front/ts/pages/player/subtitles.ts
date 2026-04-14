@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import { Subtitle } from '../../types/api';
-import { storage, Storage } from '../../utils/storage';
+import { storage, Storage, ProxyCategory } from '../../utils/storage';
 import { Logger } from '../../utils/log';
 
 const log = new Logger('subs-diag');
@@ -93,12 +93,11 @@ export const loadSubtitleTrack = (videoEl: HTMLVideoElement, $root: JQuery, subs
     dumpTracks('after-initial-showing');
   };
 
-  // Subtitles are always routed through our backend passthrough: the CDN does
-  // not set Access-Control-Allow-Origin, so a direct XHR fails with
-  // status=error and <track src=...> fails with the track-element error
-  // event. /hls/proxy is an unrestricted http/https passthrough that also
-  // serves SRT payloads fine.
-  const subUrl = '/hls/proxy?url=' + encodeURIComponent(sub.url);
+  // CDN does not set Access-Control-Allow-Origin, so without proxying a
+  // direct XHR fails and <track src=...> errors out. The 'subtitles'
+  // category is on by default; toggling it off is a conscious choice to
+  // break subtitle display.
+  const subUrl = storage.getRewrittenUrl(ProxyCategory.Subtitles, sub.url);
   log.info('loading idx={idx} lang={lang} url={url}', { idx: subIdx, lang: sub.lang, url: subUrl });
 
   $.ajax({

@@ -61,7 +61,7 @@ public static class HlsRewriter
                 {
                     return trimmed.Contains(".m3u8")
                         ? "/hls/rewrite?url=" + Uri.EscapeDataString(trimmed) + "&audio=" + audioIndex + "&proxy=true"
-                        : "/hls/proxy?url=" + Uri.EscapeDataString(trimmed);
+                        : "/proxy?url=" + Uri.EscapeDataString(trimmed);
                 }
                 if (trimmed.Contains("URI=\""))
                 {
@@ -71,7 +71,7 @@ public static class HlsRewriter
                         if (!uri.Contains("://")) return m.Value;
                         var rewritten = uri.Contains(".m3u8")
                             ? "/hls/rewrite?url=" + Uri.EscapeDataString(uri) + "&audio=" + audioIndex + "&proxy=true"
-                            : "/hls/proxy?url=" + Uri.EscapeDataString(uri);
+                            : "/proxy?url=" + Uri.EscapeDataString(uri);
                         return $"URI=\"{rewritten}\"";
                     });
                 }

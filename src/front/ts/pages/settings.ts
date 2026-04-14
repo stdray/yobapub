@@ -4,7 +4,7 @@ import { Page, RouteParams } from '../types/app';
 import { deviceApi } from '../api/device';
 import { DeviceSetting, DeviceSettingsResponse } from '../types/api';
 import { TvKey, platform } from '../utils/platform';
-import { storage, Storage, QualityId } from '../utils/storage';
+import { storage, Storage, QualityId, ProxyCategory, proxyCategoryLabel } from '../utils/storage';
 import { PageKeys, PageUtils } from '../utils/page';
 import { formatAppVersion } from '../utils/format';
 import { router } from '../router';
@@ -26,6 +26,7 @@ interface SettingItem {
   type: string;
   value: number | string | boolean | null;
   options?: SettingOption[];
+  proxyCat?: ProxyCategory;
 }
 
 type SettingKey =
@@ -179,16 +180,21 @@ const buildStartPageSetting = (): SettingItem => {
   return { key: '_startPage', label: 'Стартовая страница', type: 'list', value: null, options: opts };
 };
 
-const buildProxyModeSetting = (isVip: boolean): SettingItem => {
-  const mode = storage.getProxyMode();
-  const available = storage.getAvailableProxyModes(isVip);
-  const opts: SettingOption[] = available.map((o, i) => ({
-    id: i,
-    label: o.label,
-    description: '',
-    selected: o.id === mode ? 1 : 0,
-  }));
-  return { key: '_proxyMode', label: 'Проксировать', type: 'list', value: null, options: opts };
+const buildProxyCatSetting = (cat: ProxyCategory): SettingItem => ({
+  key: '_proxyCat_' + cat,
+  label: proxyCategoryLabel(cat),
+  type: 'checkbox',
+  value: storage.isProxyEnabled(cat) ? 1 : 0,
+  proxyCat: cat,
+});
+
+const buildProxyCatSettings = (isVip: boolean): SettingItem[] => {
+  const available = storage.getAvailableProxyCategories(isVip);
+  const items: SettingItem[] = [];
+  for (let i = 0; i < available.length; i++) {
+    items.push(buildProxyCatSetting(available[i]));
+  }
+  return items;
 };
 
 const getDisplayValue = (item: SettingItem): string => {
@@ -245,7 +251,10 @@ class SettingsPage implements Page {
           this.vipUser = vip;
           if (!vip) storage.downgradeProxyForNonVip();
           slog.info('before unshift builders');
-          this.allSettings.unshift(buildProxyModeSetting(vip));
+          const proxyCats = buildProxyCatSettings(vip);
+          for (let pi = proxyCats.length - 1; pi >= 0; pi--) {
+            this.allSettings.unshift(proxyCats[pi]);
+          }
           this.allSettings.unshift(buildSubSizeSetting());
           this.allSettings.unshift(buildQualitySetting());
           this.allSettings.unshift(buildStartPageSetting());
@@ -408,14 +417,10 @@ class SettingsPage implements Page {
       return;
     }
 
-    if (item.key === '_proxyMode') {
-      if (item.options) {
-        const available = storage.getAvailableProxyModes(this.vipUser);
-        for (let j = 0; j < item.options.length; j++) {
-          item.options[j].selected = (j === this.focusedOptionIndex) ? 1 : 0;
-        }
-        storage.setProxyMode(available[this.focusedOptionIndex].id);
-      }
+    if (item.proxyCat !== undefined) {
+      const enabled = this.focusedOptionIndex === 1;
+      item.value = enabled ? 1 : 0;
+      storage.setProxyEnabled(item.proxyCat, enabled);
       this.closeOptions();
       return;
     }

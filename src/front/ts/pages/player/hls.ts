@@ -1,4 +1,4 @@
-import { storage } from '../../utils/storage';
+import { storage, ProxyCategory } from '../../utils/storage';
 
 export const getBaseUrl = (url: string): string => {
   const i = url.indexOf('?');
@@ -41,9 +41,20 @@ export const rewriteHlsManifest = (manifest: string, audioIndex: number): string
   return result;
 };
 
-export const getRewrittenHlsUrl = (url: string, audioIndex: number): string => {
+// Always routes through /hls/rewrite (the backend rewrites m3u8 to switch
+// audio tracks). The backend's own segment proxying is toggled by the given
+// category; callers just pass the category and don't check the flag.
+export const getRewrittenHlsUrl = (url: string, audioIndex: number, cat: ProxyCategory): string => {
   const token = storage.getAccessToken() || '';
   return '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
-    (storage.isProxyAll() ? '&proxy=true' : '') +
+    (storage.isProxyEnabled(cat) ? '&proxy=true' : '') +
     (token ? '&access_token=' + encodeURIComponent(token) : '');
+};
+
+// For consumers where /hls/rewrite is only needed when proxying is on (e.g.
+// TV channels have a single audio track, so audio-switching rewrites are
+// irrelevant). Returns the original URL if the category is off.
+export const getOptionalRewrittenHlsUrl = (url: string, audioIndex: number, cat: ProxyCategory): string => {
+  if (!storage.isProxyEnabled(cat)) return url;
+  return getRewrittenHlsUrl(url, audioIndex, cat);
 };

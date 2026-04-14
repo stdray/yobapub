@@ -2,7 +2,11 @@ using System.Net;
 
 namespace YobaPub.Proxy;
 
-public class UniversalProxyMiddleware(RequestDelegate next, IHttpClientFactory httpClientFactory, ProxyConfig config)
+public class UniversalProxyMiddleware(
+    RequestDelegate next,
+    IHttpClientFactory httpClientFactory,
+    ProxyConfig config,
+    ILogger<UniversalProxyMiddleware> logger)
 {
     private static readonly string[] UpstreamPrefixes = ["/v1/", "/oauth2/"];
 
@@ -35,12 +39,6 @@ public class UniversalProxyMiddleware(RequestDelegate next, IHttpClientFactory h
             return;
         }
 
-        if (!config.AllowedProxyHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
-        {
-            context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-            return;
-        }
-
         await ForwardToUpstream(context, rawUrl);
     }
 
@@ -63,18 +61,35 @@ public class UniversalProxyMiddleware(RequestDelegate next, IHttpClientFactory h
                 request.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
         }
 
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-
-        context.Response.StatusCode = (int)response.StatusCode;
-
-        foreach (var header in response.Headers.Concat(response.Content.Headers))
+        HttpResponseMessage response;
+        try
         {
-            if (header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)) continue;
-            context.Response.Headers[header.Key] = header.Value.ToArray();
+            response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Proxy exception: {msg} url={url}", ex.Message, targetUrl);
+            context.Response.StatusCode = (int)HttpStatusCode.BadGateway;
+            return;
         }
 
-        context.Response.Headers["Access-Control-Allow-Origin"] = "*";
+        try
+        {
+            context.Response.StatusCode = (int)response.StatusCode;
 
-        await response.Content.CopyToAsync(context.Response.Body);
+            foreach (var header in response.Headers.Concat(response.Content.Headers))
+            {
+                if (header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)) continue;
+                context.Response.Headers[header.Key] = header.Value.ToArray();
+            }
+
+            context.Response.Headers["Access-Control-Allow-Origin"] = "*";
+
+            await response.Content.CopyToAsync(context.Response.Body);
+        }
+        finally
+        {
+            response.Dispose();
+        }
     }
 }

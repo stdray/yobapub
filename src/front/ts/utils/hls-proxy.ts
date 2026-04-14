@@ -1,5 +1,5 @@
 import Hls from 'hls.js';
-import { storage } from './storage';
+import { storage, ProxyCategory } from './storage';
 import { platform } from './platform';
 import { Logger } from './log';
 import { formatAppVersion } from './format';
@@ -51,7 +51,7 @@ export const logPlaybackStart = (log: Logger, url: string, opts?: PlaybackOpts):
   });
   log.info('playback url={url}', { url });
   log.info('playback opts proxy={proxy} streaming={streaming} startPos={startPos} quality={quality} audio={audio} sub={sub}', {
-    proxy: storage.isProxyAll(),
+    proxy: storage.isProxyEnabled(ProxyCategory.Media),
     streaming: storage.getStreamingType(),
     startPos: opts && opts.startPosition !== undefined ? opts.startPosition : null,
     quality: opts && opts.quality !== undefined ? opts.quality : null,

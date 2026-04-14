@@ -5,7 +5,8 @@ import { TvKey, platform } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
 import { buildBaseHlsConfig, logPlaybackStart } from '../utils/hls-proxy';
-import { storage } from '../utils/storage';
+import { getOptionalRewrittenHlsUrl } from './player/hls';
+import { ProxyCategory } from '../utils/storage';
 import { showHlsError } from '../utils/hls-error';
 import Hls from 'hls.js';
 
@@ -125,10 +126,7 @@ class TvPlayerPage implements Page {
     plog.newTraceId();
     logPlaybackStart(plog, streamUrl);
 
-    if (storage.isProxyTv()) {
-      plog.debug('Proxy enabled, will rewrite URLs');
-      streamUrl = '/hls/rewrite?url=' + encodeURIComponent(streamUrl) + '&audio=0&proxy=true';
-    }
+    streamUrl = getOptionalRewrittenHlsUrl(streamUrl, 0, ProxyCategory.Tv);
 
     this.bindHlsDebugEvents(h);
     this.bindHlsManifestParsed(h, videoEl);

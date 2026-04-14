@@ -185,7 +185,7 @@ public class HlsRewriterTests
             if (l.Contains(".m3u8"))
                 Assert.StartsWith("/hls/rewrite?url=", l);
             else
-                Assert.StartsWith("/hls/proxy?url=", l);
+                Assert.StartsWith("/proxy?url=", l);
         });
         Assert.DoesNotContain(urlLines, l => l.Contains("://cdn"));
     }
@@ -236,7 +236,7 @@ public class HlsRewriterTests
             .ToList();
 
         Assert.NotEmpty(urlLines);
-        Assert.All(urlLines, l => Assert.StartsWith("/hls/proxy?url=", l));
+        Assert.All(urlLines, l => Assert.StartsWith("/proxy?url=", l));
     }
 
     [Fact]
