@@ -67,12 +67,8 @@ module.exports = function (_env, argv) {
             loader: 'swc-loader',
             options: {
               jsc: {
-                parser: { syntax: 'typescript' }
-              },
-              env: {
-                targets: 'Chrome >= 28',
-                mode: 'usage',
-                coreJs: '3.49'
+                parser: { syntax: 'typescript' },
+                target: 'es5'
               }
             }
           }
@@ -83,11 +79,7 @@ module.exports = function (_env, argv) {
           use: {
             loader: 'swc-loader',
             options: {
-              env: {
-                targets: 'Chrome >= 28',
-                mode: 'usage',
-                coreJs: '3.49'
-              }
+              jsc: { target: 'es5' }
             }
           }
         },
