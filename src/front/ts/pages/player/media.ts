@@ -94,9 +94,22 @@ export const getResumeTime = (item: Item, seasonNum?: number, epNum?: number, vi
   if (seasonNum !== undefined && epNum !== undefined && item.seasons) {
     const found = findEpisode(item, seasonNum, epNum);
     const ep = found && found.episode;
+    mediaLog.info('getResumeTime serial s={s} e={e} epFound={ef} hasWatching={hw} wTime={wt} wStatus={ws} dur={dur}', {
+      s: seasonNum, e: epNum, ef: !!ep,
+      hw: !!(ep && ep.watching),
+      wt: ep && ep.watching ? ep.watching.time : -1,
+      ws: ep && ep.watching ? ep.watching.status : -1,
+      dur: ep ? ep.duration : -1,
+    });
     if (ep && ep.watching && isValidResume(ep.watching.time, ep.duration)) return ep.watching.time;
   } else if (videoNum !== undefined && item.videos) {
     const v = item.videos[videoNum - 1];
+    mediaLog.info('getResumeTime movie v={v} vFound={vf} hasWatching={hw} wTime={wt} dur={dur}', {
+      v: videoNum, vf: !!v,
+      hw: !!(v && v.watching),
+      wt: v && v.watching ? v.watching.time : -1,
+      dur: v ? v.duration : -1,
+    });
     if (v && v.watching && isValidResume(v.watching.time, v.duration)) return v.watching.time;
   }
   return 0;
