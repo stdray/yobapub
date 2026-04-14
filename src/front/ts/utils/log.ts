@@ -12,7 +12,7 @@ const relTs = (): string =>
 const renderTemplate = (template: string, props: Record<string, unknown>): string =>
   template.replace(/\{(\w+)\}/g, (_, key) => {
     const v = props[key];
-    return v === undefined ? '{' + key + '}' : String(v);
+    return v === undefined ? 'undefined' : String(v);
   });
 
 const sendToBackend = (level: Level, message: string, props: Record<string, unknown>, traceId?: string): void => {
