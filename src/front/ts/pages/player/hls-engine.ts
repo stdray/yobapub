@@ -295,6 +295,26 @@ export class HlsEngine {
       });
     });
 
+    hls.on(Hls.Events.MANIFEST_LOADED, (_e, data) => {
+      log.info('hls MANIFEST_LOADED url={url} levels={count}', {
+        url: data.url ? data.url.substring(0, 200) : null,
+        count: data.levels ? data.levels.length : 0,
+      });
+    });
+
+    hls.on(Hls.Events.LEVEL_LOADING, (_e, data) => {
+      log.info('hls LEVEL_LOADING level={level} url={url}', {
+        level: data.level, url: data.url ? data.url.substring(0, 200) : null,
+      });
+    });
+
+    hls.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
+      const loadMs = data.stats ? data.stats.tload - data.stats.trequest : null;
+      log.info('hls LEVEL_LOADED level={level} load={load}ms', {
+        level: data.levelId, load: loadMs,
+      });
+    });
+
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       const lvls = hls.levels;
       log.info('hls MANIFEST_PARSED levels={count} details={details}', {
