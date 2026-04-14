@@ -1,21 +1,27 @@
 import $ from 'jquery';
 import { apiClient } from './client';
-import { TokenResponse, AuthErrorResponse } from '../types/api';
+import { DeviceCodeResponse, TokenResponse, AuthErrorResponse } from '../types/api';
 import { storage } from '../utils/storage';
 
-export const requestDeviceCode = (): JQueryXHR =>
+export const requestDeviceCode = (): JQueryDeferred<DeviceCodeResponse> => {
+  const d = $.Deferred<DeviceCodeResponse>();
   $.ajax({
     url: '/oauth2/device',
     method: 'POST',
     data: {
       grant_type: 'device_code',
       client_id: apiClient.getClientId(),
-      client_secret: apiClient.getClientSecret()
+      client_secret: apiClient.getClientSecret(),
     },
-    dataType: 'json'
-  });
+    dataType: 'json',
+  }).then(
+    (data: DeviceCodeResponse) => { d.resolve(data); },
+    (xhr: JQueryXHR) => { d.reject(xhr); },
+  );
+  return d;
+};
 
-export interface PollDeviceTokenOpts {
+interface PollDeviceTokenOpts {
   readonly code: string;
   readonly interval: number;
   readonly expiresIn: number;

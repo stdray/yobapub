@@ -1,9 +1,8 @@
 import Hls from 'hls.js';
 import { Logger } from '../../utils/log';
 import { extractHostname } from '../../utils/url';
-import { buildBaseHlsConfig, HlsConfig, logPlaybackStart } from '../../utils/hls-proxy';
+import { buildBaseHlsConfig, HlsConfig, logPlaybackStart, getRewrittenHlsUrl } from '../../utils/hls-utils';
 import { ProxyCategory } from '../../utils/storage';
-import { getRewrittenHlsUrl } from './hls';
 
 interface HlsFragData {
   frag?: { sn: number; start: number; duration: number };
@@ -29,7 +28,7 @@ export interface HlsFatalErrorData {
   readonly frag?: { url?: string; sn?: number; start?: number };
 }
 
-export interface HlsLoadContext {
+interface HlsLoadContext {
   readonly startPosition: number;
   readonly quality: number;
   readonly audio: number;
@@ -38,7 +37,7 @@ export interface HlsLoadContext {
   readonly qualityTarget: { readonly w: number; readonly h: number } | null;
 }
 
-export interface HlsEngineDeps {
+interface HlsEngineDeps {
   readonly getVideoEl: () => HTMLVideoElement | null;
   readonly getPlaybackStarted: () => boolean;
   readonly onReady: () => void;

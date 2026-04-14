@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["ts/main.ts"],
+  "project": ["ts/**/*.ts"],
+  "ignore": [
+    "bootstrap.js"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "ignoreMembers": ["Yellow", "Blue", "Key0", "Key1", "Key2", "Key3", "Key4", "Key5", "Key6", "Key7", "Key8", "Key9"],
+  "ignoreDependencies": [
+    "core-js"
+  ]
+}

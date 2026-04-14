@@ -16,7 +16,7 @@ const tplLoadingCompiled = doT.template(`
   </div>
 `);
 
-export const tplLoading = (data: Record<string, never>): string => tplLoadingCompiled(data);
+const tplLoading = (data: Record<string, never>): string => tplLoadingCompiled(data);
 
 const tplCodeCompiled = doT.template(`
   <div class="login">
@@ -28,7 +28,7 @@ const tplCodeCompiled = doT.template(`
   </div>
 `);
 
-export const tplCode = (data: { readonly uri: string; readonly code: string; readonly expires: number }): string =>
+const tplCode = (data: { readonly uri: string; readonly code: string; readonly expires: number }): string =>
   tplCodeCompiled(data);
 
 const tplExpiredCompiled = doT.template(`
@@ -39,7 +39,7 @@ const tplExpiredCompiled = doT.template(`
   </div>
 `);
 
-export const tplExpired = (data: Record<string, never>): string => tplExpiredCompiled(data);
+const tplExpired = (data: Record<string, never>): string => tplExpiredCompiled(data);
 
 const tplErrorCompiled = doT.template(`
   <div class="login">
@@ -49,7 +49,7 @@ const tplErrorCompiled = doT.template(`
   </div>
 `);
 
-export const tplError = (data: { readonly message: string }): string => tplErrorCompiled(data);
+const tplError = (data: { readonly message: string }): string => tplErrorCompiled(data);
 
 // --- page ---
 

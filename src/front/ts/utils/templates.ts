@@ -7,7 +7,7 @@ export const tplCard = (data: { readonly id: number; readonly poster: string; re
 
 const tplRatingCompiled = doT.template(`<span class="detail__rating">{{=it.label}} <span class="detail__rating-value">{{=it.value}}</span></span>`);
 
-export const tplRating = (data: { readonly label: string; readonly value: number }): string =>
+const tplRating = (data: { readonly label: string; readonly value: number }): string =>
   tplRatingCompiled(data);
 
 const tplEmptyTextCompiled = doT.template(`<div class="empty-text">{{=it.text}}</div>`);

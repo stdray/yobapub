@@ -68,11 +68,9 @@ src/
 │       ├── format.ts           # formatDuration, formatTimecode, formatTimeShort, formatAppVersion
 │       ├── detail-controls.ts  # DetailControls class for movie/serial detail button navigation
 │       ├── exit-dialog.ts      # Exit confirmation dialog
-│       ├── hls-proxy.ts        # buildBaseHlsConfig(), logPlaybackStart()
-│       ├── hls-error.ts        # showHlsError() for HLS playback error display
+│       ├── hls-utils.ts        # HLS config, proxy URL rewriting, error display
 │       ├── log.ts              # Logger class for structured logging
-│       ├── number-set.ts       # Lightweight numeric set utility
-│       └── playback-errors.ts  # Playback error tracking and reporting
+│       └── number-set.ts       # Lightweight numeric set utility
 ```
 
 ### Data Flow

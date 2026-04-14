@@ -14,7 +14,7 @@ const logXhr = (tag: string, xhr: JQueryXHR | undefined | null): void => {
   });
 };
 
-export interface UserProfile {
+interface UserProfile {
   readonly username: string;
   readonly avatar: string;
   readonly subscriptionDays: number;
@@ -29,7 +29,7 @@ const parseUserResponse = (res: UserResponse): { username: string; avatar: strin
   };
 };
 
-export class DeviceApi {
+class DeviceApi {
   private cachedDeviceId: number | null = null;
   private cachedVip: boolean | null = null;
   private cachedProfile: UserProfile | null = null;

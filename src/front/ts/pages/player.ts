@@ -6,7 +6,7 @@ import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
-import { pickHlsUrl } from '../utils/hls-proxy';
+import { pickHlsUrl } from '../utils/hls-utils';
 
 import { tplPlayer } from './player/template';
 import {

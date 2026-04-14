@@ -1,7 +1,7 @@
 import { Item } from '../../types/api';
 import { arrayFindIndex } from '../../utils/array';
 
-export interface TrackNavigatorDeps {
+interface TrackNavigatorDeps {
   readonly getItem: () => Item | null;
   readonly getSeason: () => number | undefined;
   readonly getEpisode: () => number | undefined;

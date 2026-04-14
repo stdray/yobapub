@@ -2,11 +2,11 @@ import { router } from '../../router';
 import { TvKey, platform } from '../../utils/platform';
 import { PageKeys } from '../../utils/page';
 import { Logger } from '../../utils/log';
-import { showHlsError } from '../../utils/hls-error';
-import { tplErrorScreen } from './error-template';
+import { showHlsError } from '../../utils/hls-utils';
+import { tplErrorScreen } from './template';
 import { HlsEngine, HlsFatalErrorData } from './hls-engine';
 
-export interface PlayerErrorViewDeps {
+interface PlayerErrorViewDeps {
   readonly $root: JQuery;
   readonly keys: PageKeys;
   readonly engine: HlsEngine;

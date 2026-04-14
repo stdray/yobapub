@@ -1,8 +1,8 @@
 import { Lazy } from '../../utils/lazy';
 
-export type OsdIcon = 'play' | 'pause' | 'rw' | 'ff';
+type OsdIcon = 'play' | 'pause' | 'rw' | 'ff';
 
-export interface OverlayDeps {
+interface OverlayDeps {
   readonly $root: JQuery;
   readonly info: { show(): void; hide(): void };
   readonly updateProgress: () => void;
@@ -36,14 +36,7 @@ export class OverlayView {
     this.$bar = new Lazy(() => $root.find('.player__header, .player__gradient, .player__bar'));
     this.$osd = new Lazy(() => $root.find('.player__osd'));
     this.$barSeek = new Lazy(() => $root.find('.player__bar-seek'));
-    this.$toast = new Lazy(() => {
-      let $t = $root.find('.player__toast');
-      if ($t.length === 0) {
-        $root.find('.player').append('<div class="player__toast"></div>');
-        $t = $root.find('.player__toast');
-      }
-      return $t;
-    });
+    this.$toast = new Lazy(() => $root.find('.player__toast'));
   }
 
   // Called after tplPlayer replaces the page DOM — the previous jQuery refs

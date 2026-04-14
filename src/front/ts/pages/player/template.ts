@@ -43,3 +43,40 @@ const tplPlayerCompiled = doT.template(`
 
 export const tplPlayer = (data: { readonly title: string; readonly episode: string }): string =>
   tplPlayerCompiled(data);
+
+interface ErrorScreenData {
+  readonly prefix: 'player' | 'tv-player';
+  readonly msg: string;
+  readonly debugLines: ReadonlyArray<string>;
+}
+
+const tplErrorScreenCompiled = doT.template(`
+  <div class="{{=it.prefix}}">
+    <div class="{{=it.prefix}}__error">
+      <div>{{=it.msg}}</div>
+      {{~it.debugLines :line}}<div class="player__error-debug">{{=line}}</div>{{~}}
+    </div>
+  </div>
+`);
+
+export const tplErrorScreen = (data: ErrorScreenData): string => tplErrorScreenCompiled(data);
+
+interface PanelListItem {
+  readonly label: string;
+  readonly selected: boolean;
+}
+
+interface PanelListData {
+  readonly items: ReadonlyArray<PanelListItem>;
+  readonly focusedIndex: number;
+}
+
+const tplPanelListCompiled = doT.template(`
+  {{~it.items :item:i}}
+    <div class="ppanel__list-item{{?item.selected}} selected{{?}}{{?i===it.focusedIndex}} focused{{?}}">
+      {{=item.label}}
+    </div>
+  {{~}}
+`);
+
+export const tplPanelList = (data: PanelListData): string => tplPanelListCompiled(data);

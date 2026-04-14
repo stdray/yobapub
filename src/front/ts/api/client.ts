@@ -4,7 +4,7 @@ import { TokenResponse } from '../types/api';
 
 type QueryParams = Record<string, string | number | boolean>;
 
-export class ApiClient {
+class ApiClient {
   private clientId = '';
   private clientSecret = '';
 

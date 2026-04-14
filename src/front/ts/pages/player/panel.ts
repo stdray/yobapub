@@ -1,15 +1,7 @@
-import * as doT from 'dot';
 import { AudioTrack, Subtitle, VideoFile } from '../../types/api';
 import { TvKey } from '../../utils/platform';
 import { Lazy } from '../../utils/lazy';
-
-const tplListItemsCompiled = doT.template(
-  '{{~it.items :item:i}}'
-  + '<div class="ppanel__list-item{{?item.selected}} selected{{?}}{{?i===it.focusedIndex}} focused{{?}}">'
-  + '{{=item.label}}'
-  + '</div>'
-  + '{{~}}'
-);
+import { tplPanelList } from './template';
 
 const PANEL_SECTIONS = ['audio', 'subs', 'quality'] as const;
 const PANEL_IDLE_MS = 4000;
@@ -28,7 +20,7 @@ export interface PanelData {
   readonly qualityEnabled: boolean;
 }
 
-export interface PanelCallbacks {
+interface PanelCallbacks {
   readonly onShowInfo: () => void;
   readonly onAfterClose: () => void;
   readonly onApplyAudio: (idx: number) => void;
@@ -38,7 +30,7 @@ export interface PanelCallbacks {
   readonly getData: () => PanelData;
 }
 
-export const buildAudioLabel = (a: AudioTrack): string => {
+const buildAudioLabel = (a: AudioTrack): string => {
   let label = a.lang;
   if (a.type && a.type.title) label += ' - ' + a.type.title;
   if (a.author && a.author.title) label += ' (' + a.author.title + ')';
@@ -208,7 +200,7 @@ export class Panel {
   private renderList(): void {
     const items = this.getItems(this.listSection);
     const $list = this.$list.get();
-    $list.html(tplListItemsCompiled({ items, focusedIndex: this.listIndex }));
+    $list.html(tplPanelList({ items, focusedIndex: this.listIndex }));
     this.scrollToFocused($list);
   }
 

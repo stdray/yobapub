@@ -1,9 +1,8 @@
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
 import { storage, Storage, QualityId, TitlePrefs } from '../../utils/storage';
 
-export type { TitlePrefs };
 
-export const pickDefaultQualityIndex = (files: VideoFile[]): number => {
+const pickDefaultQualityIndex = (files: VideoFile[]): number => {
   let savedId = storage.getDefaultQuality();
   if (savedId === -1) {
     savedId = QualityId.HD;
@@ -65,7 +64,7 @@ export const restoreSubIndex = (subs: Subtitle[], prefs: TitlePrefs | null): num
   return -1;
 };
 
-export interface SavePrefsOpts {
+interface SavePrefsOpts {
   readonly itemId: number;
   readonly files: ReadonlyArray<VideoFile>;
   readonly audios: ReadonlyArray<AudioTrack>;

@@ -3,7 +3,7 @@ import { buildSubLabel } from './panel';
 import { Lazy } from '../../utils/lazy';
 import Hls from 'hls.js';
 
-export interface InfoDataSource {
+interface InfoDataSource {
   readonly files: () => ReadonlyArray<VideoFile>;
   readonly audios: () => ReadonlyArray<AudioTrack>;
   readonly subs: () => ReadonlyArray<Subtitle>;

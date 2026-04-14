@@ -1,19 +1,19 @@
 import { markTime, toggleWatched } from '../../api/watching';
 import { Logger } from '../../utils/log';
 
-export interface WatchContext {
+interface WatchContext {
   readonly itemId: number;
   readonly season: number | undefined;
   readonly episode: number | undefined;
   readonly video: number | undefined;
 }
 
-export interface DroppedFrames {
+interface DroppedFrames {
   readonly total: number;
   readonly dropped: number;
 }
 
-export interface WatchTrackerDeps {
+interface WatchTrackerDeps {
   readonly getVideoEl: () => HTMLVideoElement | null;
   readonly getContext: () => WatchContext | null;
   readonly getDuration: () => number;

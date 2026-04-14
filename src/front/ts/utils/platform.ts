@@ -28,10 +28,10 @@ export enum TvKey {
   Key6 = 54,
   Key7 = 55,
   Key8 = 56,
-  Key9 = 57
+  Key9 = 57,
 }
 
-export interface DeviceInfo {
+interface DeviceInfo {
   readonly title: string;
   readonly hardware: string;
   readonly software: string;
@@ -146,5 +146,4 @@ class Platform {
   };
 }
 
-export { Platform };
 export const platform = new Platform();

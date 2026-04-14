@@ -221,7 +221,6 @@ class SettingsPage implements Page {
   private focusedIndex = 0;
   private focusedOptionIndex = 0;
   private optionsOpen = false;
-  private vipUser = false;
 
   mount(_params: RouteParams): void {
     this.allSettings = [];
@@ -248,7 +247,6 @@ class SettingsPage implements Page {
             slog.info('parseSettings ok count={n}', { n: this.allSettings.length });
             persistStreamingType(data.settings);
           }
-          this.vipUser = vip;
           if (!vip) storage.downgradeProxyForNonVip();
           slog.info('before unshift builders');
           const proxyCats = buildProxyCatSettings(vip);

@@ -1,6 +1,6 @@
 import { CARDS_PER_ROW } from '../settings';
 
-export interface GridPos {
+interface GridPos {
   col: number;
   row: number;
   totalRows: number;

@@ -37,7 +37,7 @@ export const changeSubSize = (dir: number, showToast: (text: string) => void): v
   showToast('Субтитры: ' + size + 'px');
 };
 
-export const srtToVtt = (srt: string): string => {
+const srtToVtt = (srt: string): string => {
   const vtt = 'WEBVTT\n\n' + srt
     .replace(/\r\n/g, '\n')
     .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');

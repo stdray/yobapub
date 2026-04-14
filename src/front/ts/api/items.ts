@@ -2,7 +2,7 @@ import { apiClient } from './client';
 import { Item, ItemResponse, ItemsResponse, WatchingInfoItem, WatchingInfoResponse } from '../types/api';
 import { getWatchingInfo } from './watching';
 
-export const getItem = (id: number): JQueryDeferred<ItemResponse> =>
+const getItem = (id: number): JQueryDeferred<ItemResponse> =>
   apiClient.apiGetWithRefresh('/v1/items/' + id);
 
 export const getItems = (type: string, sort?: string): JQueryDeferred<ItemsResponse> =>

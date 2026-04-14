@@ -1,7 +1,7 @@
 import { formatTimecode } from '../../utils/format';
 import { Lazy } from '../../utils/lazy';
 
-export interface ProgressBarDeps {
+interface ProgressBarDeps {
   readonly $root: JQuery;
   readonly getVideoEl: () => HTMLVideoElement | null;
   readonly getDurationHint: () => number;
@@ -10,17 +10,17 @@ export interface ProgressBarDeps {
 }
 
 export class ProgressBar {
-  private readonly barValue: Lazy<HTMLElement | null>;
-  private readonly barPct: Lazy<HTMLElement | null>;
-  private readonly barDuration: Lazy<HTMLElement | null>;
-  private readonly barSeek: Lazy<HTMLElement | null>;
+  private readonly barValue: Lazy<HTMLElement>;
+  private readonly barPct: Lazy<HTMLElement>;
+  private readonly barDuration: Lazy<HTMLElement>;
+  private readonly barSeek: Lazy<HTMLElement>;
 
   constructor(private readonly deps: ProgressBarDeps) {
     const $root = deps.$root;
-    this.barValue = new Lazy(() => $root.find('.player__bar-value')[0] || null);
-    this.barPct = new Lazy(() => $root.find('.player__bar-pct')[0] || null);
-    this.barDuration = new Lazy(() => $root.find('.player__bar-duration')[0] || null);
-    this.barSeek = new Lazy(() => $root.find('.player__bar-seek')[0] || null);
+    this.barValue = new Lazy(() => $root.find('.player__bar-value')[0]);
+    this.barPct = new Lazy(() => $root.find('.player__bar-pct')[0]);
+    this.barDuration = new Lazy(() => $root.find('.player__bar-duration')[0]);
+    this.barSeek = new Lazy(() => $root.find('.player__bar-seek')[0]);
   }
 
   getDuration(): number {
@@ -48,18 +48,10 @@ export class ProgressBar {
     if (cur < 0) cur = 0;
     let pct = dur > 0 ? (cur / dur) * 100 : 0;
     if (pct > 100) pct = 100;
-    const barValue = this.barValue.get();
-    const barPct = this.barPct.get();
-    const barDuration = this.barDuration.get();
-    const barSeek = this.barSeek.get();
-    if (barValue) barValue.style.width = pct + '%';
-    if (barPct) barPct.innerHTML = pct.toFixed(1) + '%';
-    if (barDuration) {
-      barDuration.innerHTML = formatTimecode(cur) + (dur > 0 ? ' / ' + formatTimecode(dur) : '');
-    }
-    if (barSeek) {
-      barSeek.innerHTML = seeking ? formatTimecode(seekPos) : '';
-    }
+    this.barValue.get().style.width = pct + '%';
+    this.barPct.get().innerHTML = pct.toFixed(1) + '%';
+    this.barDuration.get().innerHTML = formatTimecode(cur) + (dur > 0 ? ' / ' + formatTimecode(dur) : '');
+    this.barSeek.get().innerHTML = seeking ? formatTimecode(seekPos) : '';
   }
 
   resetElements(): void {

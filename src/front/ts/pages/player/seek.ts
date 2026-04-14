@@ -2,7 +2,7 @@ import { Logger } from '../../utils/log';
 
 export type SeekDirection = 'left' | 'right';
 
-export interface SeekDeps {
+interface SeekDeps {
   readonly getVideoEl: () => HTMLVideoElement | null;
   readonly getDuration: () => number;
   readonly onTick: (dir: SeekDirection) => void;

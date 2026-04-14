@@ -4,10 +4,8 @@ import { router } from '../router';
 import { TvKey, platform } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
-import { buildBaseHlsConfig, logPlaybackStart } from '../utils/hls-proxy';
-import { getOptionalRewrittenHlsUrl } from './player/hls';
+import { buildBaseHlsConfig, logPlaybackStart, getOptionalRewrittenHlsUrl, showHlsError } from '../utils/hls-utils';
 import { ProxyCategory } from '../utils/storage';
-import { showHlsError } from '../utils/hls-error';
 import Hls from 'hls.js';
 
 const plog = new Logger('tv-player');
