@@ -1,6 +1,8 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import stylistic from '@stylistic/eslint-plugin';
+import compat from 'eslint-plugin-compat';
+import esX from 'eslint-plugin-es-x';
 
 export default tseslint.config(
   {
@@ -8,6 +10,28 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
+  compat.configs['flat/recommended'],
+  {
+    plugins: {
+      '@stylistic': stylistic,
+      'es-x': esX,
+    },
+    rules: {
+      // ── ES2015+ syntax that SWC lowers via Symbol.iterator runtime
+      //    helpers — forbidden because Chromium 28 (Tizen 2.3) has no Symbol.
+      //    Use indexed for-loops and explicit array access instead.
+      'es-x/no-for-of-loops': 'error',
+      'es-x/no-spread-elements': 'error',
+      'es-x/no-rest-spread-properties': 'error',
+      'es-x/no-array-from': 'error',
+      'es-x/no-array-of': 'error',
+      'es-x/no-symbol': 'error',
+      'es-x/no-map': 'error',
+      'es-x/no-set': 'error',
+      'es-x/no-weak-map': 'error',
+      'es-x/no-weak-set': 'error',
+    },
+  },
   {
     plugins: {
       '@stylistic': stylistic,

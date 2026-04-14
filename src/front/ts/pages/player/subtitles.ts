@@ -105,6 +105,8 @@ export const loadSubtitleTrack = (videoEl: HTMLVideoElement, $root: JQuery, subs
       const vtt = srtToVtt(data);
       log.info('vtt head={head}', { head: vtt.substring(0, 200) });
       const blob = new Blob([vtt], { type: 'text/vtt' });
+      // URL.createObjectURL exists on Tizen 2.3 (Chrome 23+); only new URL() is missing.
+      // eslint-disable-next-line compat/compat
       addTrackFromUrl(URL.createObjectURL(blob));
     },
     error: (_xhr, status, err) => {

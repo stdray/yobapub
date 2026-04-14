@@ -10,6 +10,7 @@ import { buildBaseHlsConfig, HlsConfig, logPlaybackStart } from '../utils/hls-pr
 import { showHlsError } from '../utils/hls-error';
 import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
+import { extractHostname } from '../utils/url';
 
 const plog = new Logger('player');
 
@@ -711,7 +712,9 @@ class PlayerController {
         if (data.details === 'bufferAppendingError') {
           this.appendErrorCount++;
           plog.warn('hls bufferAppendingError count={count} hadFull={hadFull} started={started} ct={ct} rs={rs} br={br}', {
-            count: this.appendErrorCount, hadFull: this.hadBufferFullError, ...diag,
+            count: this.appendErrorCount,
+            hadFull: this.hadBufferFullError,
+            started: diag.started, ct: diag.ct, rs: diag.rs, paused: diag.paused, br: diag.br,
           });
           if (this.appendErrorCount >= 2 || this.hadBufferFullError) {
             plog.warn('hls RECOVER via bufferAppendingError started={started} ct={ct} rs={rs} br={br}', diag);
@@ -723,7 +726,8 @@ class PlayerController {
         }
         if (data.details === 'bufferStalledError') {
           plog.warn('hls bufferStalledError hadFull={hadFull} started={started} ct={ct} rs={rs} br={br}', {
-            hadFull: this.hadBufferFullError, ...diag,
+            hadFull: this.hadBufferFullError,
+            started: diag.started, ct: diag.ct, rs: diag.rs, paused: diag.paused, br: diag.br,
           });
           if (!this.nudgePastBufferGap() && this.hadBufferFullError) {
             plog.warn('hls RECOVER via bufferStalledError started={started} ct={ct} rs={rs} br={br}', diag);
@@ -802,7 +806,7 @@ class PlayerController {
   }
 
   private getHlsDomain(): string {
-    try { return new URL(this.media.hlsUrl).hostname; } catch { return ''; }
+    return extractHostname(this.media.hlsUrl);
   }
 
   private getCurrentHlsLevel(): Hls.Level | undefined {

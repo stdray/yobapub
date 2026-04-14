@@ -52,6 +52,16 @@ const generateTraceId = (): string => {
   return result;
 };
 
+const withCategory = (category: string, props?: Record<string, unknown>): Record<string, unknown> => {
+  const out: Record<string, unknown> = { category };
+  if (props) {
+    for (const k in props) {
+      if (Object.prototype.hasOwnProperty.call(props, k)) out[k] = props[k];
+    }
+  }
+  return out;
+};
+
 export class Logger {
   private traceId?: string;
 
@@ -63,18 +73,18 @@ export class Logger {
   clearTraceId = (): void => { this.traceId = undefined; };
 
   info = (template: string, props?: Record<string, unknown>): void => {
-    emit('Information', template, { category: this.category, ...props }, this.traceId);
+    emit('Information', template, withCategory(this.category, props), this.traceId);
   };
 
   debug = (template: string, props?: Record<string, unknown>): void => {
-    emit('Verbose', template, { category: this.category, ...props }, this.traceId);
+    emit('Verbose', template, withCategory(this.category, props), this.traceId);
   };
 
   warn = (template: string, props?: Record<string, unknown>): void => {
-    emit('Warning', template, { category: this.category, ...props }, this.traceId);
+    emit('Warning', template, withCategory(this.category, props), this.traceId);
   };
 
   error = (template: string, props?: Record<string, unknown>): void => {
-    emit('Error', template, { category: this.category, ...props }, this.traceId);
+    emit('Error', template, withCategory(this.category, props), this.traceId);
   };
 }

@@ -1,5 +1,6 @@
 import { Logger } from './log';
 import { platform } from './platform';
+import { extractHostname } from './url';
 
 export interface HlsErrorData {
   fatal: boolean;
@@ -10,14 +11,6 @@ export interface HlsErrorData {
   url?: string;
   context?: { url?: string };
 }
-
-const extractDomain = (url: string): string => {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return '';
-  }
-};
 
 const getErrorMessage = (type: string, details: string): string => {
   if (type === 'networkError') {
@@ -42,7 +35,7 @@ export const showHlsError = (
   cssPrefix: string,
 ): void => {
   const failedUrl = getFailedUrl(data);
-  const domain = extractDomain(failedUrl);
+  const domain = extractHostname(failedUrl);
   const message = getErrorMessage(data.type, data.details);
   const debug = formatHlsErrorDebug(data);
 

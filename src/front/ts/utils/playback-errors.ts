@@ -1,25 +1,18 @@
 import { storage } from './storage';
+import { extractHostname } from './url';
 
 const DAY_MS = 86400000;
-const reported = new Map<string, number>();
-
-const extractDomain = (url: string): string => {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return '';
-  }
-};
+const reported: Record<string, number> = {};
 
 export const reportPlaybackError = (url: string, errorDetails: string): void => {
-  const domain = extractDomain(url);
+  const domain = extractHostname(url);
   if (!domain) return;
 
   const now = Date.now();
-  const lastReported = reported.get(domain);
+  const lastReported = reported[domain];
   if (lastReported !== undefined && now - lastReported < DAY_MS) return;
 
-  reported.set(domain, now);
+  reported[domain] = now;
 
   try {
     const xhr = new XMLHttpRequest();
