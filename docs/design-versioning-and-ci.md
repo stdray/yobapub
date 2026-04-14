@@ -5,7 +5,7 @@
 ## Overview
 
 Внедрить GitVersion для автоматического семантического версионирования. На основе версии:
-- бэкенд отдает `/v1/about` с метаданными сборки
+- бэкенд отдает `/api/about` с метаданными сборки
 - фронт запекает версию при сборке (compile-time)
 - Docker-образы тегируются semver
 - APK и Tizen .wgt собираются и публикуются как GitHub Release по тегу
@@ -72,9 +72,9 @@ branches:
 | `SemVer` | `2.0.0` | `2.0.1-my-feature.3` | Docker-тег, фронт, бэк about |
 | `FullSemVer` | `2.0.0` | `2.0.1-my-feature.3+5` | InformationalVersion, .NET assembly |
 | `MajorMinorPatch` | `2.0.0` | `2.0.1` | APK versionName (без pre-release) |
-| `Sha` | `28c853...` | `28c853...` | `/v1/about` |
-| `ShortSha` | `28c8531` | `28c8531` | `/v1/about`, Docker-тег |
-| `CommitDate` | `2026-04-02` | `2026-04-02` | `/v1/about` (дата коммита = дата сборки приблизительно) |
+| `Sha` | `28c853...` | `28c853...` | `/api/about` |
+| `ShortSha` | `28c8531` | `28c8531` | `/api/about`, Docker-тег |
+| `CommitDate` | `2026-04-02` | `2026-04-02` | `/api/about` (дата коммита = дата сборки приблизительно) |
 | `PreReleaseLabel` | `""` | `my-feature` | Определение: release или pre-release |
 | `WeightedPreReleaseNumber` | `55000` | `30003` | APK `versionCode` (монотонно растёт, учитывает вес ветки) |
 | `BranchName` | `master` | `feature/my-feature` | Информационно |
@@ -183,7 +183,7 @@ echo "Done: SemVer=$SEMVER"
 
 ---
 
-## 3. Бэкенд: `/v1/about`
+## 3. Бэкенд: `/api/about`
 
 ### Механизм инжекта версии
 
@@ -206,7 +206,7 @@ Prepare-скрипт генерирует `src/back/YobaPub.Proxy/version.json`.
 Minimal API в `Program.cs`. Файл читается один раз при старте и кэшируется:
 
 ```csharp
-app.MapGet("/v1/about", () =>
+app.MapGet("/api/about", () =>
 {
     var path = Path.Combine(AppContext.BaseDirectory, "version.json");
     if (!File.Exists(path))
@@ -761,7 +761,7 @@ XMLEOF
 | `.github/workflows/ci.yml` | Переписать | build, publish (с prepare), release (build-env container) |
 | `.github/workflows/build-env.yml` | Создать | Сборка build-env образа по тегу `build-env-docker-*` |
 | `Dockerfile` | Изменить | `ARG APP_VERSION` → `ARG GITVERSION_*` |
-| `src/back/YobaPub.Proxy/Program.cs` | Изменить | Добавить `GET /v1/about` |
+| `src/back/YobaPub.Proxy/Program.cs` | Изменить | Добавить `GET /api/about` |
 | `src/back/YobaPub.Proxy/YobaPub.Proxy.csproj` | Изменить | `<None Include="version.json" ...>` |
 | `src/front/webpack.config.js` | Изменить | Читать `GITVERSION_*`, добавить `__BUILD_SHA__` etc. |
 | `src/front/ts/types/globals.d.ts` | Изменить | Добавить `__BUILD_SHA__`, `__BUILD_SHORT_SHA__`, `__BUILD_DATE__` |
@@ -793,7 +793,7 @@ XMLEOF
 1. **Build-env образы** — `docker/apk-env.Dockerfile`, `docker/tizen-env.Dockerfile`, `.github/workflows/build-env.yml`. Push теги `apk-env-docker-1` и `tizen-env-docker-1` для первичной сборки.
 2. **GitVersion.yml** — создать конфиг, проверить локально `gitversion` → ожидаемый `2.0.0`
 3. **scripts/prepare-version.sh** — скрипт подстановки
-4. **Бэкенд** — `GET /v1/about` + `.csproj` include `version.json`
+4. **Бэкенд** — `GET /api/about` + `.csproj` include `version.json`
 5. **Фронт** — webpack DefinePlugin с `GITVERSION_*` + globals.d.ts + settings.ts
 6. **Dockerfile** — новые build args
 7. **CI: ci.yml** — publish job (GitVersion + prepare + Docker + deploy) + release job (apk-env/tizen-env containers + GitHub Release)

@@ -78,7 +78,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 
-app.MapGet("/v1/about", () =>
+app.MapGet("/api/about", () =>
 {
     var path = Path.Combine(AppContext.BaseDirectory, "version.json");
     if (!File.Exists(path))
