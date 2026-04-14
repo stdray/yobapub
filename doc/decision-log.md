@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-04-14 12:37 — replace recoverMediaError with stopLoad+startLoad for bufferStalledError
+
+**Решение:** в `hls-engine.ts` убран вызов `recoverMediaError()` при `bufferStalledError + hadBufferFullError`. Теперь все stall-сценарии единообразно используют `stopLoad+startLoad(ct)`. Порог: 2 stall'а при `hadBufferFullError`, 3 без.
+
+**Причина:** лог `yFZiYSiOQEqMZNtyaK4m1Q` на **Tizen 3.0** (device `35b24341`). При `bufferStalledError` с `hadFull=true` вызывался `recoverMediaError()`, который сбросил `currentTime` в 0. После этого hls.js перестал грузить фрагменты, воспроизведение зависло навсегда. Проблема воспроизводится и на Tizen 2.3, и на 3.0 — `recoverMediaError()` не подходит для stall-recovery.
+
+**Данные:** лог https://yobapub.3po.su/s/logs/yFZiYSiOQEqMZNtyaK4m1Q/tsv
+
+**Результат:** ждём проверки
+
+---
+
 ## 2026-04-14 11:23 — stall watchdog: force restart loading after 3 consecutive bufferStalledError
 
 **Решение:** в `hls-engine.ts` добавлен счётчик `stallCount`, инкрементируется на каждый `bufferStalledError`. Если nudge не помог и `hadBufferFullError=false`, после 3-х подряд stall'ов вызываем `hls.stopLoad()` + `hls.startLoad(ct)` — заставляем hls.js перезагрузить фрагменты с текущей позиции. Счётчик сбрасывается при `video playing`, после recovery, и при `load`/`destroy`.

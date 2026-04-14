@@ -153,10 +153,14 @@ export class HlsEngine {
 
   tryRecoverVideoError(): boolean {
     if ((this.appendErrorCount === 0 && !this.hadBufferFullError) || !this.hls) return false;
-    this.deps.log.warn('video error during buffer recovery, attempting recoverMediaError instead of destroying', {});
-    this.hls.recoverMediaError();
     const v = this.deps.getVideoEl();
-    if (v) v.play();
+    if (!v) return false;
+    this.deps.log.warn('video error during buffer recovery, stopLoad+startLoad ct={ct}', {
+      ct: v.currentTime,
+    });
+    this.hls.stopLoad();
+    this.hls.startLoad(v.currentTime);
+    if (v.paused) v.play();
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     return true;
@@ -370,10 +374,11 @@ export class HlsEngine {
         hadFull: this.hadBufferFullError,
         started: diag.started, ct: diag.ct, rs: diag.rs, paused: diag.paused, br: diag.br,
       });
-      if (this.appendErrorCount >= 2 || this.hadBufferFullError) {
-        log.warn('hls RECOVER via bufferAppendingError started={started} ct={ct} rs={rs} br={br}', diag);
-        hls.recoverMediaError();
-        if (v) v.play();
+      if ((this.appendErrorCount >= 2 || this.hadBufferFullError) && v) {
+        log.warn('hls RECOVER via bufferAppendingError stopLoad+startLoad ct={ct} br={br}', diag);
+        hls.stopLoad();
+        hls.startLoad(v.currentTime);
+        if (v.paused) v.play();
         this.appendErrorCount = 0;
         this.hadBufferFullError = false;
       }
@@ -386,26 +391,21 @@ export class HlsEngine {
         sc: this.stallCount,
       });
       if (this.nudgePastBufferGap()) return;
-      if (this.hadBufferFullError) {
-        log.warn('hls RECOVER via bufferStalledError started={started} ct={ct} rs={rs} br={br}', diag);
-        hls.recoverMediaError();
-        if (v) v.play();
-        this.hadBufferFullError = false;
-        this.appendErrorCount = 0;
-        this.stallCount = 0;
-        return;
-      }
-      // If stall persists for several cycles without bufferFullError, hls.js likely
-      // thinks fragments are loaded but they were silently evicted from SourceBuffer
-      // (common on Chromium 28 / Tizen 2.3 with limited memory). Force-restart
-      // loading from current position so hls.js re-fetches the needed fragments.
-      if (this.stallCount >= 3 && v) {
-        log.warn('hls RECOVER via stallCount={sc} stopLoad+startLoad ct={ct} br={br}', {
-          sc: this.stallCount, ct: diag.ct, br: diag.br,
+      // Do NOT use recoverMediaError() for stalls — on Tizen 2.3/3.0 it resets
+      // currentTime to 0 and leaves playback dead. Instead, force hls.js to
+      // re-fetch fragments from the current position via stopLoad+startLoad.
+      // Use threshold 2 when hadBufferFullError (fragments likely evicted
+      // immediately), 3 otherwise.
+      const threshold = this.hadBufferFullError ? 2 : 3;
+      if (this.stallCount >= threshold && v) {
+        log.warn('hls RECOVER via stallCount={sc} stopLoad+startLoad ct={ct} br={br} hadFull={hadFull}', {
+          sc: this.stallCount, ct: diag.ct, br: diag.br, hadFull: this.hadBufferFullError,
         });
         hls.stopLoad();
         hls.startLoad(v.currentTime);
         this.stallCount = 0;
+        this.hadBufferFullError = false;
+        this.appendErrorCount = 0;
       }
     }
   }
