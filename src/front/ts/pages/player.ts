@@ -13,13 +13,14 @@ import {
   MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks,
   getResumeTime, isEpisodeWatched, isVideoWatched,
 } from './player/media';
-import { applySubSize, changeSubSize, loadSubtitleTrack } from './player/subtitles';
+import { applySubSize, loadSubtitleTrack } from './player/subtitles';
+import { storage } from '../utils/storage';
 import { HlsEngine, HlsFatalErrorData } from './player/hls-engine';
 import { TrackNavigator } from './player/track-navigator';
 import { PlayerErrorView } from './player/error-view';
 import { ProgressBar } from './player/progress';
 import {
-  Panel, PanelData, getAudioItems, getSubItems, getQualityItems,
+  Panel, PanelData, getAudioItems, getSubItems, getQualityItems, getSubSizeItems,
 } from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
 import { PlayerInfo } from './player/info';
@@ -142,6 +143,7 @@ class PlayerController {
     onApplyQuality: (idx) => {
       if (idx !== this.state.quality) this.continueWith({ quality: idx });
     },
+    onApplySubSize: (size) => { storage.setSubSize(size); applySubSize(); },
     onSavePrefs: () => { this.doSavePrefs(); },
     getData: () => this.getPanelData(),
   });
@@ -177,13 +179,16 @@ class PlayerController {
   }
 
   private getPanelData(): PanelData {
+    const subsActive = this.state.sub >= 0 && this.media.subs.length > 0;
     return {
       audioItems: getAudioItems(this.media.audios, this.state.audio, this.videoEl),
       subItems: getSubItems(this.media.subs, this.state.sub),
       qualityItems: getQualityItems(this.media.files, this.state.quality),
+      subSizeItems: getSubSizeItems(storage.getSubSize()),
       audioEnabled: this.media.audios.length > 1 && this.media.files.length > 0,
       subsEnabled: this.media.subs.length > 0,
       qualityEnabled: this.media.files.length > 1,
+      subSizeEnabled: subsActive,
     };
   }
 
@@ -429,7 +434,12 @@ class PlayerController {
 
     switch (kc) {
       case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
-        this.destroyPlayer(); router.goBack(); break;
+        if (kc !== TvKey.Stop && this.overlay.barVisible) {
+          this.overlay.hideBar();
+        } else {
+          this.destroyPlayer(); router.goBack();
+        }
+        break;
 
       case TvKey.Enter: case TvKey.PlayPause:
         if (!this.playbackStarted) break;
@@ -468,11 +478,10 @@ class PlayerController {
         this.overlay.showBar();
         this.panel.focus();
         break;
+      case TvKey.Down:
+        if (this.overlay.barVisible) this.overlay.hideBar();
+        break;
 
-      case TvKey.Green:
-        changeSubSize(1, (text) => this.overlay.showToast(text)); break;
-      case TvKey.Red:
-        changeSubSize(-1, (text) => this.overlay.showToast(text)); break;
     }
     e.preventDefault();
   };

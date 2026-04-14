@@ -693,7 +693,7 @@ html, body {
   left: 0;
   right: 140px;
   height: 14px;
-  top: 28px;
+  top: 96px;
   background: rgba(255,255,255,0.4);
   border-radius: 4px;
 }
@@ -736,6 +736,7 @@ html, body {
 .player__bar-duration {
   position: absolute;
   right: 0;
+  top: 68px;
   line-height: 70px;
   font-size: 28px;
   color: #ccc;

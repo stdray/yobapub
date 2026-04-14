@@ -1,9 +1,10 @@
 import { AudioTrack, Subtitle, VideoFile } from '../../types/api';
 import { TvKey } from '../../utils/platform';
+import { Storage } from '../../utils/storage';
 import { Lazy } from '../../utils/lazy';
 import { tplSidePanel } from './template';
 
-const SECTION_LABELS = ['Аудио', 'Субтитры', 'Качество'] as const;
+const SECTION_LABELS = ['Аудио', 'Субтитры', 'Качество', 'Размер сабов'] as const;
 const SECTION_COUNT = SECTION_LABELS.length;
 const IDLE_MS = 4000;
 
@@ -16,9 +17,11 @@ export interface PanelData {
   readonly audioItems: ReadonlyArray<LabeledItem>;
   readonly subItems: ReadonlyArray<LabeledItem>;
   readonly qualityItems: ReadonlyArray<LabeledItem>;
+  readonly subSizeItems: ReadonlyArray<LabeledItem>;
   readonly audioEnabled: boolean;
   readonly subsEnabled: boolean;
   readonly qualityEnabled: boolean;
+  readonly subSizeEnabled: boolean;
 }
 
 interface PanelCallbacks {
@@ -26,6 +29,7 @@ interface PanelCallbacks {
   readonly onApplyAudio: (idx: number) => void;
   readonly onApplySub: (menuIdx: number) => void;
   readonly onApplyQuality: (idx: number) => void;
+  readonly onApplySubSize: (size: number) => void;
   readonly onSavePrefs: () => void;
   readonly getData: () => PanelData;
 }
@@ -107,6 +111,14 @@ export const getQualityItems = (
   return items;
 };
 
+export const getSubSizeItems = (currentSize: number): LabeledItem[] => {
+  const items: LabeledItem[] = [];
+  for (let s = Storage.SUB_SIZE_MIN; s <= Storage.SUB_SIZE_MAX; s += Storage.SUB_SIZE_STEP) {
+    items.push({ label: s + 'px', selected: s === currentSize });
+  }
+  return items;
+};
+
 export class Panel {
   private readonly cbs: PanelCallbacks;
   private readonly $actionBtns: Lazy<JQuery>;
@@ -138,14 +150,16 @@ export class Panel {
     const d = this.cbs.getData();
     if (section === 0) return d.audioItems;
     if (section === 1) return d.subItems;
-    return d.qualityItems;
+    if (section === 2) return d.qualityItems;
+    return d.subSizeItems;
   }
 
   private isSectionEnabled(section: number): boolean {
     const d = this.cbs.getData();
     if (section === 0) return d.audioEnabled;
     if (section === 1) return d.subsEnabled;
-    return d.qualityEnabled;
+    if (section === 2) return d.qualityEnabled;
+    return d.subSizeEnabled;
   }
 
   // --- idle timer ---
@@ -258,8 +272,11 @@ export class Panel {
       this.cbs.onApplyAudio(this.listIndex);
     } else if (this.listSection === 1) {
       this.cbs.onApplySub(this.listIndex);
-    } else {
+    } else if (this.listSection === 2) {
       this.cbs.onApplyQuality(this.listIndex);
+    } else {
+      const size = Storage.SUB_SIZE_MIN + this.listIndex * Storage.SUB_SIZE_STEP;
+      this.cbs.onApplySubSize(size);
     }
     this.cbs.onSavePrefs();
     this.renderSidePanel();

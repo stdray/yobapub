@@ -60,6 +60,10 @@ export class OverlayView {
     }
   }
 
+  get barVisible(): boolean {
+    return !this.$bar.get().first().hasClass('hidden');
+  }
+
   hideBar(): void {
     this.stopProgressTimer();
     this.$bar.get().addClass('hidden');

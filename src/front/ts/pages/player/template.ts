@@ -17,6 +17,7 @@ const tplPlayerCompiled = doT.template(`
           <div class="player__action-btn" data-section="0">Аудио</div>
           <div class="player__action-btn" data-section="1">Субтитры</div>
           <div class="player__action-btn" data-section="2">Качество</div>
+          <div class="player__action-btn" data-section="3">Размер сабов</div>
         </div>
         <div class="player__bar-progress">
           <div class="player__bar-value">
