@@ -11,6 +11,7 @@ import { showHlsError } from '../utils/hls-error';
 import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
 import { extractHostname } from '../utils/url';
+import { arrayFindIndex } from '../utils/array';
 
 const plog = new Logger('player');
 
@@ -329,16 +330,10 @@ class PlayerController {
   private navigateEpisode(dir: number): boolean {
     const item = this.media.item;
     if (!item || !item.seasons) return false;
-    let si = -1;
-    for (let i = 0; i < item.seasons.length; i++) {
-      if (item.seasons[i].number === this.media.season) { si = i; break; }
-    }
+    const si = arrayFindIndex(item.seasons, (s) => s.number === this.media.season);
     if (si < 0) return false;
     const s = item.seasons[si];
-    let ei = -1;
-    for (let i = 0; i < s.episodes.length; i++) {
-      if (s.episodes[i].number === this.media.episode) { ei = i; break; }
-    }
+    const ei = arrayFindIndex(s.episodes, (ep) => ep.number === this.media.episode);
     if (ei < 0) return false;
 
     const nextEi = ei + dir;

@@ -1,6 +1,7 @@
 import { apiClient } from '../../api/client';
 import { Item, VideoFile, AudioTrack, Subtitle, MediaLinksResponse } from '../../types/api';
 import { Logger } from '../../utils/log';
+import { arrayFind } from '../../utils/array';
 
 const subsDiagLog = new Logger('subs-diag');
 const mediaLog = new Logger('media-diag');
@@ -17,21 +18,13 @@ interface FoundEpisode {
   episode: NonNullable<Item['seasons']>[number]['episodes'][number];
 }
 
-const findSeason = (item: Item, seasonNum: number): NonNullable<Item['seasons']>[number] | undefined => {
-  if (!item.seasons) return undefined;
-  for (let i = 0; i < item.seasons.length; i++) {
-    if (item.seasons[i].number === seasonNum) return item.seasons[i];
-  }
-  return undefined;
-};
-
 const findEpisode = (item: Item, seasonNum: number, epNum: number): FoundEpisode | undefined => {
-  const s = findSeason(item, seasonNum);
+  if (!item.seasons) return undefined;
+  const s = arrayFind(item.seasons, (ss) => ss.number === seasonNum);
   if (!s) return undefined;
-  for (let i = 0; i < s.episodes.length; i++) {
-    if (s.episodes[i].number === epNum) return { season: s, episode: s.episodes[i] };
-  }
-  return undefined;
+  const ep = arrayFind(s.episodes, (e) => e.number === epNum);
+  if (!ep) return undefined;
+  return { season: s, episode: ep };
 };
 
 export const findEpisodeMedia = (item: Item, seasonNum: number, epNum: number): MediaInfo | null => {
