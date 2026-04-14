@@ -122,7 +122,9 @@ const isSettingKey = (key: string): key is SettingKey => key in DISPLAY_KEYS;
 
 const parseSettings = (raw: Record<string, DeviceSetting>): SettingItem[] => {
   const items: SettingItem[] = [];
-  for (const key of Object.keys(raw)) {
+  const keys = Object.keys(raw);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
     if (!isSettingKey(key)) continue;
     const setting = raw[key];
     const label = LABELS[key] || (setting.label || key);
