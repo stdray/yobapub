@@ -378,20 +378,37 @@ class PlayerController {
       plog.error('loadAndPlay: no item — leaving spinner visible');
       return;
     }
-    plog.info('loadAndPlay start season={s} episode={e} video={v}', {
+    plog.info('loadAndPlay start season={s} episode={e} video={v} hasSeasons={hs} hasVideos={hv}', {
       s: this.media.season, e: this.media.episode, v: this.media.video,
+      hs: !!this.media.item.seasons, hv: !!this.media.item.videos,
     });
     let found: MediaInfo | null = null;
     let pos = 0;
 
-    if (this.media.season !== undefined && this.media.episode !== undefined) {
-      found = findEpisodeMedia(this.media.item, this.media.season, this.media.episode);
-      pos = getResumeTime(this.media.item, this.media.season, this.media.episode);
-      this.wasWatched = isEpisodeWatched(this.media.item, this.media.season, this.media.episode);
-    } else if (this.media.video !== undefined) {
-      found = findVideoMedia(this.media.item, this.media.video);
-      pos = getResumeTime(this.media.item, undefined, undefined, this.media.video);
-      this.wasWatched = isVideoWatched(this.media.item, this.media.video);
+    try {
+      if (this.media.season !== undefined && this.media.episode !== undefined) {
+        plog.info('calling findEpisodeMedia');
+        found = findEpisodeMedia(this.media.item, this.media.season, this.media.episode);
+        plog.info('findEpisodeMedia ok found={f}', { f: !!found });
+        pos = getResumeTime(this.media.item, this.media.season, this.media.episode);
+        plog.info('getResumeTime ok pos={pos}', { pos });
+        this.wasWatched = isEpisodeWatched(this.media.item, this.media.season, this.media.episode);
+        plog.info('isEpisodeWatched ok');
+      } else if (this.media.video !== undefined) {
+        plog.info('calling findVideoMedia');
+        found = findVideoMedia(this.media.item, this.media.video);
+        plog.info('findVideoMedia ok found={f}', { f: !!found });
+        pos = getResumeTime(this.media.item, undefined, undefined, this.media.video);
+        this.wasWatched = isVideoWatched(this.media.item, this.media.video);
+      }
+    } catch (e) {
+      const err = e as Error;
+      plog.error('loadAndPlay find* threw: {msg} stack={stack}', {
+        msg: err && err.message ? err.message : String(e),
+        stack: err && err.stack ? err.stack.substring(0, 600) : '',
+      });
+      this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка разбора медиа-данных</div></div>');
+      return;
     }
 
     if (!found) {
@@ -726,7 +743,15 @@ class PlayerController {
         reason: data.reason || null,
         error: data.error ? String(data.error).substring(0, 200) : null,
       });
-      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+      // Unrecoverable MEDIA_ERROR details — manifest-level codec mismatches cannot be
+      // fixed by recoverMediaError(), which only handles decoder/buffer issues at runtime.
+      // Calling recover here would just leave the spinner spinning forever.
+      const unrecoverableMediaErrors: ReadonlyArray<string> = [
+        'manifestIncompatibleCodecsError',
+        'manifestParsingError',
+        'levelEmptyError',
+      ];
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR && unrecoverableMediaErrors.indexOf(data.details) < 0) {
         const vf = this.videoEl;
         plog.warn('hls RECOVER fatal MEDIA_ERROR started={started} ct={ct} rs={rs} br={br}', {
           started: this.playbackStarted,
@@ -1109,17 +1134,26 @@ class PlayerController {
 
     getItem(id).then(
       (itemRes: { item: Item }) => {
-        const data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
-        this.media.item = data.item;
-        plog.info('mount getItem ok hasItem={hasItem} title={title}', {
-          hasItem: !!this.media.item,
-          title: this.media.item ? this.media.item.title : null,
-        });
-        if (!this.media.item) {
-          plog.error('mount getItem returned no item — leaving spinner visible');
-          return;
+        try {
+          const data = Array.isArray(itemRes) ? itemRes[0] : itemRes;
+          this.media.item = data.item;
+          plog.info('mount getItem ok hasItem={hasItem} title={title}', {
+            hasItem: !!this.media.item,
+            title: this.media.item ? this.media.item.title : null,
+          });
+          if (!this.media.item) {
+            plog.error('mount getItem returned no item — leaving spinner visible');
+            return;
+          }
+          this.loadAndPlay();
+        } catch (e) {
+          const err = e as Error;
+          plog.error('mount handler threw: {msg} stack={stack}', {
+            msg: err && err.message ? err.message : String(e),
+            stack: err && err.stack ? err.stack.substring(0, 600) : '',
+          });
+          this.$root.html('<div class="player"><div class="player__title" style="padding:60px;">Ошибка инициализации плеера</div></div>');
         }
-        this.loadAndPlay();
       },
       (xhr: JQueryXHR) => {
         plog.error('mount getItem failed status={status} text={text} resp={resp}', {

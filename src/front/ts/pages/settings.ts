@@ -216,31 +216,45 @@ class SettingsPage implements Page {
     slog.info('mount start');
     $.when(deviceApi.getDeviceSettings(), deviceApi.checkVip(true)).then(
       (...args: unknown[]) => {
-        slog.info('settings+vip resolved argsLen={n}', { n: args.length });
-        const res = args[0] as [DeviceSettingsResponse, string, JQueryXHR] | DeviceSettingsResponse;
-        const isVip = args[1] as [boolean, string, JQueryXHR] | boolean;
-        const data: DeviceSettingsResponse = Array.isArray(res) ? res[0] : res;
-        const vip: boolean = Array.isArray(isVip) ? isVip[0] : isVip;
-        slog.info('parsed hasData={hd} hasSettings={hs} vip={vip}', {
-          hd: !!data, hs: !!(data && data.settings), vip,
-        });
-        if (data && data.settings) {
-          this.allSettings = parseSettings(data.settings);
-          if (data.settings.streamingType && Array.isArray(data.settings.streamingType.value)) {
-            const stValues = data.settings.streamingType.value;
-            for (let si = 0; si < stValues.length; si++) {
-              if (stValues[si].selected) { storage.setStreamingType(String(stValues[si].label || stValues[si].id).toLowerCase()); break; }
+        try {
+          slog.info('settings+vip resolved argsLen={n}', { n: args.length });
+          const res = args[0] as [DeviceSettingsResponse, string, JQueryXHR] | DeviceSettingsResponse;
+          const isVip = args[1] as [boolean, string, JQueryXHR] | boolean;
+          const data: DeviceSettingsResponse = Array.isArray(res) ? res[0] : res;
+          const vip: boolean = Array.isArray(isVip) ? isVip[0] : isVip;
+          slog.info('parsed hasData={hd} hasSettings={hs} vip={vip}', {
+            hd: !!data, hs: !!(data && data.settings), vip,
+          });
+          if (data && data.settings) {
+            slog.info('before parseSettings');
+            this.allSettings = parseSettings(data.settings);
+            slog.info('parseSettings ok count={n}', { n: this.allSettings.length });
+            if (data.settings.streamingType && Array.isArray(data.settings.streamingType.value)) {
+              const stValues = data.settings.streamingType.value;
+              for (let si = 0; si < stValues.length; si++) {
+                if (stValues[si].selected) { storage.setStreamingType(String(stValues[si].label || stValues[si].id).toLowerCase()); break; }
+              }
             }
           }
+          this.vipUser = vip;
+          if (!vip) storage.downgradeProxyForNonVip();
+          slog.info('before unshift builders');
+          this.allSettings.unshift(buildProxyModeSetting(vip));
+          this.allSettings.unshift(buildSubSizeSetting());
+          this.allSettings.unshift(buildQualitySetting());
+          this.allSettings.unshift(buildStartPageSetting());
+          this.allSettings.unshift(buildVersionSetting());
+          slog.info('before render count={n}', { n: this.allSettings.length });
+          this.render();
+          slog.info('render ok');
+        } catch (e) {
+          const err = e as Error;
+          slog.error('settings handler threw: {msg} stack={stack}', {
+            msg: err && err.message ? err.message : String(e),
+            stack: err && err.stack ? err.stack.substring(0, 600) : '',
+          });
+          this.$root.html('<div class="settings-page"><div class="settings-page__title">Ошибка инициализации настроек</div></div>');
         }
-        this.vipUser = vip;
-        if (!vip) storage.downgradeProxyForNonVip();
-        this.allSettings.unshift(buildProxyModeSetting(vip));
-        this.allSettings.unshift(buildSubSizeSetting());
-        this.allSettings.unshift(buildQualitySetting());
-        this.allSettings.unshift(buildStartPageSetting());
-        this.allSettings.unshift(buildVersionSetting());
-        this.render();
       },
       (...errArgs: unknown[]) => {
         const xhr = errArgs[0] as JQueryXHR | undefined;
