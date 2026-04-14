@@ -1,5 +1,6 @@
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
 import { buildSubLabel } from './panel';
+import { Lazy } from '../../utils/lazy';
 import Hls from 'hls.js';
 
 export interface InfoDataSource {
@@ -41,34 +42,32 @@ const getFrameCounters = (videoEl: HTMLVideoElement | null): FrameCounters | nul
 // --- PlayerInfo ---
 
 export class PlayerInfo {
-  private readonly $root: JQuery;
   private readonly src: InfoDataSource;
+  private readonly $info: Lazy<JQuery>;
   private prevFrames = 0;
   private prevTime = 0;
   private currentFps: number | null = null;
 
   constructor($root: JQuery, src: InfoDataSource) {
-    this.$root = $root;
     this.src = src;
+    this.$info = new Lazy(() => $root.find('.player__info'));
   }
+
+  resetDomCache = (): void => { this.$info.reset(); };
 
   show(): void {
     this.updateBadge();
-    this.$root.find('.player__info').removeClass('hidden');
+    this.$info.get().removeClass('hidden');
   }
 
-  hide(): void {
-    this.$root.find('.player__info').addClass('hidden');
-  }
+  hide = (): void => { this.$info.get().addClass('hidden'); };
 
   updateBadge(): void {
     this.sampleFps();
-    this.$root.find('.player__info').html(this.getStreamInfo());
+    this.$info.get().html(this.getStreamInfo());
   }
 
-  getDroppedFrames(): FrameCounters | null {
-    return getFrameCounters(this.src.videoEl());
-  }
+  getDroppedFrames = (): FrameCounters | null => getFrameCounters(this.src.videoEl());
 
   private sampleFps(): void {
     const counters = getFrameCounters(this.src.videoEl());

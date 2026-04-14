@@ -3,6 +3,17 @@ import { storage, ProxyCategory } from './storage';
 import { platform } from './platform';
 import { Logger } from './log';
 import { formatAppVersion } from './format';
+import { VideoFile } from '../types/api';
+
+export const pickHlsUrl = (f: VideoFile): string => {
+  const hls4 = (f.urls && f.urls.hls4) || (f.url && f.url.hls4) || '';
+  const hls2 = (f.urls && f.urls.hls2) || (f.url && f.url.hls2) || '';
+  if (platform.isLegacyTizen()) return hls2;
+  const sp = storage.getStreamingType();
+  if (sp === 'hls4') return hls4;
+  if (sp === 'hls2') return hls2;
+  return hls4 || hls2;
+};
 
 export type HlsConfig = Partial<Hls.Config>;
 

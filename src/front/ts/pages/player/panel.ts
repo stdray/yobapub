@@ -1,5 +1,15 @@
+import * as doT from 'dot';
 import { AudioTrack, Subtitle, VideoFile } from '../../types/api';
 import { TvKey } from '../../utils/platform';
+import { Lazy } from '../../utils/lazy';
+
+const tplListItemsCompiled = doT.template(
+  '{{~it.items :item:i}}'
+  + '<div class="ppanel__list-item{{?item.selected}} selected{{?}}{{?i===it.focusedIndex}} focused{{?}}">'
+  + '{{=item.label}}'
+  + '</div>'
+  + '{{~}}'
+);
 
 const PANEL_SECTIONS = ['audio', 'subs', 'quality'] as const;
 const PANEL_IDLE_MS = 4000;
@@ -106,8 +116,11 @@ export const getQualityItems = (
 };
 
 export class Panel {
-  private readonly $root: JQuery;
   private readonly cbs: PanelCallbacks;
+  private readonly $panel: Lazy<JQuery>;
+  private readonly $list: Lazy<JQuery>;
+  private readonly $buttons: Lazy<JQuery>;
+  private readonly $btns: Lazy<JQuery>;
 
   open = false;
   private btnIndex = 0;
@@ -117,8 +130,18 @@ export class Panel {
   private idleTimer: number | null = null;
 
   constructor($root: JQuery, cbs: PanelCallbacks) {
-    this.$root = $root;
     this.cbs = cbs;
+    this.$panel = new Lazy(() => $root.find('.player__panel'));
+    this.$list = new Lazy(() => $root.find('.ppanel__list'));
+    this.$buttons = new Lazy(() => $root.find('.ppanel__buttons'));
+    this.$btns = new Lazy(() => $root.find('.ppanel__btn'));
+  }
+
+  resetDomCache(): void {
+    this.$panel.reset();
+    this.$list.reset();
+    this.$buttons.reset();
+    this.$btns.reset();
   }
 
   // --- queries ---
@@ -166,8 +189,9 @@ export class Panel {
 
   private updateButtons(): void {
     const labels = ['Аудио: ', 'Сабы: ', 'Качество: '];
+    const $btns = this.$btns.get();
     for (let i = 0; i < PANEL_SECTIONS.length; i++) {
-      const $btn = this.$root.find('.ppanel__btn').eq(i);
+      const $btn = $btns.eq(i);
       const enabled = this.isSectionEnabled(i);
       $btn.find('.ppanel__btn-label').html(
         labels[i] + (enabled ? this.getSelectedLabel(i) : '—'),
@@ -183,15 +207,8 @@ export class Panel {
 
   private renderList(): void {
     const items = this.getItems(this.listSection);
-    let html = '';
-    for (let i = 0; i < items.length; i++) {
-      html += '<div class="ppanel__list-item'
-        + (items[i].selected ? ' selected' : '')
-        + (i === this.listIndex ? ' focused' : '')
-        + '">' + items[i].label + '</div>';
-    }
-    const $list = this.$root.find('.ppanel__list');
-    $list.html(html);
+    const $list = this.$list.get();
+    $list.html(tplListItemsCompiled({ items, focusedIndex: this.listIndex }));
     this.scrollToFocused($list);
   }
 
@@ -215,9 +232,9 @@ export class Panel {
     if (!this.open) return;
     this.listOpen = false;
     this.open = false;
-    this.$root.find('.ppanel__list').removeClass('active').addClass('hidden');
-    this.$root.find('.ppanel__buttons').removeClass('active');
-    this.$root.find('.player__panel').addClass('hidden');
+    this.$list.get().removeClass('active').addClass('hidden');
+    this.$buttons.get().removeClass('active');
+    this.$panel.get().addClass('hidden');
     this.cbs.onAfterClose();
   }
 
@@ -230,10 +247,10 @@ export class Panel {
       this.btnIndex++;
     }
     this.cbs.onShowInfo();
-    this.$root.find('.player__panel').removeClass('hidden');
+    this.$panel.get().removeClass('hidden');
     this.updateButtons();
     setTimeout(() => {
-      this.$root.find('.ppanel__buttons').addClass('active');
+      this.$buttons.get().addClass('active');
     }, 20);
     this.resetIdle();
   };
@@ -246,9 +263,9 @@ export class Panel {
       return;
     }
     this.open = false;
-    this.$root.find('.ppanel__buttons').removeClass('active');
+    this.$buttons.get().removeClass('active');
     setTimeout(() => {
-      this.$root.find('.player__panel').addClass('hidden');
+      this.$panel.get().addClass('hidden');
       this.cbs.onAfterClose();
     }, 200);
   }
@@ -263,19 +280,19 @@ export class Panel {
     }
     this.renderList();
     this.updateButtons();
-    this.$root.find('.ppanel__buttons').removeClass('active');
-    this.$root.find('.ppanel__list').removeClass('hidden');
+    this.$buttons.get().removeClass('active');
+    this.$list.get().removeClass('hidden');
     setTimeout(() => {
-      this.$root.find('.ppanel__list').addClass('active');
+      this.$list.get().addClass('active');
     }, 20);
   }
 
   private closeList(): void {
     this.listOpen = false;
-    this.$root.find('.ppanel__list').removeClass('active');
+    this.$list.get().removeClass('active');
     setTimeout(() => {
-      this.$root.find('.ppanel__list').addClass('hidden');
-      this.$root.find('.ppanel__buttons').addClass('active');
+      this.$list.get().addClass('hidden');
+      this.$buttons.get().addClass('active');
       this.updateButtons();
     }, 200);
   }

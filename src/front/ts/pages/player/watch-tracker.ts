@@ -1,0 +1,136 @@
+import { markTime, toggleWatched } from '../../api/watching';
+import { Logger } from '../../utils/log';
+
+export interface WatchContext {
+  readonly itemId: number;
+  readonly season: number | undefined;
+  readonly episode: number | undefined;
+  readonly video: number | undefined;
+}
+
+export interface DroppedFrames {
+  readonly total: number;
+  readonly dropped: number;
+}
+
+export interface WatchTrackerDeps {
+  readonly getVideoEl: () => HTMLVideoElement | null;
+  readonly getContext: () => WatchContext | null;
+  readonly getDuration: () => number;
+  readonly getDroppedFrames: () => DroppedFrames | null;
+  readonly log: Logger;
+}
+
+const TICK_MS = 30000;
+const SERIAL_END_THRESHOLD_SEC = 120;
+const MOVIE_END_THRESHOLD_SEC = 420;
+
+export class WatchProgressTracker {
+  private timer: number | null = null;
+  private marked = false;
+  private wasWatched = false;
+
+  constructor(private readonly deps: WatchTrackerDeps) {}
+
+  get markedWatched(): boolean { return this.marked; }
+
+  setWasWatched = (v: boolean): void => { this.wasWatched = v; };
+
+  start(): void {
+    this.stop();
+    this.marked = false;
+    this.deps.log.info('startMarkTimer interval={ms}', { ms: TICK_MS });
+    this.timer = window.setInterval(() => this.tick(), TICK_MS);
+  }
+
+  stop(): void {
+    if (this.timer !== null) {
+      this.deps.log.info('stopMarkTimer', {});
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  sendMarkTime(): void {
+    const v = this.deps.getVideoEl();
+    const ctx = this.deps.getContext();
+    const log = this.deps.log;
+    if (!v || !ctx) {
+      log.warn('sendMarkTime skip hasVideo={hv} hasItem={hi}', { hv: !!v, hi: !!ctx });
+      return;
+    }
+    const time = Math.floor(v.currentTime);
+    if (time <= 0) {
+      log.warn('sendMarkTime skip time<=0 ct={ct}', { ct: v.currentTime });
+      return;
+    }
+    let promise: JQueryDeferred<void>;
+    if (ctx.season !== undefined && ctx.episode !== undefined) {
+      log.info('sendMarkTime serial id={id} season={s} episode={e} time={t}', {
+        id: ctx.itemId, s: ctx.season, e: ctx.episode, t: time,
+      });
+      promise = markTime(ctx.itemId, ctx.episode, time, ctx.season);
+    } else if (ctx.video !== undefined) {
+      log.info('sendMarkTime movie id={id} video={v} time={t}', {
+        id: ctx.itemId, v: ctx.video, t: time,
+      });
+      promise = markTime(ctx.itemId, ctx.video, time);
+    } else {
+      log.warn('sendMarkTime skip no season/episode/video', {});
+      return;
+    }
+    promise.then(
+      (res: unknown) => log.info('markTime resp id={id} time={t} body={b}', {
+        id: ctx.itemId, t: time, b: JSON.stringify(res).substring(0, 300),
+      }),
+      (xhr: JQueryXHR) => log.error('markTime failed status={s} text={txt} resp={r}', {
+        s: xhr ? xhr.status : -1,
+        txt: xhr ? String(xhr.statusText || '') : '',
+        r: xhr ? String(xhr.responseText || '').substring(0, 200) : '',
+      })
+    );
+  }
+
+  sendToggleWatched(): void {
+    const ctx = this.deps.getContext();
+    if (!ctx) return;
+    if (ctx.season !== undefined && ctx.episode !== undefined) {
+      toggleWatched(ctx.itemId, ctx.episode, ctx.season);
+    } else if (ctx.video !== undefined) {
+      toggleWatched(ctx.itemId, ctx.video);
+    }
+  }
+
+  private tick(): void {
+    this.deps.log.info('markTimer tick', {});
+    this.sendMarkTime();
+    this.logPlaybackQuality();
+
+    if (this.wasWatched) {
+      this.wasWatched = false;
+      this.deps.log.info('resetting watched status after 30s of playback', {});
+      this.sendToggleWatched();
+    }
+
+    if (this.marked) return;
+    const dur = this.deps.getDuration();
+    if (dur <= 0) return;
+    const v = this.deps.getVideoEl();
+    const time = v ? Math.floor(v.currentTime) : 0;
+    const ctx = this.deps.getContext();
+    const threshold = ctx && ctx.season !== undefined ? SERIAL_END_THRESHOLD_SEC : MOVIE_END_THRESHOLD_SEC;
+    if (dur - time <= threshold) {
+      this.marked = true;
+      this.sendToggleWatched();
+    }
+  }
+
+  private logPlaybackQuality(): void {
+    const q = this.deps.getDroppedFrames();
+    if (!q || q.total === 0) return;
+    const pct = (q.dropped / q.total * 100).toFixed(1);
+    this.deps.log.info('playbackQuality total={total} dropped={dropped} ({pct}%)', {
+      total: q.total, dropped: q.dropped, pct,
+    });
+  }
+}

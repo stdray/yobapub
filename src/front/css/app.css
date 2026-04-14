@@ -170,6 +170,13 @@ html, body {
   color: #aaa;
 }
 
+.empty-text {
+  margin-top: 200px;
+  text-align: center;
+  font-size: 32px;
+  color: #aaa;
+}
+
 .watching__grid {
   display: flex;
   flex-wrap: wrap;
@@ -727,7 +734,13 @@ html, body {
   line-height: 1.4;
 }
 
-/* --- Error debug info --- */
+/* --- Error screen --- */
+.player__error {
+  padding: 60px;
+  font-size: 52px;
+  font-weight: bold;
+}
+
 .player__error-debug {
   font-size: 0.55em;
   margin-top: 12px;
@@ -1225,6 +1238,12 @@ video::cue {
 }
 .tv-player__title {
   font-size: 36px;
+  color: #fff;
+}
+.tv-player__error {
+  padding: 60px;
+  font-size: 36px;
+  font-weight: bold;
   color: #fff;
 }
 .tv-player__spinner {

@@ -1,6 +1,7 @@
 import { Logger } from './log';
 import { platform } from './platform';
 import { extractHostname } from './url';
+import { tplErrorScreen } from '../pages/player/error-template';
 
 export interface HlsErrorData {
   fatal: boolean;
@@ -32,7 +33,7 @@ export const showHlsError = (
   log: Logger,
   $root: JQuery,
   data: HlsErrorData,
-  cssPrefix: string,
+  prefix: 'player' | 'tv-player',
 ): void => {
   const failedUrl = getFailedUrl(data);
   const domain = extractHostname(failedUrl);
@@ -45,14 +46,9 @@ export const showHlsError = (
     ua: navigator.userAgent, hw: devInfo.hardware, sw: devInfo.software,
   });
 
-  $root.html(
-    '<div class="' + cssPrefix + '">' +
-      '<div class="' + cssPrefix + '__title" style="padding:60px;">' +
-        '<div>' + message + '</div>' +
-        (domain ? '<div class="player__error-debug">' + domain + '</div>' : '') +
-        '<div class="player__error-debug">' + debug + '</div>' +
-        '<div class="player__error-debug">' + navigator.userAgent + '</div>' +
-      '</div>' +
-    '</div>'
-  );
+  const debugLines: string[] = [];
+  if (domain) debugLines.push(domain);
+  debugLines.push(debug);
+  debugLines.push(navigator.userAgent);
+  $root.html(tplErrorScreen({ prefix, msg: message, debugLines }));
 };

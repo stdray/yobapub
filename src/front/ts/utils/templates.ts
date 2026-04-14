@@ -10,7 +10,7 @@ const tplRatingCompiled = doT.template(`<span class="detail__rating">{{=it.label
 export const tplRating = (data: { readonly label: string; readonly value: number }): string =>
   tplRatingCompiled(data);
 
-const tplEmptyTextCompiled = doT.template(`<div class="watching__section-title" style="margin-top:200px;text-align:center;">{{=it.text}}</div>`);
+const tplEmptyTextCompiled = doT.template(`<div class="empty-text">{{=it.text}}</div>`);
 
 export const tplEmptyText = (data: { readonly text: string }): string =>
   tplEmptyTextCompiled(data);
