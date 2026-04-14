@@ -12,24 +12,21 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   compat.configs['flat/recommended'],
   {
-    plugins: {
-      '@stylistic': stylistic,
-      'es-x': esX,
-    },
+    plugins: { 'es-x': esX },
     rules: {
-      // ── ES2015+ syntax that SWC lowers via Symbol.iterator runtime
-      //    helpers — forbidden because Chromium 28 (Tizen 2.3) has no Symbol.
-      //    Use indexed for-loops and explicit array access instead.
+      // TypeScript's lib:["ES5","DOM"] + types:[...] is the primary barrier
+      // against ES2015+ API usage in source (Array.prototype.find, Map, Symbol,
+      // etc.) — when you write `arr.find(...)` tsc reports TS2550 with a hint
+      // about changing the lib option. eslint-plugin-compat additionally flags
+      // global constructors like `new URL()` / `new Map()`.
+      //
+      // These three rules cover what TS/compat can't see: iterator-protocol
+      // lowering done by SWC at build time. `for...of`, array/argument spread,
+      // and object rest/spread all compile to calls that dereference
+      // Symbol.iterator, which Chromium 28 (Tizen 2.3) does not have.
       'es-x/no-for-of-loops': 'error',
       'es-x/no-spread-elements': 'error',
       'es-x/no-rest-spread-properties': 'error',
-      'es-x/no-array-from': 'error',
-      'es-x/no-array-of': 'error',
-      'es-x/no-symbol': 'error',
-      'es-x/no-map': 'error',
-      'es-x/no-set': 'error',
-      'es-x/no-weak-map': 'error',
-      'es-x/no-weak-set': 'error',
     },
   },
   {

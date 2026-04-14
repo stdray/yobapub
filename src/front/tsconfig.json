@@ -4,6 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "lib": ["ES5", "DOM"],
+    "types": ["jquery", "hls.js", "tizen-common-web", "tizen-tv-webapis"],
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

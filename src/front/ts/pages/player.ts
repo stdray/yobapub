@@ -329,10 +329,16 @@ class PlayerController {
   private navigateEpisode(dir: number): boolean {
     const item = this.media.item;
     if (!item || !item.seasons) return false;
-    const si = item.seasons.findIndex((s) => s.number === this.media.season);
+    let si = -1;
+    for (let i = 0; i < item.seasons.length; i++) {
+      if (item.seasons[i].number === this.media.season) { si = i; break; }
+    }
     if (si < 0) return false;
     const s = item.seasons[si];
-    const ei = s.episodes.findIndex((ep) => ep.number === this.media.episode);
+    let ei = -1;
+    for (let i = 0; i < s.episodes.length; i++) {
+      if (s.episodes[i].number === this.media.episode) { ei = i; break; }
+    }
     if (ei < 0) return false;
 
     const nextEi = ei + dir;

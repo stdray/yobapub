@@ -17,13 +17,21 @@ interface FoundEpisode {
   episode: NonNullable<Item['seasons']>[number]['episodes'][number];
 }
 
-const findEpisode = (item: Item, seasonNum: number, epNum: number): FoundEpisode | undefined => {
+const findSeason = (item: Item, seasonNum: number): NonNullable<Item['seasons']>[number] | undefined => {
   if (!item.seasons) return undefined;
-  const s = item.seasons.find((ss) => ss.number === seasonNum);
+  for (let i = 0; i < item.seasons.length; i++) {
+    if (item.seasons[i].number === seasonNum) return item.seasons[i];
+  }
+  return undefined;
+};
+
+const findEpisode = (item: Item, seasonNum: number, epNum: number): FoundEpisode | undefined => {
+  const s = findSeason(item, seasonNum);
   if (!s) return undefined;
-  const ep = s.episodes.find((e) => e.number === epNum);
-  if (!ep) return undefined;
-  return { season: s, episode: ep };
+  for (let i = 0; i < s.episodes.length; i++) {
+    if (s.episodes[i].number === epNum) return { season: s, episode: s.episodes[i] };
+  }
+  return undefined;
 };
 
 export const findEpisodeMedia = (item: Item, seasonNum: number, epNum: number): MediaInfo | null => {
@@ -91,8 +99,8 @@ const isValidResume = (time: number, duration?: number): boolean =>
 
 export const getResumeTime = (item: Item, seasonNum?: number, epNum?: number, videoNum?: number): number => {
   if (seasonNum !== undefined && epNum !== undefined && item.seasons) {
-    const s = item.seasons.find((ss) => ss.number === seasonNum);
-    const ep = s && s.episodes.find((e) => e.number === epNum);
+    const found = findEpisode(item, seasonNum, epNum);
+    const ep = found && found.episode;
     if (ep && ep.watching && isValidResume(ep.watching.time, ep.duration)) return ep.watching.time;
   } else if (videoNum !== undefined && item.videos) {
     const v = item.videos[videoNum - 1];
