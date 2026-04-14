@@ -1,147 +1,184 @@
-import $ from 'jquery';
 import * as doT from 'dot';
 import { RouteParams } from '../types/app';
-import { Item } from '../types/api';
+import { Item, ItemsResponse } from '../types/api';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { PageUtils } from '../utils/page';
-import { CARDS_PER_ROW, gridMove, gridPos } from '../utils/grid';
+import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText } from '../utils/templates';
 import { storage } from '../utils/storage';
-import { getItems } from '../api/items';
+import { getItemsFresh, getItemsHot, getItemsPopular } from '../api/items';
 import { sidebar } from '../sidebar';
 import { SidebarPage } from './sidebar-page';
 
-const SECTIONS_CONFIG = [
-  { type: 'movie',      title: 'Новые фильмы' },
-  { type: 'serial',     title: 'Новые сериалы' },
-  { type: 'documovie',  title: 'Новые документальные фильмы' },
-  { type: 'docuserial', title: 'Новые документальные сериалы' },
-  { type: '3D',         title: 'Новое в 3D' },
-  { type: 'tvshow',     title: 'Новые ТВ-шоу' },
-  { type: 'concert',    title: 'Новые концерты' }
-];
+const TYPE_TABS = [
+  { type: 'movie',  title: 'Фильмы' },
+  { type: 'serial', title: 'Сериалы' }
+] as const;
 
-interface NoveltySectionItem {
-  id: number;
-  type: string;
-  title: string;
-  poster: string;
+const CATEGORY_TABS = [
+  { fetch: getItemsPopular, title: 'Популярные' },
+  { fetch: getItemsFresh,   title: 'Свежие' },
+  { fetch: getItemsHot,     title: 'Горячие' }
+] as const;
+
+const enum FocusLevel {
+  TypeTabs,
+  CategoryTabs,
+  Grid
 }
 
-interface SectionData {
-  title: string;
-  items: NoveltySectionItem[];
+interface CardItem {
+  readonly id: number;
+  readonly type: string;
+  readonly title: string;
+  readonly poster: string;
 }
 
-const tplSectionCompiled = doT.template(`
-  <div class="watching__section-title">{{=it.title}}</div>
-  <div class="watching__grid" data-section="{{=it.idx}}">{{=it.cards}}</div>
-`);
+const tplTabsCompiled = doT.template(
+  `<div class="novelties-tabs" data-level="{{=it.level}}">` +
+  `{{~it.tabs :tab:i}}<div class="novelties-tabs__item{{? i === it.active}} active{{?}}" data-idx="{{=i}}">{{=tab}}</div>{{~}}` +
+  `</div>`
+);
 
-const tplSection = (data: { readonly title: string; readonly idx: number; readonly cards: string }): string =>
-  tplSectionCompiled(data);
+const tplTabs = (data: { readonly level: string; readonly tabs: readonly string[]; readonly active: number }): string =>
+  tplTabsCompiled(data);
 
-const tplLayoutCompiled = doT.template(`
-  <div class="content"><div class="watching">{{=it.rows}}</div></div>
-`);
+const tplGridCompiled = doT.template(
+  `<div class="watching__grid">{{=it.cards}}</div>`
+);
 
-const tplLayout = (data: { readonly rows: string }): string =>
-  tplLayoutCompiled(data);
+const tplGrid = (data: { readonly cards: string }): string =>
+  tplGridCompiled(data);
 
 class NoveltiesPage extends SidebarPage {
-  private sections: SectionData[] = [];
-  private focusedSection = 0;
+  private cards: CardItem[] = [];
+  private focusLevel: FocusLevel = FocusLevel.TypeTabs;
+  private typeTab = 0;
+  private categoryTab = 0;
   private focusedIndex = 0;
+  private loading = false;
 
   constructor() { super('novelties'); }
 
   protected onUnfocus(): void { this.updateFocus(); }
 
   protected onMount(params: RouteParams): void {
-    const savedSection = params.focusedSection;
-    const savedIndex = params.focusedIndex;
-    PageUtils.showSpinnerIn(this.$root);
+    this.typeTab = typeof params.typeTab === 'number' ? params.typeTab : 0;
+    this.categoryTab = typeof params.categoryTab === 'number' ? params.categoryTab : 0;
+    this.focusedIndex = typeof params.focusedIndex === 'number' ? params.focusedIndex : 0;
+    this.focusLevel = FocusLevel.TypeTabs;
 
-    const requests = [];
-    for (let i = 0; i < SECTIONS_CONFIG.length; i++) {
-      requests.push(getItems(SECTIONS_CONFIG[i].type, 'created-'));
-    }
-
-    ($.when as (...d: JQuery.Deferred<unknown>[]) => JQuery.Promise<unknown>)
-      .apply($, requests).then((...args: unknown[]) => {
-      this.sections = [];
-      const n = SECTIONS_CONFIG.length;
-      for (let i = 0; i < n; i++) {
-        const raw = n === 1 ? args[0] : args[i];
-        const res = Array.isArray(raw) ? raw[0] : raw;
-        const items: Item[] = (res && res.items) || [];
-        if (items.length > 0) {
-          const sectionItems = items.map((it: Item) => ({
-            id: it.id, type: it.type, title: it.title, poster: it.posters.medium
-          }));
-          this.sections.push({ title: SECTIONS_CONFIG[i].title, items: sectionItems });
-        }
-      }
-
-      if (typeof savedSection === 'number' && typeof savedIndex === 'number' && savedSection < this.sections.length) {
-        this.focusedSection = savedSection;
-        this.focusedIndex = Math.min(savedIndex, this.sections[savedSection].items.length - 1);
-      } else {
-        this.focusedSection = 0;
-        this.focusedIndex = 0;
-      }
-
-      this.render();
-    });
+    this.renderShell();
+    this.loadCards();
   }
 
   protected onUnmount(): void {
-    this.sections = [];
+    this.cards = [];
   }
 
   protected handleKey(e: JQuery.Event): void {
-    if (this.sections.length === 0) { sidebar.handleEmptyState(e); return; }
+    if (this.loading) { e.preventDefault(); return; }
 
-    const currentItems = this.sections[this.focusedSection].items;
-    const g = gridPos(this.focusedIndex, currentItems.length);
+    switch (this.focusLevel) {
+      case FocusLevel.TypeTabs:     this.handleTypeTabs(e); break;
+      case FocusLevel.CategoryTabs: this.handleCategoryTabs(e); break;
+      case FocusLevel.Grid:         this.handleGrid(e); break;
+    }
+  }
 
+  private handleTypeTabs(e: JQuery.Event): void {
+    switch (e.keyCode) {
+      case TvKey.Right:
+        if (this.typeTab < TYPE_TABS.length - 1) {
+          this.typeTab++;
+          this.onTabChanged();
+        }
+        e.preventDefault(); break;
+      case TvKey.Left: {
+        if (this.typeTab > 0) {
+          this.typeTab--;
+          this.onTabChanged();
+          e.preventDefault();
+        } else {
+          sidebar.focus();
+        }
+        break;
+      }
+      case TvKey.Down:
+        this.focusLevel = FocusLevel.CategoryTabs;
+        this.updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Enter:
+        this.focusLevel = FocusLevel.CategoryTabs;
+        this.updateFocus();
+        e.preventDefault(); break;
+      default: sidebar.backOrFocus(e);
+    }
+  }
+
+  private handleCategoryTabs(e: JQuery.Event): void {
+    switch (e.keyCode) {
+      case TvKey.Right:
+        if (this.categoryTab < CATEGORY_TABS.length - 1) {
+          this.categoryTab++;
+          this.onCategoryChanged();
+        }
+        e.preventDefault(); break;
+      case TvKey.Left:
+        if (this.categoryTab > 0) {
+          this.categoryTab--;
+          this.onCategoryChanged();
+        } else {
+          sidebar.focus();
+        }
+        e.preventDefault(); break;
+      case TvKey.Up:
+        this.focusLevel = FocusLevel.TypeTabs;
+        this.updateFocus();
+        e.preventDefault(); break;
+      case TvKey.Down:
+      case TvKey.Enter:
+        if (this.cards.length > 0) {
+          this.focusLevel = FocusLevel.Grid;
+          this.focusedIndex = 0;
+          this.updateFocus();
+        }
+        e.preventDefault(); break;
+      default: sidebar.backOrFocus(e);
+    }
+  }
+
+  private handleGrid(e: JQuery.Event): void {
     switch (e.keyCode) {
       case TvKey.Right: {
-        const nr = gridMove(this.focusedIndex, currentItems.length, 'right');
+        const nr = gridMove(this.focusedIndex, this.cards.length, 'right');
         if (nr >= 0) { this.focusedIndex = nr; this.updateFocus(); }
         e.preventDefault(); break;
       }
       case TvKey.Left: {
-        const nl = sidebar.gridLeftOrFocus(this.focusedIndex, currentItems.length);
+        const nl = sidebar.gridLeftOrFocus(this.focusedIndex, this.cards.length);
         if (nl >= 0) { this.focusedIndex = nl; this.updateFocus(); }
         e.preventDefault(); break;
       }
       case TvKey.Down: {
-        const nd = gridMove(this.focusedIndex, currentItems.length, 'down');
+        const nd = gridMove(this.focusedIndex, this.cards.length, 'down');
         if (nd >= 0) { this.focusedIndex = nd; this.updateFocus(); }
-        else if (this.focusedSection < this.sections.length - 1) {
-          this.focusedSection++;
-          this.focusedIndex = Math.min(g.col, this.sections[this.focusedSection].items.length - 1);
-          this.updateFocus();
-        }
         e.preventDefault(); break;
       }
       case TvKey.Up: {
-        const nu = gridMove(this.focusedIndex, currentItems.length, 'up');
+        const nu = gridMove(this.focusedIndex, this.cards.length, 'up');
         if (nu >= 0) { this.focusedIndex = nu; this.updateFocus(); }
-        else if (this.focusedSection > 0) {
-          this.focusedSection--;
-          const pg = gridPos(0, this.sections[this.focusedSection].items.length);
-          this.focusedIndex = Math.min((pg.totalRows - 1) * CARDS_PER_ROW + g.col, this.sections[this.focusedSection].items.length - 1);
+        else {
+          this.focusLevel = FocusLevel.CategoryTabs;
           this.updateFocus();
         }
         e.preventDefault(); break;
       }
       case TvKey.Enter: {
-        const item = currentItems[this.focusedIndex];
+        const item = this.cards[this.focusedIndex];
         if (item) {
-          router.setParams({ focusedSection: this.focusedSection, focusedIndex: this.focusedIndex });
+          router.setParams({ typeTab: this.typeTab, categoryTab: this.categoryTab, focusedIndex: this.focusedIndex });
           router.navigateItem(item);
         }
         e.preventDefault(); break;
@@ -150,42 +187,119 @@ class NoveltiesPage extends SidebarPage {
     }
   }
 
-  private buildRows(): string {
-    if (this.sections.length === 0) {
-      return tplEmptyText({ text: 'Нет данных' });
-    }
-    let html = '';
-    for (let i = 0; i < this.sections.length; i++) {
-      let cards = '';
-      for (let j = 0; j < this.sections[i].items.length; j++) {
-        const item = this.sections[i].items[j];
-        cards += tplCard({
-          id: item.id,
-          poster: storage.proxyPosterUrl(item.poster),
-          title: item.title,
-          extra: ''
-        });
-      }
-      html += tplSection({ title: this.sections[i].title, idx: i, cards: cards });
-    }
-    return html;
+  private onTabChanged(): void {
+    this.categoryTab = 0;
+    this.focusedIndex = 0;
+    this.renderTabs();
+    this.loadCards();
   }
 
-  private render(): void {
-    this.$root.html(tplLayout({ rows: this.buildRows() }));
-    this.updateFocus();
+  private onCategoryChanged(): void {
+    this.focusedIndex = 0;
+    this.renderCategoryTabs();
+    this.loadCards();
+  }
+
+  private loadCards(): void {
+    this.loading = true;
+    this.renderGridArea('<div class="spinner"><div class="spinner__circle"></div></div>');
+
+    const type = TYPE_TABS[this.typeTab].type;
+    const fetcher = CATEGORY_TABS[this.categoryTab].fetch;
+
+    fetcher(type).then(
+      (res: ItemsResponse) => {
+        this.cards = (res.items || []).map((it: Item) => ({
+          id: it.id, type: it.type, title: it.title, poster: it.posters.medium
+        }));
+        this.loading = false;
+        this.renderGrid();
+        this.updateFocus();
+      },
+      () => {
+        this.cards = [];
+        this.loading = false;
+        this.renderGridArea(tplEmptyText({ text: 'Ошибка загрузки' }));
+      }
+    );
+  }
+
+  private renderShell(): void {
+    const typeTabs = tplTabs({
+      level: 'type',
+      tabs: TYPE_TABS.map((t) => t.title),
+      active: this.typeTab
+    });
+    const categoryTabs = tplTabs({
+      level: 'category',
+      tabs: CATEGORY_TABS.map((t) => t.title),
+      active: this.categoryTab
+    });
+
+    this.$root.html(
+      '<div class="content"><div class="watching">' +
+      typeTabs + categoryTabs +
+      '<div class="novelties-grid-area"></div>' +
+      '</div></div>'
+    );
+  }
+
+  private renderTabs(): void {
+    this.$root.find('.novelties-tabs[data-level="type"]').replaceWith(
+      tplTabs({ level: 'type', tabs: TYPE_TABS.map((t) => t.title), active: this.typeTab })
+    );
+    this.$root.find('.novelties-tabs[data-level="category"]').replaceWith(
+      tplTabs({ level: 'category', tabs: CATEGORY_TABS.map((t) => t.title), active: this.categoryTab })
+    );
+  }
+
+  private renderCategoryTabs(): void {
+    this.$root.find('.novelties-tabs[data-level="category"]').replaceWith(
+      tplTabs({ level: 'category', tabs: CATEGORY_TABS.map((t) => t.title), active: this.categoryTab })
+    );
+  }
+
+  private renderGridArea(html: string): void {
+    this.$root.find('.novelties-grid-area').html(html);
+  }
+
+  private renderGrid(): void {
+    if (this.cards.length === 0) {
+      this.renderGridArea(tplEmptyText({ text: 'Нет данных' }));
+      return;
+    }
+    let cardsHtml = '';
+    for (let i = 0; i < this.cards.length; i++) {
+      const c = this.cards[i];
+      cardsHtml += tplCard({ id: c.id, poster: storage.proxyPosterUrl(c.poster), title: c.title, extra: '' });
+    }
+    this.renderGridArea(tplGrid({ cards: cardsHtml }));
   }
 
   private updateFocus(): void {
+    this.$root.find('.novelties-tabs__item').removeClass('focused');
     this.$root.find('.card').removeClass('focused');
-    if (this.sections.length === 0) return;
 
-    const $grid = this.$root.find('.watching__grid[data-section="' + this.focusedSection + '"]');
-    const $cards = $grid.find('.card');
-    if ($cards.length > 0 && this.focusedIndex < $cards.length) {
-      const $card = $cards.eq(this.focusedIndex);
-      $card.addClass('focused');
-      PageUtils.scrollIntoView($card[0], this.$root.find('.watching')[0]);
+    switch (this.focusLevel) {
+      case FocusLevel.TypeTabs: {
+        const $items = this.$root.find('.novelties-tabs[data-level="type"] .novelties-tabs__item');
+        $items.eq(this.typeTab).addClass('focused');
+        break;
+      }
+      case FocusLevel.CategoryTabs: {
+        const $items = this.$root.find('.novelties-tabs[data-level="category"] .novelties-tabs__item');
+        $items.eq(this.categoryTab).addClass('focused');
+        break;
+      }
+      case FocusLevel.Grid: {
+        const $cards = this.$root.find('.card');
+        if ($cards.length > 0 && this.focusedIndex < $cards.length) {
+          const $card = $cards.eq(this.focusedIndex);
+          $card.addClass('focused');
+          PageUtils.scrollIntoView($card[0], this.$root.find('.watching')[0]);
+        }
+        break;
+      }
     }
   }
 }

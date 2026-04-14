@@ -8,6 +8,15 @@ const getItem = (id: number): JQueryDeferred<ItemResponse> =>
 export const getItems = (type: string, sort?: string): JQueryDeferred<ItemsResponse> =>
   apiClient.apiGetWithRefresh('/v1/items', sort ? { type, sort } : { type });
 
+export const getItemsFresh = (type: string): JQueryDeferred<ItemsResponse> =>
+  apiClient.apiGetWithRefresh('/v1/items/fresh', { type });
+
+export const getItemsHot = (type: string): JQueryDeferred<ItemsResponse> =>
+  apiClient.apiGetWithRefresh('/v1/items/hot', { type });
+
+export const getItemsPopular = (type: string): JQueryDeferred<ItemsResponse> =>
+  apiClient.apiGetWithRefresh('/v1/items/popular', { type });
+
 export const searchItems = (
   query: string, page?: number, perpage?: number
 ): JQueryDeferred<ItemsResponse> => {

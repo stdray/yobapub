@@ -7,6 +7,8 @@ export interface RouteParams {
   video?: number;
   focusedSection?: number;
   focusedIndex?: number;
+  typeTab?: number;
+  categoryTab?: number;
   folderId?: number;
   folderTitle?: string;
   searchQuery?: string;

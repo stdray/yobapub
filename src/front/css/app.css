@@ -164,6 +164,29 @@ html, body {
   display: none;
 }
 
+/* --- Novelties tabs --- */
+.novelties-tabs {
+  display: flex;
+  margin-bottom: 30px;
+}
+
+.novelties-tabs__item {
+  font-size: 30px;
+  color: #888;
+  margin-right: 40px;
+  padding-bottom: 6px;
+  border-bottom: 3px solid transparent;
+}
+
+.novelties-tabs__item.active {
+  color: #fff;
+  border-bottom-color: #e94560;
+}
+
+.novelties-tabs__item.focused {
+  color: #e94560;
+}
+
 .watching__section-title {
   font-size: 32px;
   margin-bottom: 20px;
