@@ -6,7 +6,7 @@ import { tplSidePanel } from './template';
 
 const SECTION_LABELS = ['Аудио', 'Субтитры', 'Качество', 'Размер сабов'] as const;
 const SECTION_COUNT = SECTION_LABELS.length;
-const IDLE_MS = 4000;
+const IDLE_MS = 6000;
 
 interface LabeledItem {
   readonly label: string;
@@ -245,6 +245,7 @@ export class Panel {
   // --- side panel open / close ---
 
   private openSidePanel(): void {
+    this.resetIdle();
     this.listOpen = true;
     this.listSection = this.btnIndex;
     const items = this.getItems(this.listSection);
@@ -260,6 +261,7 @@ export class Panel {
   }
 
   private closeSidePanel(): void {
+    this.resetIdle();
     this.listOpen = false;
     const $sp = this.$sidePanel.get();
     $sp.removeClass('active');
@@ -268,6 +270,7 @@ export class Panel {
   }
 
   private applySelection(): void {
+    this.resetIdle();
     if (this.listSection === 0) {
       this.cbs.onApplyAudio(this.listIndex);
     } else if (this.listSection === 1) {
