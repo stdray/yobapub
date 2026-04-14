@@ -1,4 +1,4 @@
-import { CARDS_PER_ROW } from '../settings';
+export const CARDS_PER_ROW = 4;
 
 interface GridPos {
   col: number;

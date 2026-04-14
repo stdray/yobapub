@@ -306,15 +306,15 @@ class SettingsPage implements Page {
         if (this.focusedIndex < this.allSettings.length - 1) { this.focusedIndex++; this.render(); }
         e.preventDefault(); break;
       case TvKey.Left:
-        if (item && item.type === 'stepper') { this.stepSubSize(-1); e.preventDefault(); }
-        else if (item && item.type === 'list') { this.cycleListOption(-1); e.preventDefault(); }
-        else { e.preventDefault(); }
-        break;
+        if (item && item.type === 'stepper') { this.stepSubSize(-1); }
+        else if (item && item.type === 'list') { this.cycleListOption(-1); }
+        else if (item && item.type === 'checkbox') { this.toggleCheckbox(); }
+        e.preventDefault(); break;
       case TvKey.Right:
-        if (item && item.type === 'stepper') { this.stepSubSize(1); e.preventDefault(); }
-        else if (item && item.type === 'list') { this.cycleListOption(1); e.preventDefault(); }
-        else { e.preventDefault(); }
-        break;
+        if (item && item.type === 'stepper') { this.stepSubSize(1); }
+        else if (item && item.type === 'list') { this.cycleListOption(1); }
+        else if (item && item.type === 'checkbox') { this.toggleCheckbox(); }
+        e.preventDefault(); break;
       case TvKey.Enter:
         if (item && (item.type === 'stepper' || item.type === 'readonly')) { e.preventDefault(); break; }
         this.openOptions(); e.preventDefault(); break;
@@ -454,6 +454,13 @@ class SettingsPage implements Page {
     this.render();
   }
 
+  private toggleCheckbox(): void {
+    const item = this.allSettings[this.focusedIndex];
+    if (!item || item.type !== 'checkbox') return;
+    this.focusedOptionIndex = item.value ? 0 : 1;
+    this.applyOption();
+  }
+
   private cycleListOption(dir: number): void {
     const item = this.allSettings[this.focusedIndex];
     if (!item || item.type !== 'list' || !item.options || item.options.length === 0) return;
@@ -463,8 +470,8 @@ class SettingsPage implements Page {
       if (item.options[i].selected) { currentIdx = i; break; }
     }
 
-    const newIdx = currentIdx + dir;
-    if (newIdx < 0 || newIdx >= item.options.length) return;
+    const len = item.options.length;
+    const newIdx = (currentIdx + dir + len) % len;
 
     this.focusedOptionIndex = newIdx;
     this.applyOption();
