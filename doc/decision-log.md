@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-04-14 06:38 — stopLoad/startLoad around pendingStartSeek
+
+**Решение:** в `hls-engine.ts` перед выполнением `pendingStartSeek` (seek на сохранённую позицию после загрузки первого фрагмента) вызываем `hls.stopLoad()`, а после `v.currentTime = target` — `hls.startLoad(target)`. Это предотвращает загрузку ненужного следующего фрагмента (sn=2) с начала файла.
+
+**Причина:** лог `7-sChUlDu0iFg461eG_6LA` на Tizen 2.3 при переключении качества на 1080p@10Mbps. После `FRAG_BUFFERED sn=1` hls.js начинал грузить sn=2 (start=10с) параллельно с seek на позицию ~1771с. Фрагмент sn=2 (~17MB) загружался 5с впустую, отбирая полосу у нужных фрагментов. Результат — каскад `bufferStalledError` в течение 30с после переключения. Фрагменты по 10-25MB грузились 3-7с при канале ~28Mbps, буфер не успевал расти.
+
+**Данные:** лог https://yobapub.3po.su/s/logs/7-sChUlDu0iFg461eG_6LA/tsv, коммит `91e0094` (перезаписан rebase)
+
+**Результат:** ждём проверки
+
+---
+
 ## 2026-04-13 22:40 — перенести resume-seek из `canplay` в `FRAG_BUFFERED`
 
 **Решение:** в `pages/player.ts` seek на `pendingStartSeek` для resume-сценария (`pos > 0`) перенесён из обработчика `video canplay` в обработчик `hls FRAG_BUFFERED`. Seek выполняется один раз, когда `v.buffered.length > 0` (т.е. в SourceBuffer уже появилась реальная медиа-дата). Canplay теперь отвечает только за PTS-offset снап (свежий запуск, `pendingStartSeek == 0`, `ct < bStart`).

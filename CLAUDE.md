@@ -92,7 +92,7 @@ Every page exports `{ mount(params), unmount() }`. On mount: render DOM, bind ke
 - `pageKeys()` from `utils/page.ts` — binds/unbinds `$(window).on('keydown')`
 - `TvKey` enum in `utils/platform.ts` — key codes (Enter, Return, Backspace, Escape, arrows, Stop, etc.)
 - `gridMove(index, total, direction)` from `utils/grid.ts` — returns next index or -1 for card grids
-- `CARDS_PER_ROW = 4` from `settings.ts`
+- `CARDS_PER_ROW = 4` from `utils/grid.ts`
 
 ### API Layer
 - `ApiClient` class in `api/client.ts` with `apiGetWithRefresh(path, params?)` / `apiPostWithRefresh(path, data)`
