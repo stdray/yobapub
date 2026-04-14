@@ -133,10 +133,9 @@ class PlayerController {
     $root: this.$root,
     info: this.info,
     updateProgress: () => this.progressBar.update(),
-    canAutoHide: () => !this.panel.open && !this.seek.active,
+    canAutoHide: () => !this.panel.focused && !this.seek.active,
   });
   private readonly panel = new Panel(this.$root, {
-    onShowInfo: () => { this.info.show(); },
     onAfterClose: () => { this.overlay.showBar(); },
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
     onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
@@ -423,7 +422,7 @@ class PlayerController {
       return;
     }
 
-    if (this.panel.open) {
+    if (this.panel.focused) {
       this.panel.handleKey(e, kc);
       return;
     }
@@ -466,9 +465,9 @@ class PlayerController {
         this.trackNavigator.navigate(-1); break;
 
       case TvKey.Up:
-        this.overlay.showBar(); break;
-      case TvKey.Down:
-        this.panel.show(); break;
+        this.overlay.showBar();
+        this.panel.focus();
+        break;
 
       case TvKey.Green:
         changeSubSize(1, (text) => this.overlay.showToast(text)); break;

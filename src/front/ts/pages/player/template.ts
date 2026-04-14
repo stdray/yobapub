@@ -13,6 +13,11 @@ const tplPlayerCompiled = doT.template(`
     </div>
     <div class="player__bar hidden">
       <div class="player__bar-wrap">
+        <div class="player__actions">
+          <div class="player__action-btn" data-section="0">Аудио</div>
+          <div class="player__action-btn" data-section="1">Субтитры</div>
+          <div class="player__action-btn" data-section="2">Качество</div>
+        </div>
         <div class="player__bar-progress">
           <div class="player__bar-value">
             <div class="player__bar-pct"></div>
@@ -22,21 +27,7 @@ const tplPlayerCompiled = doT.template(`
         <div class="player__bar-duration"></div>
       </div>
     </div>
-    <div class="player__panel hidden">
-      <div class="ppanel__overlay"></div>
-      <div class="ppanel__buttons">
-        <div class="ppanel__btn ppanel__btn--audio">
-          <span class="ppanel__btn-label">Аудио: ...</span>
-        </div>
-        <div class="ppanel__btn ppanel__btn--subs">
-          <span class="ppanel__btn-label">Сабы: ...</span>
-        </div>
-        <div class="ppanel__btn ppanel__btn--quality">
-          <span class="ppanel__btn-label">Качество: ...</span>
-        </div>
-      </div>
-      <div class="ppanel__list hidden"></div>
-    </div>
+    <div class="player__side-panel hidden"></div>
     <div class="player__toast hidden"></div>
   </div>
 `);
@@ -61,22 +52,24 @@ const tplErrorScreenCompiled = doT.template(`
 
 export const tplErrorScreen = (data: ErrorScreenData): string => tplErrorScreenCompiled(data);
 
-interface PanelListItem {
+interface SidePanelItem {
   readonly label: string;
   readonly selected: boolean;
 }
 
-interface PanelListData {
-  readonly items: ReadonlyArray<PanelListItem>;
+interface SidePanelData {
+  readonly title: string;
+  readonly items: ReadonlyArray<SidePanelItem>;
   readonly focusedIndex: number;
 }
 
-const tplPanelListCompiled = doT.template(`
+const tplSidePanelCompiled = doT.template(`
+  <div class="player__side-panel__title">{{=it.title}}</div>
   {{~it.items :item:i}}
-    <div class="ppanel__list-item{{?item.selected}} selected{{?}}{{?i===it.focusedIndex}} focused{{?}}">
+    <div class="player__side-item{{?item.selected}} selected{{?}}{{?i===it.focusedIndex}} focused{{?}}">
       {{=item.label}}
     </div>
   {{~}}
 `);
 
-export const tplPanelList = (data: PanelListData): string => tplPanelListCompiled(data);
+export const tplSidePanel = (data: SidePanelData): string => tplSidePanelCompiled(data);
