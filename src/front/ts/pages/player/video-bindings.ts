@@ -57,6 +57,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
       br: formatBuffered(v),
     });
     overlay.hideSpinner();
+    videoEl.classList.add('player__video--visible');
   });
   videoEl.addEventListener('seeked', () => {
     const v = getV();

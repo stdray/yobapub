@@ -76,6 +76,22 @@
   - [ ] Если это тянет много внутренних типов — пишем свой минимальный
     `HlsLike`-интерфейс (~30–50 членов). `unknown` + type guards на границе адаптера
 
+- [ ] **Start seek без костылей на modern**
+  - На legacy мы стартуем с `currentTime=0`, ждём первый фрагмент в SourceBuffer,
+    прыгаем на `resumeTime` и вручную флашим `[0..target-1]` через
+    `BUFFER_FLUSHING`. Причина — Tizen 2.3: `_seekToStartPos` в 0.14 стреляет
+    seek во время прогрева декодера и ломает A/V sync (см. `buildBaseHlsConfig`
+    и decision log). Поэтому `cfg.startPosition` не используем.
+  - На modern этих замуток быть не должно: `HlsAdapterModern` стартует сразу
+    с `config.startPosition = resumeTime` (или `hls.startLoad(resumeTime)`),
+    никакого стартового seek из нуля, никакого ручного `BUFFER_FLUSHING`,
+    никакого `pendingStartSeek`/`firstFragSnapped`. Вся эта логика живёт только
+    в `HlsAdapterLegacy`.
+  - Проверить на Этапе 2 Фазы 4, что A/V sync на Tizen 3.0+/Android TV при
+    старте с ненулевой позиции действительно в порядке (ради чего и затевали
+    legacy-костыль). Если всплывёт — завести отдельную задачу, не тащить
+    legacy-обходы в modern по умолчанию.
+
 - [ ] **`patch-hls.js`**
   - [ ] Старый патч оставляем только для legacy-бандла
   - [ ] На modern **сначала не патчим**: включить подробное логирование публичных
