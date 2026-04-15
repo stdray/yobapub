@@ -151,6 +151,25 @@ tr.row-old td { animation: row-old 4s ease-out; }
 .active-filter.inc { color: #8f8; background: #0a2a0a; }
 .active-filter.exc { color: #f88; background: #2a0a0a; }
 
+.filter-fields { display: flex; flex-direction: column; margin: 6px 0; }
+.filter-field {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0; font-size: 12px;
+}
+.filter-field > label {
+  width: 80px; color: #aaa; font-weight: bold;
+}
+.filter-field > input[type="text"] {
+  width: 180px; background: #222; color: #ddd;
+  border: 1px solid #444; padding: 2px 6px; font: inherit;
+}
+.filter-field__inc, .filter-field__exc {
+  background: #222; border: 1px solid #444; color: #ccc;
+  padding: 2px 8px; cursor: pointer; font: inherit;
+}
+.filter-field__inc:hover { background: #145014; color: #8f8; }
+.filter-field__exc:hover { background: #501414; color: #f88; }
+
 .cell { position: relative; display: inline-block; padding-right: 2px; }
 .cell__inc, .cell__exc {
   display: none; text-decoration: none; font-size: 11px;

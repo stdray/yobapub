@@ -21,15 +21,26 @@
     <button type="submit">Найти</button>
     <button type="button" @@click="reset()">Сброс</button>
   </form>
-  <div class="active-filters">
-    <template x-for="chip in chips()" :key="chip.key">
-      <span class="active-filter" :class="chip.mode">
-        <b x-text="chip.field"></b>
-        <span x-text="chip.mode === 'inc' ? '=' : '≠'"></span>
-        <span x-text="chip.value"></span>
-        <a href="#" @@click.prevent="removeFilter(chip.field, chip.mode, chip.value)">&#x2715;</a>
-      </span>
-    </template>
+  <div class="filter-fields">
+    @foreach (var field in new[] { "Level", "Category", "DeviceId", "TraceId", "ClientIp" })
+    {
+      <div class="filter-field" x-data="{ val: '' }">
+        <label>@field</label>
+        <input type="text" x-model="val" placeholder="значение"
+               @@keydown.enter.prevent="if (val) { $store.logs.addIncl('@field', val); val = ''; }">
+        <button type="button" class="filter-field__inc" title="Добавить в include"
+                @@click="if (val) { $store.logs.addIncl('@field', val); val = ''; }">&#x2713;</button>
+        <button type="button" class="filter-field__exc" title="Добавить в exclude"
+                @@click="if (val) { $store.logs.addExcl('@field', val); val = ''; }">&#x2715;</button>
+        <template x-for="chip in fieldChips('@field')" :key="chip.key">
+          <span class="active-filter" :class="chip.mode">
+            <span x-text="chip.mode === 'inc' ? '=' : '≠'"></span>
+            <span x-text="chip.value"></span>
+            <a href="#" @@click.prevent="removeFilter('@field', chip.mode, chip.value)">&#x2715;</a>
+          </span>
+        </template>
+      </div>
+    }
   </div>
   <label><input type="checkbox" x-model="autoRefresh"> Auto 10s</label>
   <span id="status" x-text="status"></span>

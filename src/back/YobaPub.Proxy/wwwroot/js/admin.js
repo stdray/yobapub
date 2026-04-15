@@ -191,13 +191,11 @@ window.logsPage = () => ({
       this.lastId = s.dataset.lastId || null;
       this.hasMore = s.dataset.hasMore === '1';
     },
-    chips() {
+    fieldChips(field) {
+      const { inc, exc } = window.Alpine.store('logs').filters[field];
       const out = [];
-      FIELDS.forEach((field) => {
-        const { inc, exc } = window.Alpine.store('logs').filters[field];
-        inc.forEach((value) => out.push({ key: `${field}:i:${value}`, field, mode: 'inc', value }));
-        exc.forEach((value) => out.push({ key: `${field}:e:${value}`, field, mode: 'exc', value }));
-      });
+      inc.forEach((value) => out.push({ key: `${field}:i:${value}`, field, mode: 'inc', value }));
+      exc.forEach((value) => out.push({ key: `${field}:e:${value}`, field, mode: 'exc', value }));
       return out;
     },
     removeFilter(field, mode, value) {
