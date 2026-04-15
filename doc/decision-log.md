@@ -13,6 +13,28 @@
 
 ---
 
+## 2026-04-15 21:46 — HEVC 1080p на Tizen 3.0 через hls.js 1.6.16 — стабильно, без stall'ов
+
+**Решение:** подтверждено на реальном устройстве, что modern hls.js (1.6.16) чинит главную проблему 0.14 на Tizen 3.0 — частые `bufferStalledError` при HEVC 1080p. Tizen 3.0 становится кандидатом на default=modern.
+
+**Причина:** лог реального устройства с веткой `hls-upgrade` и включённой настройкой «Старый телевизор = off». Ключевые строки:
+- `[hls] version=1.6.16 mode=modern isSupported=true`
+- `pinQualityLevel idx=5 target=1920x800 level=1920x800 codec=hvc1.2.4.L150.B0 bitrate=1264862 preferHevc=true` — двухпроходный скан корректно предпочёл HEVC-вариант
+- `LEVEL_SWITCHED level=5 1920x800 bitrate=1264862 videoCodec=hvc1.2.4.L150.B0 audioCodec=mp4a.40.2`
+- **0 записей bufferStalledError**, 0 ERROR за всю сессию (против ~1 stall / 30 сек на 0.14)
+- экономия битрейта ~40% в пользу HEVC: 1.26 Mbps hvc1 vs 2.14 Mbps avc1 для того же 1920×800
+
+**Данные:**
+- commit: `5aa19e6`
+- лог: https://yobapub.3po.su/s/logs/0hCxKHZVXkKjo9VAvUT8NA/tsv
+- предыдущий baseline (H.264, тот же билд): commit `af6bcfd`
+
+**Результат:** подтверждено. Пересматриваем стратегию раскатки в `doc/hls-upgrade.md` — риск «регрессия на Tizen 3.0» снимается, modern на 3.0 реально **улучшает** воспроизведение. 4K HEVC на 3.0 всё равно не тянет декодер (см. запись 14:30) — ограничение остаётся.
+
+Косметический остаток для Фазы 2: в логах `LEVEL_LOADED level=undefined load=NaNms` — hls.js 1.x переименовал `data.levelId`→`data.level` и `stats.trequest/tload`→`stats.loading.start/end`. Подхватится при написании HlsAdapter.
+
+---
+
 ## 2026-04-15 14:30 — 4K HEVC на Tizen 3.0: звук есть, картинка зависает
 
 **Решение:** зафиксировано как ограничение платформы. Tizen 3.0 не тянет 4K HEVC через MSE.
