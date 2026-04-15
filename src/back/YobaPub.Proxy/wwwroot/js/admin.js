@@ -159,6 +159,7 @@ registerLogsStore();
 window.logsPage = () => ({
     search: '',
     pageSize: 100,
+    showFilters: false,
     autoRefresh: false,
     status: '',
     topId: '',

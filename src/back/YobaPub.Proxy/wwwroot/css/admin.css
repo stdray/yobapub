@@ -151,7 +151,10 @@ tr.row-old td { animation: row-old 4s ease-out; }
 .active-filter.inc { color: #8f8; background: #0a2a0a; }
 .active-filter.exc { color: #f88; background: #2a0a0a; }
 
-.filter-fields { display: flex; flex-direction: column; margin: 6px 0; }
+.filter-fields {
+  display: flex; flex-direction: column;
+  padding: 8px 14px; background: #161616; border-bottom: 1px solid #333;
+}
 .filter-field {
   display: flex; align-items: center; gap: 6px;
   padding: 3px 0; font-size: 12px;
