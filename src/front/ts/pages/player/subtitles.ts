@@ -3,8 +3,6 @@ import { Subtitle } from '../../types/api';
 import { storage, Storage, ProxyCategory } from '../../utils/storage';
 import { Logger } from '../../utils/log';
 
-const log = new Logger('subs-diag');
-
 let subStyleEl: HTMLStyleElement | null = null;
 
 export const applySubSize = (): void => {
@@ -36,79 +34,88 @@ const srtToVtt = (srt: string): string => {
   return vtt;
 };
 
-export const loadSubtitleTrack = (videoEl: HTMLVideoElement, $root: JQuery, subs: Subtitle[], subIdx: number): void => {
-  $root.find('video track').remove();
-  const tracks = videoEl.textTracks;
-  for (let i = 0; i < tracks.length; i++) {
-    tracks[i].mode = 'disabled';
+export class SubtitleLoader {
+  private readonly log: Logger;
+
+  constructor(log?: Logger) {
+    this.log = log || new Logger('subs-diag');
   }
 
-  if (subIdx < 0 || subIdx >= subs.length) return;
-
-  const sub = subs[subIdx];
-  const v = videoEl;
-
-  const dumpTracks = (tag: string): void => {
-    const tt = v.textTracks;
-    const parts: string[] = [];
-    for (let i = 0; i < tt.length; i++) {
-      const cues = tt[i].cues;
-      parts.push(i + ':mode=' + tt[i].mode + ',lang=' + tt[i].language + ',cues=' + (cues ? cues.length : -1));
+  load(videoEl: HTMLVideoElement, $root: JQuery, subs: Subtitle[], subIdx: number): void {
+    $root.find('video track').remove();
+    const tracks = videoEl.textTracks;
+    for (let i = 0; i < tracks.length; i++) {
+      tracks[i].mode = 'disabled';
     }
-    log.info('tracks tag={tag} count={count} items={items}', { tag, count: tt.length, items: parts.join(' | ') });
-  };
 
-  const addTrackFromUrl = (src: string): void => {
-    const track = document.createElement('track');
-    track.kind = 'subtitles';
-    track.label = sub.lang;
-    track.srclang = sub.lang;
-    track.src = src;
-    track.setAttribute('default', '');
-    track.addEventListener('load', () => {
-      dumpTracks('track-load');
-      const idx = v.textTracks.length - 1;
-      if (idx >= 0) {
-        v.textTracks[idx].mode = 'showing';
-        log.info('forced showing idx={idx}', { idx });
-        dumpTracks('after-force-showing');
+    if (subIdx < 0 || subIdx >= subs.length) return;
+
+    const sub = subs[subIdx];
+    const v = videoEl;
+    const log = this.log;
+
+    const dumpTracks = (tag: string): void => {
+      const tt = v.textTracks;
+      const parts: string[] = [];
+      for (let i = 0; i < tt.length; i++) {
+        const cues = tt[i].cues;
+        parts.push(i + ':mode=' + tt[i].mode + ',lang=' + tt[i].language + ',cues=' + (cues ? cues.length : -1));
+      }
+      log.info('tracks tag={tag} count={count} items={items}', { tag, count: tt.length, items: parts.join(' | ') });
+    };
+
+    const addTrackFromUrl = (src: string): void => {
+      const track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.label = sub.lang;
+      track.srclang = sub.lang;
+      track.src = src;
+      track.setAttribute('default', '');
+      track.addEventListener('load', () => {
+        dumpTracks('track-load');
+        const idx = v.textTracks.length - 1;
+        if (idx >= 0) {
+          v.textTracks[idx].mode = 'showing';
+          log.info('forced showing idx={idx}', { idx });
+          dumpTracks('after-force-showing');
+        }
+      });
+      track.addEventListener('error', () => {
+        log.warn('track element error event', {});
+      });
+      v.appendChild(track);
+      dumpTracks('after-append');
+      if (v.textTracks.length > 0) {
+        v.textTracks[v.textTracks.length - 1].mode = 'showing';
+      }
+      dumpTracks('after-initial-showing');
+    };
+
+    // CDN does not set Access-Control-Allow-Origin, so without proxying a
+    // direct XHR fails and <track src=...> errors out. The 'subtitles'
+    // category is on by default; toggling it off is a conscious choice to
+    // break subtitle display.
+    const subUrl = storage.getRewrittenUrl(ProxyCategory.Subtitles, sub.url);
+    log.info('loading idx={idx} lang={lang} url={url}', { idx: subIdx, lang: sub.lang, url: subUrl });
+
+    $.ajax({
+      url: subUrl,
+      dataType: 'text',
+      success: (data: string) => {
+        if (!v || !v.parentNode) return;
+        log.info('ajax ok len={len} head={head}', { len: data.length, head: data.substring(0, 120) });
+        const vtt = srtToVtt(data);
+        log.info('vtt head={head}', { head: vtt.substring(0, 200) });
+        const blob = new Blob([vtt], { type: 'text/vtt' });
+        // URL.createObjectURL exists on Tizen 2.3 (Chrome 23+); only new URL() is missing.
+        // eslint-disable-next-line compat/compat
+        addTrackFromUrl(URL.createObjectURL(blob));
+      },
+      error: (_xhr, status, err) => {
+        if (!v || !v.parentNode) return;
+        log.warn('ajax error status={status} err={err}', { status: String(status), err: String(err) });
+        addTrackFromUrl(subUrl);
       }
     });
-    track.addEventListener('error', () => {
-      log.warn('track element error event', {});
-    });
-    v.appendChild(track);
-    dumpTracks('after-append');
-    if (v.textTracks.length > 0) {
-      v.textTracks[v.textTracks.length - 1].mode = 'showing';
-    }
-    dumpTracks('after-initial-showing');
-  };
-
-  // CDN does not set Access-Control-Allow-Origin, so without proxying a
-  // direct XHR fails and <track src=...> errors out. The 'subtitles'
-  // category is on by default; toggling it off is a conscious choice to
-  // break subtitle display.
-  const subUrl = storage.getRewrittenUrl(ProxyCategory.Subtitles, sub.url);
-  log.info('loading idx={idx} lang={lang} url={url}', { idx: subIdx, lang: sub.lang, url: subUrl });
-
-  $.ajax({
-    url: subUrl,
-    dataType: 'text',
-    success: (data: string) => {
-      if (!v || !v.parentNode) return;
-      log.info('ajax ok len={len} head={head}', { len: data.length, head: data.substring(0, 120) });
-      const vtt = srtToVtt(data);
-      log.info('vtt head={head}', { head: vtt.substring(0, 200) });
-      const blob = new Blob([vtt], { type: 'text/vtt' });
-      // URL.createObjectURL exists on Tizen 2.3 (Chrome 23+); only new URL() is missing.
-      // eslint-disable-next-line compat/compat
-      addTrackFromUrl(URL.createObjectURL(blob));
-    },
-    error: (_xhr, status, err) => {
-      if (!v || !v.parentNode) return;
-      log.warn('ajax error status={status} err={err}', { status: String(status), err: String(err) });
-      addTrackFromUrl(subUrl);
-    }
-  });
-};
+  }
+}

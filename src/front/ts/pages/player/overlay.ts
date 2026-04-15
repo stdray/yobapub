@@ -1,10 +1,8 @@
 import { Lazy } from '../../utils/lazy';
-import { Logger } from '../../utils/log';
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
 import { buildSubLabel } from './panel';
+import { Logger } from '../../utils/log';
 import Hls from 'hls.js';
-
-const olog = new Logger('overlay');
 
 export type HudIcon = 'pause' | 'rw' | 'ff';
 
@@ -25,6 +23,7 @@ interface OverlayDeps {
   readonly selectedSub: () => number;
   readonly hlsInstance: () => Hls | null;
   readonly videoEl: () => HTMLVideoElement | null;
+  readonly log?: Logger;
 }
 
 const PROGRESS_TICK_MS = 1000;
@@ -62,8 +61,10 @@ export class OverlayView {
   private prevFrames = 0;
   private prevTime = 0;
   private currentFps: number | null = null;
+  private readonly log: Logger;
 
   constructor(private readonly deps: OverlayDeps) {
+    this.log = deps.log || new Logger('overlay');
     const $root = deps.$root;
     this.$spinner = new Lazy(() => $root.find('.player__spinner'));
     this.$hud = new Lazy(() => $root.find('.player__hud'));
@@ -83,7 +84,7 @@ export class OverlayView {
   }
 
   showBar(): void {
-    olog.info('showBar');
+    this.log.info('showBar');
     this.updateBadge();
     this.$hud.get().removeClass('hidden');
     this.deps.updateProgress();
@@ -91,7 +92,7 @@ export class OverlayView {
   }
 
   hideBar(): void {
-    olog.info('hideBar');
+    this.log.info('hideBar');
     this.stopProgressTimer();
     this.$hud.get().addClass('hidden');
   }

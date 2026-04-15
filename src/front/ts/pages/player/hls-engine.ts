@@ -102,7 +102,6 @@ export class HlsEngine {
     this.stallCount = 0;
 
     const log = this.deps.log;
-    log.newTraceId();
 
     const cfg = this.buildConfig();
     logPlaybackStart(log, originalUrl, {

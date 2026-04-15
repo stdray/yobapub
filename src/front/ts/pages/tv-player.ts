@@ -121,7 +121,6 @@ class TvPlayerPage implements Page {
     const h = new Hls(buildBaseHlsConfig());
     this.hls = h;
 
-    plog.newTraceId();
     logPlaybackStart(plog, streamUrl);
 
     streamUrl = getOptionalRewrittenHlsUrl(streamUrl, 0, ProxyCategory.Tv);

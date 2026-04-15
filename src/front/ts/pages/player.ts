@@ -5,15 +5,14 @@ import { Item, VideoFile, AudioTrack, Subtitle, WatchingInfoItem } from '../type
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
-import { Logger } from '../utils/log';
 import { pickHlsUrl } from '../utils/hls-utils';
 
 import { tplPlayer } from './player/template';
 import {
-  MediaInfo, findEpisodeMedia, findVideoMedia, loadMediaLinks,
-  getResumeTime, isEpisodeWatched, isVideoWatched,
+  MediaInfo, MediaService, findEpisodeMedia, findVideoMedia,
+  isEpisodeWatched, isVideoWatched,
 } from './player/media';
-import { applySubSize, loadSubtitleTrack } from './player/subtitles';
+import { applySubSize, SubtitleLoader } from './player/subtitles';
 import { storage } from '../utils/storage';
 import { HlsEngine, HlsFatalErrorData } from './player/hls-engine';
 import { TrackNavigator } from './player/track-navigator';
@@ -31,14 +30,7 @@ import { bindVideoEvents, VideoBindingsDeps } from './player/video-bindings';
 import { Fsm } from '../utils/fsm';
 import { playerMachine, PlayerFsmCtx, PlayerState, PlayerEvent } from './player/player-fsm';
 
-const plog = new Logger('player');
-const medlog = new Logger('player-media');
-const hlslog = new Logger('player-hls');
-const seeklog = new Logger('player-seek');
-const watchlog = new Logger('player-watch');
-const keylog = new Logger('player-keys');
-
-installCtLogShim(hlslog);
+import { Logger, generateTraceId } from '../utils/log';
 
 // --- Interfaces ---
 
@@ -80,6 +72,19 @@ class PlayerController implements PlayerFsmCtx {
   private readonly $root = $('#page-player');
   private readonly keys = new PageKeys();
 
+  // Loggers — all share one traceId per PlayerController instance
+  private readonly traceId = generateTraceId();
+  private readonly plog = new Logger('player', this.traceId);
+  private readonly medlog = new Logger('player-media', this.traceId);
+  private readonly hlslog = new Logger('player-hls', this.traceId);
+  private readonly seeklog = new Logger('player-seek', this.traceId);
+  private readonly watchlog = new Logger('player-watch', this.traceId);
+  private readonly keylog = new Logger('player-keys', this.traceId);
+  private readonly olog = new Logger('overlay', this.traceId);
+  private readonly subsDiagLog = new Logger('subs-diag', this.traceId);
+  private readonly mediaService = new MediaService(this.medlog, this.subsDiagLog);
+  private readonly subtitleLoader = new SubtitleLoader(this.subsDiagLog);
+
   // State
   private videoEl: HTMLVideoElement | null = null;
   private media = defaultMedia();
@@ -89,14 +94,14 @@ class PlayerController implements PlayerFsmCtx {
     getPlaybackStarted: () => this.playbackStarted,
     onReady: () => this.onSourceReady(),
     onFatalError: (data: HlsFatalErrorData) => { this.reportFatal(); this.errorView.showHlsFatalError(data); },
-    log: hlslog,
+    log: this.hlslog,
   });
   private readonly errorView = new PlayerErrorView({
     $root: this.$root,
     keys: this.keys,
     engine: this.engine,
     onDestroy: () => this.destroyPlayer(),
-    log: plog,
+    log: this.plog,
   });
   private readonly trackNavigator = new TrackNavigator({
     getItem: () => this.media.item,
@@ -118,7 +123,7 @@ class PlayerController implements PlayerFsmCtx {
   private readonly seek: SeekController = new SeekController({
     getVideoEl: () => this.videoEl,
     getDuration: () => this.progressBar.getDuration(),
-    log: seeklog,
+    log: this.seeklog,
   });
   private readonly overlay = new OverlayView({
     $root: this.$root,
@@ -131,6 +136,7 @@ class PlayerController implements PlayerFsmCtx {
     selectedSub: () => this.state.sub,
     hlsInstance: () => this.engine.instance,
     videoEl: () => this.videoEl,
+    log: this.olog,
   });
   private readonly panel = new Panel(this.$root, {
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
@@ -157,12 +163,16 @@ class PlayerController implements PlayerFsmCtx {
     },
     getDuration: () => this.progressBar.getDuration(),
     getDroppedFrames: () => this.overlay.getDroppedFrames(),
-    log: watchlog,
+    log: this.watchlog,
   });
 
   // Flags
   private playbackStarted = false;
   private fsm: Fsm<PlayerState, PlayerFsmCtx, PlayerEvent> | null = null;
+
+  constructor() {
+    installCtLogShim(this.hlslog);
+  }
 
   // --- PlayerFsmCtx ---
 
@@ -262,10 +272,10 @@ class PlayerController implements PlayerFsmCtx {
 
   private loadAndPlay(): void {
     if (!this.media.item) {
-      medlog.error('loadAndPlay: no item — leaving spinner visible');
+      this.medlog.error('loadAndPlay: no item — leaving spinner visible');
       return;
     }
-    medlog.info('loadAndPlay start season={s} episode={e} video={v} hasSeasons={hs} hasVideos={hv}', {
+    this.medlog.info('loadAndPlay start season={s} episode={e} video={v} hasSeasons={hs} hasVideos={hv}', {
       s: this.media.season, e: this.media.episode, v: this.media.video,
       hs: !!this.media.item.seasons, hv: !!this.media.item.videos,
     });
@@ -274,23 +284,26 @@ class PlayerController implements PlayerFsmCtx {
 
     try {
       if (this.media.season !== undefined && this.media.episode !== undefined) {
-        medlog.info('calling findEpisodeMedia');
+        this.medlog.info('calling findEpisodeMedia');
         found = findEpisodeMedia(this.media.item, this.media.season, this.media.episode);
-        medlog.info('findEpisodeMedia ok found={f}', { f: !!found });
-        pos = getResumeTime(this.media.item, this.media.watching, this.media.season, this.media.episode);
-        medlog.info('getResumeTime ok pos={pos}', { pos });
+        this.medlog.info('findEpisodeMedia ok found={f}', { f: !!found });
+        pos = this.mediaService.getResumeTime({
+          item: this.media.item, watching: this.media.watching,
+          season: this.media.season, episode: this.media.episode,
+        });
+        this.medlog.info('getResumeTime ok pos={pos}', { pos });
         this.watchTracker.setWasWatched(isEpisodeWatched(this.media.item, this.media.season, this.media.episode));
-        medlog.info('isEpisodeWatched ok');
+        this.medlog.info('isEpisodeWatched ok');
       } else if (this.media.video !== undefined) {
-        medlog.info('calling findVideoMedia');
+        this.medlog.info('calling findVideoMedia');
         found = findVideoMedia(this.media.item, this.media.video);
-        medlog.info('findVideoMedia ok found={f}', { f: !!found });
-        pos = getResumeTime(this.media.item, this.media.watching, undefined, undefined, this.media.video);
+        this.medlog.info('findVideoMedia ok found={f}', { f: !!found });
+        pos = this.mediaService.getResumeTime({ item: this.media.item, watching: this.media.watching, video: this.media.video });
         this.watchTracker.setWasWatched(isVideoWatched(this.media.item, this.media.video));
       }
     } catch (e) {
       const err = e as Error;
-      medlog.error('loadAndPlay find* threw: {msg} stack={stack}', {
+      this.medlog.error('loadAndPlay find* threw: {msg} stack={stack}', {
         msg: err && err.message ? err.message : String(e),
         stack: err && err.stack ? err.stack.substring(0, 600) : '',
       });
@@ -299,11 +312,11 @@ class PlayerController implements PlayerFsmCtx {
     }
 
     if (!found) {
-      medlog.error('loadAndPlay: findEpisode/findVideo returned null');
+      this.medlog.error('loadAndPlay: findEpisode/findVideo returned null');
       this.reportFatal(); this.errorView.showMessage('Видео не найдено');
       return;
     }
-    medlog.info('loadAndPlay found mid={mid} title={title} audios={audios}', {
+    this.medlog.info('loadAndPlay found mid={mid} title={title} audios={audios}', {
       mid: found.mid, title: found.title, audios: found.audios.length,
     });
 
@@ -313,8 +326,8 @@ class PlayerController implements PlayerFsmCtx {
     this.media.audios = found.audios;
     const prefs = getTitlePrefs(this.media.item.id);
 
-    loadMediaLinks(found.mid, (files, subs) => {
-      medlog.info('loadMediaLinks cb files={files} subs={subs}', { files: files.length, subs: subs.length });
+    this.mediaService.loadLinks(found.mid, (files, subs) => {
+      this.medlog.info('loadMediaLinks cb files={files} subs={subs}', { files: files.length, subs: subs.length });
       this.media.files = files.slice().sort((a, b) => b.w - a.w);
       this.media.subs = subs.filter((s) => s.url && !s.embed);
       const q = restoreQualityIndex(this.media.files, prefs);
@@ -322,11 +335,11 @@ class PlayerController implements PlayerFsmCtx {
       const sub = restoreSubIndex(this.media.subs, prefs);
 
       if (this.media.files.length === 0) {
-        medlog.error('loadAndPlay: no files — showing Видео не найдено');
+        this.medlog.error('loadAndPlay: no files — showing Видео не найдено');
         this.reportFatal(); this.errorView.showMessage('Видео не найдено');
         return;
       }
-      medlog.info('calling startPlayback q={q} a={a} sub={sub} pos={pos}', { q, a, sub, pos });
+      this.medlog.info('calling startPlayback q={q} a={a} sub={sub} pos={pos}', { q, a, sub, pos });
       const epPrefix = (this.media.season !== undefined && this.media.episode !== undefined)
         ? 'S' + this.media.season + 'E' + this.media.episode + ' ' : '';
       this.startPlayback({ quality: q, audio: a, sub, position: pos, paused: false }, itemTitle + ' - ' + epPrefix + this.media.title);
@@ -339,7 +352,7 @@ class PlayerController implements PlayerFsmCtx {
   }
 
   private startPlayback(next: PlayState, title: string): void {
-    plog.info('startPlayback {pos} {quality} {audio} {sub} {paused}', {
+    this.plog.info('startPlayback {pos} {quality} {audio} {sub} {paused}', {
       pos: next.position, quality: next.quality, audio: next.audio, sub: next.sub, paused: next.paused,
     });
     this.state = { quality: next.quality, audio: next.audio, sub: next.sub, position: next.position, paused: next.paused };
@@ -355,7 +368,7 @@ class PlayerController implements PlayerFsmCtx {
     const needSub = next.sub !== this.state.sub;
     const needSeek = !needSource && Math.abs(next.position - this.currentPosition()) > 2;
 
-    plog.info('continuePlaying {needSource} {needSeek} {needSub}', {
+    this.plog.info('continuePlaying {needSource} {needSeek} {needSub}', {
       needSource, needSeek, needSub,
       pos: next.position, quality: next.quality, audio: next.audio, sub: next.sub,
       paused: next.paused, hasVideo: !!this.videoEl,
@@ -378,7 +391,7 @@ class PlayerController implements PlayerFsmCtx {
     }
 
     if (needSub && this.videoEl) {
-      loadSubtitleTrack(this.videoEl, this.$root, this.media.subs, this.state.sub);
+      this.subtitleLoader.load(this.videoEl, this.$root, this.media.subs, this.state.sub);
     }
   }
 
@@ -413,13 +426,13 @@ class PlayerController implements PlayerFsmCtx {
 
   private onSourceReady(): void {
     if (!this.videoEl) return;
-    plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', {
+    this.plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', {
       pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime,
     });
     if (!this.state.paused) this.videoEl.play();
     this.playbackStarted = true;
     if (this.state.sub >= 0 && this.videoEl) {
-      loadSubtitleTrack(this.videoEl, this.$root, this.media.subs, this.state.sub);
+      this.subtitleLoader.load(this.videoEl, this.$root, this.media.subs, this.state.sub);
     }
     this.overlay.hideSpinner();
     this.watchTracker.start();
@@ -444,7 +457,7 @@ class PlayerController implements PlayerFsmCtx {
       trackNavigator: this.trackNavigator,
       errorView: this.errorView,
       sourceUrl: url,
-      log: hlslog,
+      log: this.hlslog,
       onBack: () => router.goBack(),
       onFatalError: () => this.reportFatal(),
     };
@@ -509,7 +522,7 @@ class PlayerController implements PlayerFsmCtx {
     if (kc === TvKey.TrackPrev) { this.trackNavigator.navigate(-1); e.preventDefault(); return; }
     const ev = this.keyToEvent(kc);
     if (!ev) return;
-    keylog.info('key kc={kc} state={st} ev={ev}', {
+    this.keylog.info('key kc={kc} state={st} ev={ev}', {
       kc, st: this.fsm ? this.fsm.state : 'null', ev: ev.type,
     });
     if (this.fsm) this.fsm.send(ev);
@@ -527,7 +540,7 @@ class PlayerController implements PlayerFsmCtx {
 
     PageUtils.showSpinnerIn(this.$root);
     const id = params.id!;
-    plog.info('mount start id={id} season={s} episode={e} video={v}', {
+    this.plog.info('mount start id={id} season={s} episode={e} video={v}', {
       id, s: params.season, e: params.episode, v: params.video,
     });
 
@@ -536,13 +549,13 @@ class PlayerController implements PlayerFsmCtx {
         try {
           this.media.item = item;
           this.media.watching = watching;
-          plog.info('mount loadItemWithWatching ok title={title} hasWatching={hw}', {
+          this.plog.info('mount loadItemWithWatching ok title={title} hasWatching={hw}', {
             title: item.title, hw: !!watching,
           });
           this.loadAndPlay();
         } catch (e) {
           const err = e as Error;
-          plog.error('mount handler threw: {msg} stack={stack}', {
+          this.plog.error('mount handler threw: {msg} stack={stack}', {
             msg: err && err.message ? err.message : String(e),
             stack: err && err.stack ? err.stack.substring(0, 600) : '',
           });
@@ -551,7 +564,7 @@ class PlayerController implements PlayerFsmCtx {
         }
       },
       () => {
-        plog.error('mount loadItemWithWatching failed');
+        this.plog.error('mount loadItemWithWatching failed');
         this.reportFatal();
         this.errorView.showMessage('Ошибка загрузки');
       }
@@ -570,9 +583,15 @@ class PlayerController implements PlayerFsmCtx {
 
 // --- Export ---
 
-const controller = new PlayerController();
+// Per-playback controller: instantiated on mount so each session gets a fresh traceId.
+let controller: PlayerController | null = null;
 
 export const playerPage: Page = {
-  mount: (params) => controller.mount(params),
-  unmount: () => controller.unmount(),
+  mount: (params) => {
+    controller = new PlayerController();
+    controller.mount(params);
+  },
+  unmount: () => {
+    if (controller) { controller.unmount(); controller = null; }
+  },
 };

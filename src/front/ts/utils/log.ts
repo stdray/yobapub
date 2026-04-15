@@ -45,7 +45,7 @@ const emit = (level: Level, template: string, props: Record<string, unknown>, tr
   }
 };
 
-const generateTraceId = (): string => {
+export const generateTraceId = (): string => {
   const chars = '0123456789abcdef';
   let result = '';
   for (let i = 0; i < 4; i++) result += chars[Math.floor(Math.random() * 16)];
@@ -63,14 +63,13 @@ const withCategory = (category: string, props?: Record<string, unknown>): Record
 };
 
 export class Logger {
-  private traceId?: string;
+  private readonly traceId: string;
 
-  constructor(private readonly category: string) {}
+  constructor(private readonly category: string, traceId?: string) {
+    this.traceId = traceId || generateTraceId();
+  }
 
-  setTraceId = (id: string): void => { this.traceId = id; };
-  newTraceId = (): string => { this.traceId = generateTraceId(); return this.traceId; };
-  getTraceId = (): string | undefined => this.traceId;
-  clearTraceId = (): void => { this.traceId = undefined; };
+  getTraceId = (): string => this.traceId;
 
   info = (template: string, props?: Record<string, unknown>): void => {
     emit('Information', template, withCategory(this.category, props), this.traceId);
