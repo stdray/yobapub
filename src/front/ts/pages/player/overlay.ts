@@ -172,23 +172,31 @@ export class OverlayView {
     }
     if (line1.length > 0) lines.push(line1.join(' &bull; '));
 
-    // Line 2: HLS + quality + codec + bitrate
-    const line2: string[] = ['HLS'];
+    // Line 2: HLS + quality + codec + bitrate. Codec comes from the actually
+    // selected hls.js level (videoCodec from the manifest), not from API
+    // metadata on the file — the API describes hls4 multi-variant files as
+    // HEVC even when pinQualityLevel ends up matching an avc1 variant first.
+    const line2: string[] = ['HLS ' + (Hls.version || '?')];
     const files = this.deps.files();
     const sq = this.deps.selectedQuality();
     if (files.length > 0 && sq < files.length) {
       const f = files[sq];
       const ql = f.quality || (f.h + 'p');
       line2.push(ql + ' ' + f.w + '×' + f.h);
-      if (f.codec) line2.push(f.codec.toUpperCase());
     }
     const hls = this.deps.hlsInstance();
-    if (hls) {
-      const h = hls as unknown as { readonly levels?: ReadonlyArray<{ readonly bitrate?: number }>; readonly currentLevel?: number };
-      const level = h.levels && h.currentLevel !== undefined && h.currentLevel >= 0
-        ? h.levels[h.currentLevel]
-        : undefined;
-      if (level && level.bitrate) {
+    const level = hls && hls.levels && hls.currentLevel !== undefined && hls.currentLevel >= 0
+      ? hls.levels[hls.currentLevel]
+      : undefined;
+    if (level) {
+      const vc = level.videoCodec;
+      if (vc) {
+        const short = /^hvc1|^hev1/i.test(vc) ? 'HEVC'
+          : /^avc1/i.test(vc) ? 'H.264'
+          : vc.toUpperCase();
+        line2.push(short);
+      }
+      if (level.bitrate) {
         line2.push((level.bitrate / 1000000).toFixed(1) + ' Mbps');
       }
     }

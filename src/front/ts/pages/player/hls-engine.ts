@@ -109,8 +109,8 @@ export class HlsEngine {
       quality: ctx.quality, audio: ctx.audio, sub: ctx.sub,
     });
 
-    const hlsVersion = (Hls as unknown as { version?: string }).version || 'unknown';
-    const isModern = /^1\./.test(hlsVersion);
+    const hlsVersion = Hls.version || 'unknown';
+    const isModern = /^[1-9]\d*\./.test(hlsVersion) && !/^0\./.test(hlsVersion);
     log.info('[hls] version={v} mode={mode} isSupported={s}', {
       v: hlsVersion, mode: isModern ? 'modern' : 'legacy', s: Hls.isSupported(),
     });
