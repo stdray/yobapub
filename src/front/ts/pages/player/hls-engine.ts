@@ -301,6 +301,12 @@ export class HlsEngine {
         hls.stopLoad();
         v.currentTime = target;
         hls.startLoad(target);
+        // Drop the [0..firstFragEnd] range left over from sn=1. We can't set
+        // startPosition on the config (Tizen 2.3 _seekToStartPos desyncs A/V),
+        // so we always pre-load sn=1 — but after the real seek lands that data
+        // is dead weight in the SourceBuffer. Supported by both hls.js 0.14 and
+        // 1.5+, type omitted so both audio & video are flushed.
+        hls.trigger(Hls.Events.BUFFER_FLUSHING, { startOffset: 0, endOffset: target - 1 });
       }
     });
 
