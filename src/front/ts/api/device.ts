@@ -112,7 +112,7 @@ class DeviceApi {
     const d = $.Deferred<void>();
     this.getDeviceId().then(
       (id: number) => {
-        apiClient.apiPost('/v1/device/' + id + '/settings', settings).then(
+        apiClient.apiPostWithRefresh('/v1/device/' + id + '/settings', settings).then(
           () => { d.resolve(); },
           (err: JQueryXHR) => { d.reject(err); }
         );

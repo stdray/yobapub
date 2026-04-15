@@ -156,7 +156,7 @@ class Sidebar {
 
   private render(): void {
     const up = deviceApi.getUserProfile();
-    const profile = up && up.avatar
+    const profile = up && up.username
       ? { avatar: storage.proxyPosterUrl(up.avatar), username: up.username, days: up.subscriptionDays }
       : null;
     this.$el.html(tplCompiled({ items: this.buildItems(), profile: profile }));

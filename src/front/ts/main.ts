@@ -85,6 +85,10 @@ const notifyDevice = (): void => {
         text: err ? String(err.statusText || '') : '',
         resp: err ? String(err.responseText || '').substring(0, 200) : '',
       });
+      if (err && (err.status === 401 || err.status === 403)) {
+        storage.clearTokens();
+        router.navigateLogin();
+      }
     }
   );
 };
