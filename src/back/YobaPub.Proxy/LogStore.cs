@@ -60,13 +60,8 @@ public class LogStore : IDisposable
 
     private static IEnumerable<LogEntry> ApplyFilters(IEnumerable<LogEntry> rows, LogsQuery q)
     {
-        var levels = (q.Level ?? []).Where(l => !string.IsNullOrEmpty(l)).ToArray();
-        if (levels.Length > 0)
-            rows = rows.Where(x => levels.Contains(x.Level));
-        if (!string.IsNullOrEmpty(q.Device))
-            rows = rows.Where(x => x.DeviceId.StartsWith(q.Device, StringComparison.OrdinalIgnoreCase));
-        if (!string.IsNullOrEmpty(q.TraceId))
-            rows = rows.Where(x => q.TraceId.Equals(x.TraceId, StringComparison.OrdinalIgnoreCase));
+        foreach (IFieldFilter f in q.Filters ?? [])
+            rows = rows.Where(f.Apply);
         if (!string.IsNullOrEmpty(q.Search))
         {
             var s = q.Search;

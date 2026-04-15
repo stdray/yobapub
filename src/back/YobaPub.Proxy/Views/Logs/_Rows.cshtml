@@ -1,60 +1,42 @@
 @model LogsViewModel
 @{
     var q = Model.Query;
-    var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
-    var levelParts = (q.Level ?? []).Where(l => !string.IsNullOrEmpty(l)).Select(l => $"level={Uri.EscapeDataString(l)}");
-    var filterQs = string.Join("&", levelParts.Concat(new[] {
-        $"device={Uri.EscapeDataString(q.Device ?? "")}",
-        $"traceId={Uri.EscapeDataString(q.TraceId ?? "")}",
-        $"search={Uri.EscapeDataString(q.Search ?? "")}"
-    }));
-    var isRefresh = q.After != null;
-    var rowClass  = isRefresh ? "row-new" : q.Before != null ? "row-old" : "";
+    var tz = UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset;
 }
-@if (isRefresh && Model.Entries.Length > 0)
+<tr data-top-id="@Model.TopId" data-last-id="@Model.LastId" data-has-more="@(Model.HasMore ? "1" : "0")" class="hidden"></tr>
+@if (Model.Entries.Length == 0)
 {
-    <tr id="empty-row" class="hidden" hx-swap-oob="outerHTML"></tr>
-}
-@if (isRefresh)
-{
-    <tr id="top-sentinel" class="hidden"
-        hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&after=@Model.TopId"
-        hx-trigger="every 10s [document.getElementById('autoRefresh').checked]"
-        hx-swap="outerHTML"
-        hx-target="this">
-    </tr>
+    <tr><td colspan="8" class="empty">Записей нет</td></tr>
 }
 @foreach (var e in Model.Entries)
 {
     var cls = e.Level switch { "Error" => "E", "Warning" => "W", "Verbose" => "V", _ => "" };
     var devPrefix = e.DeviceId.Length >= 8 ? e.DeviceId[..8] : e.DeviceId;
-    <tr class="@cls @rowClass">
-        <td class="ts"><a href="/admin/logs/@e.Id">@e.ServerTs.FormatTime(UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset)</a></td>
-        <td class="dev" title="@e.DeviceId">@devPrefix</td>
+    var cat = e.Category ?? "";
+    <tr class="@cls">
+        <td class="ts"><a href="/admin/logs/@e.Id">@e.ServerTs.FormatTime(tz)</a></td>
+        <td class="dev" title="@e.DeviceId">
+            <span class="cell">@devPrefix<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('DeviceId', '@e.DeviceId')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('DeviceId', '@e.DeviceId')">&#x2715;</a></span>
+        </td>
         <td class="trace">
             @if (!string.IsNullOrEmpty(e.TraceId))
             {
-                <a class="trace-btn" href="@Url.Action("Index", new { level = q.Level, device = devPrefix, search = q.Search, traceId = e.TraceId, pageSize })"
-                   title="Фильтр по device + trace">@e.TraceId</a>
+                <span class="cell">@e.TraceId<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('TraceId', '@e.TraceId')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('TraceId', '@e.TraceId')">&#x2715;</a></span>
             }
         </td>
-        <td class="ip">@e.ClientIp</td>
-        <td class="lvl lvl-@e.Level">@e.Level.LevelAbbr()</td>
-        @{ var cat = e.Category ?? ""; }
-        <td class="cat" title="@cat">@cat.ShortName()</td>
+        <td class="ip">
+            <span class="cell">@e.ClientIp<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('ClientIp', '@e.ClientIp')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('ClientIp', '@e.ClientIp')">&#x2715;</a></span>
+        </td>
+        <td class="lvl lvl-@e.Level">
+            <span class="cell">@e.Level.LevelAbbr()<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('Level', '@e.Level')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('Level', '@e.Level')">&#x2715;</a></span>
+        </td>
+        <td class="cat" title="@cat">
+            <span class="cell">@cat.ShortName()<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('Category', '@cat')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('Category', '@cat')">&#x2715;</a></span>
+        </td>
         <td class="msg">@e.Message</td>
         <td class="act">
             <button class="copy-row-btn" type="button" title="Копировать"
                     data-copy-url="/admin/logs/@e.Id/text">&#x2398;</button>
         </td>
-    </tr>
-}
-@if (!isRefresh && Model.HasMore && Model.LastId != null)
-{
-    <tr hx-get="/admin/logs/more?@filterQs&pageSize=@pageSize&before=@Model.LastId"
-        hx-trigger="intersect once"
-        hx-swap="outerHTML"
-        hx-target="this">
-        <td colspan="8" class="load-more">&#x2193;</td>
     </tr>
 }

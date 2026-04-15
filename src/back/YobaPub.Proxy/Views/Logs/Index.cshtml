@@ -1,93 +1,63 @@
 @model LogsViewModel
 @{
     ViewData["Title"] = "YobaPub Logs";
-    var q = Model.Query;
-    var pageSize = Math.Clamp(q.PageSize > 0 ? q.PageSize : 100, 1, 500);
-    var levelParts = (q.Level ?? []).Where(l => !string.IsNullOrEmpty(l)).Select(l => $"level={Uri.EscapeDataString(l)}");
-    var filterQs = string.Join("&", levelParts.Concat(new[] {
-        $"device={Uri.EscapeDataString(q.Device ?? "")}",
-        $"traceId={Uri.EscapeDataString(q.TraceId ?? "")}",
-        $"search={Uri.EscapeDataString(q.Search ?? "")}"
-    }));
-    var currentQs = $"{filterQs}&pageSize={pageSize}";
+    var tz = UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset;
 }
-<div id="page-content" data-filter-qs="@filterQs">
+<div id="page-content"
+     x-data="logsPage()"
+     x-init="init(@Json.Serialize(Model.TopId), @Json.Serialize(Model.LastId))">
 <header>
-  <h1>YobaPub Logs</h1>
-  <form id="log-filter-form" class="filter-form"
-        hx-get="/admin/logs"
-        hx-target="#page-content"
-        hx-select="#page-content"
-        hx-swap="outerHTML"
-        hx-push-url="true"
-        hx-trigger="change">
-    <select name="level" id="level-select" multiple class="hidden">
-      @foreach (var lvl in new[] { "Error", "Warning", "Information", "Verbose" })
-      {
-        <option value="@lvl" selected="@((q.Level ?? []).Contains(lvl) ? "selected" : null)">@lvl</option>
-      }
-    </select>
-    <input type="hidden" name="device" value="@q.Device">
-    <input type="text" name="search" value="@q.Search" placeholder="Поиск..."
-           class="search-input" hx-trigger="change, keyup[key=='Enter']">
-    <input type="hidden" name="traceId" value="@q.TraceId">
-    <select name="pageSize">
+  <form class="filter-form" @@submit.prevent="search()">
+    <input type="text" x-model="search" placeholder="Поиск..." class="search-input"
+           @@keydown.enter.prevent="doSearch()">
+    <select x-model.number="pageSize" @@change="doSearch()">
       @foreach (var ps in new[] { 50, 100, 200, 500 })
       {
-        <option value="@ps" selected="@(pageSize == ps ? "selected" : null)">@ps / стр.</option>
+        <option value="@ps">@ps / стр.</option>
       }
     </select>
-    @if (!string.IsNullOrEmpty(q.TraceId))
-    {
-      <span class="active-filter">trace: @q.TraceId
-        <a href="@Url.Action("Index", new { device = q.Device, search = q.Search, pageSize })"
-           title="Сбросить фильтр по trace">&#x2715;</a>
-      </span>
-    }
+    <button type="submit">Найти</button>
+    <button type="button" @@click="reset()">Сброс</button>
   </form>
-  <label><input type="checkbox" id="autoRefresh" checked hx-preserve="true"> Auto 10s</label>
-  <span id="status"></span>
+  <div class="active-filters">
+    <template x-for="chip in chips()" :key="chip.key">
+      <span class="active-filter" :class="chip.mode">
+        <b x-text="chip.field"></b>
+        <span x-text="chip.mode === 'inc' ? '=' : '≠'"></span>
+        <span x-text="chip.value"></span>
+        <a href="#" @@click.prevent="removeFilter(chip.field, chip.mode, chip.value)">&#x2715;</a>
+      </span>
+    </template>
+  </div>
+  <label><input type="checkbox" x-model="autoRefresh"> Auto 10s</label>
+  <span id="status" x-text="status"></span>
   <div class="dropdown">
     <button type="button" class="dropdown-toggle">Выгрузить &#x25BE;</button>
     <div class="dropdown-menu">
-      <a href="/admin/logs/download?@(filterQs)&limit=15">Последние 15</a>
-      <a href="/admin/logs/download?@(filterQs)&limit=50">Последние 50</a>
-      <a href="/admin/logs/download?@(filterQs)">Загрузить все</a>
+      <a href="#" @@click.prevent="download(15)">Последние 15</a>
+      <a href="#" @@click.prevent="download(50)">Последние 50</a>
+      <a href="#" @@click.prevent="download(0)">Загрузить все</a>
     </div>
   </div>
   <div class="dropdown">
     <button type="button" class="dropdown-toggle">Копировать &#x25BE;</button>
     <div class="dropdown-menu">
-      <a href="#" data-copy-logs="15">Последние 15</a>
-      <a href="#" data-copy-logs="50">Последние 50</a>
-      <a href="#" data-copy-logs="0">Копировать все</a>
+      <a href="#" @@click.prevent="copy(15)">Последние 15</a>
+      <a href="#" @@click.prevent="copy(50)">Последние 50</a>
+      <a href="#" @@click.prevent="copy(0)">Копировать все</a>
     </div>
   </div>
   <div class="dropdown">
     <button type="button" class="dropdown-toggle">Поделиться &#x25BE;</button>
     <div class="dropdown-menu">
-      <a href="#" data-share-logs="1">На 1 день</a>
-      <a href="#" data-share-logs="7">На 7 дней</a>
-      <a href="#" data-share-logs="30">На 30 дней</a>
-      <a href="#" data-share-logs="0">Без срока</a>
+      <a href="#" @@click.prevent="share(1)">На 1 день</a>
+      <a href="#" @@click.prevent="share(7)">На 7 дней</a>
+      <a href="#" @@click.prevent="share(30)">На 30 дней</a>
+      <a href="#" @@click.prevent="share(0)">Без срока</a>
     </div>
   </div>
-  <form class="form-inline"
-        hx-post="/admin/logs/clear"
-        hx-target="#page-content"
-        hx-select="#page-content"
-        hx-swap="outerHTML"
-        hx-confirm="Удалить все логи?">
-    @foreach (var lvl in q.Level ?? [])
-    {
-      <input type="hidden" name="level" value="@lvl">
-    }
-    <input type="hidden" name="device" value="@q.Device">
-    <input type="hidden" name="traceId" value="@q.TraceId">
-    <input type="hidden" name="search" value="@q.Search">
-    <input type="hidden" name="pageSize" value="@pageSize">
-    <button type="submit" class="danger">Очистить</button>
-  </form>
+  <button type="button" class="danger"
+          @@click="if (confirm('Удалить все логи?')) clearLogs()">Очистить</button>
 </header>
 <table>
   <thead>
@@ -96,36 +66,17 @@
       <th class="dev">Device</th>
       <th class="trace">Trace</th>
       <th class="ip">IP</th>
-      <th class="lvl lvl-head">
-        <span id="lvl-toggle" class="@((q.Level ?? []).Length > 0 ? "lvl-active" : "")">Lvl</span>
-        <div id="lvl-dropdown" class="lvl-dropdown">
-          @foreach (var lvl in new[] { "Error", "Warning", "Information", "Verbose" })
-          {
-            <label>
-              <input type="checkbox" value="@lvl" class="lvl-cb"
-                     @((q.Level ?? []).Contains(lvl) ? "checked" : "")>
-              <span>@lvl</span>
-            </label>
-          }
-        </div>
-      </th>
+      <th class="lvl">Lvl</th>
       <th class="cat">Category</th>
       <th class="msg">Message</th>
       <th class="act"></th>
     </tr>
   </thead>
-  <tbody>
-    <tr id="top-sentinel" class="hidden"
-        hx-get="/admin/logs/more?@currentQs&after=@Model.TopId"
-        hx-trigger="every 10s [document.getElementById('autoRefresh').checked]"
-        hx-swap="outerHTML"
-        hx-target="this">
-    </tr>
-    @if (Model.Entries.Length == 0)
-    {
-      <tr id="empty-row"><td colspan="8" class="empty">Записей нет</td></tr>
-    }
+  <tbody id="logs-tbody">
     @await Html.PartialAsync("_Rows", Model)
   </tbody>
 </table>
+<div class="load-more-wrap" x-show="hasMore" x-ref="loadMoreEl">
+  <button type="button" @@click="loadMore()" :disabled="loading">Загрузить ещё</button>
+</div>
 </div>

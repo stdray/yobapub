@@ -19,9 +19,7 @@ public class LogShareStore
         var share = new LogShare
         {
             Id = Guid.NewGuid(),
-            Level = (query.Level ?? []).Where(l => !string.IsNullOrEmpty(l)).ToArray(),
-            Device = query.Device ?? "",
-            TraceId = query.TraceId ?? "",
+            Filters = query.Filters ?? [],
             Search = query.Search ?? "",
             PageSize = query.PageSize > 0 ? query.PageSize : 100,
             CreatedAt = now,
@@ -38,6 +36,8 @@ public class LogShareStore
         return _col.DeleteMany(x => x.ExpiresAt.HasValue && x.ExpiresAt.Value < now);
     }
 
+    public int DeleteAll() => _col.DeleteAll();
+
     public LogShare? Get(Guid token)
     {
         var share = _col.FindOne(x => x.Id == token);
@@ -49,9 +49,7 @@ public class LogShareStore
 
     public static LogsQuery ToQuery(LogShare share) => new()
     {
-        Level = share.Level,
-        Device = share.Device,
-        TraceId = share.TraceId,
+        Filters = share.Filters ?? [],
         Search = share.Search,
         PageSize = share.PageSize
     };

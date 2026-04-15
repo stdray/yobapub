@@ -3,9 +3,7 @@ namespace YobaPub.Proxy.Models;
 public class LogShare
 {
     public Guid Id { get; set; }
-    public string[] Level { get; set; } = [];
-    public string Device { get; set; } = "";
-    public string TraceId { get; set; } = "";
+    public FieldFilter<string>[] Filters { get; set; } = [];
     public string Search { get; set; } = "";
     public int PageSize { get; set; } = 100;
     public DateTimeOffset CreatedAt { get; set; }
@@ -21,4 +19,3 @@ public class SharedLogsViewModel
     public DateTimeOffset? ExpiresAt { get; init; }
     public bool HasMore { get; init; }
 }
-

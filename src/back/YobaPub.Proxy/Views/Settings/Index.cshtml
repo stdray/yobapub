@@ -67,6 +67,20 @@
           </form>
         </td>
       </tr>
+      <tr>
+        <td>Сохранённые ссылки на логи</td>
+        <td></td>
+        <td>
+          <form class="form-inline"
+                hx-post="/admin/settings/clear-shares"
+                hx-target="#page-content"
+                hx-select="#page-content"
+                hx-swap="outerHTML"
+                hx-confirm="Удалить все сохранённые запросы логов?">
+            <button type="submit" class="danger">Очистить</button>
+          </form>
+        </td>
+      </tr>
     </tbody>
   </table>
 </div>

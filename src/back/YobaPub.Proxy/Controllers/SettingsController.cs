@@ -6,7 +6,7 @@ namespace YobaPub.Proxy.Controllers;
 
 [Route("admin/settings")]
 [Authorize]
-public class SettingsController(DebugSettingsStore debugSettings, UserSettingsStore userSettings) : Controller
+public class SettingsController(DebugSettingsStore debugSettings, UserSettingsStore userSettings, LogShareStore shares) : Controller
 {
     private string Login => User.Identity!.Name!;
 
@@ -30,6 +30,13 @@ public class SettingsController(DebugSettingsStore debugSettings, UserSettingsSt
     public IActionResult SetMaxLogEntries(int max)
     {
         debugSettings.SetMaxLogEntries(Math.Max(100, max));
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("clear-shares")]
+    public IActionResult ClearShares()
+    {
+        shares.DeleteAll();
         return RedirectToAction(nameof(Index));
     }
 
