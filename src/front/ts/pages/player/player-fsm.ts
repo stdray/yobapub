@@ -23,6 +23,8 @@ export type PlayerEvent =
   | { readonly type: 'KEY_ENTER' }
   | { readonly type: 'KEY_BACK' }
   | { readonly type: 'KEY_PLAY_PAUSE' }
+  | { readonly type: 'KEY_PLAY' }
+  | { readonly type: 'KEY_PAUSE' }
   | { readonly type: 'SOURCE_READY' }
   | { readonly type: 'BUFFERING' }
   | { readonly type: 'FATAL_ERROR' };
@@ -39,6 +41,8 @@ export interface PlayerFsmCtx {
 
   // --- playback ---
   togglePlay(): void;
+  play(): void;
+  pause(): void;
   exit(): void;
 
   // --- panel (action buttons) ---
@@ -96,6 +100,8 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
         KEY_LEFT:       'seeking',
         KEY_RIGHT:      'seeking',
         KEY_PLAY_PAUSE: { target: 'seekFocus', action: (c) => c.togglePlay() },
+        KEY_PLAY:       { target: 'seekFocus', action: (c) => c.play() },
+        KEY_PAUSE:      { target: 'seekFocus', action: (c) => c.pause() },
         KEY_ENTER:      { target: 'seekFocus', action: (c) => c.togglePlay() },
         BUFFERING:      'loading',
         FATAL_ERROR:    'error',
@@ -112,6 +118,8 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
         KEY_LEFT:       'seeking',
         KEY_RIGHT:      'seeking',
         KEY_PLAY_PAUSE: { target: 'seekFocus', action: (c) => c.togglePlay() },
+        KEY_PLAY:       { target: 'seekFocus', action: (c) => c.play() },
+        KEY_PAUSE:      { target: 'seekFocus', action: (c) => c.pause() },
         KEY_ENTER:      { target: 'seekFocus', action: (c) => c.togglePlay() },
         KEY_BACK:       { target: 'idle', action: (c) => c.markSeekClosed() },
         BUFFERING:      'loading',

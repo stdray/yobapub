@@ -163,10 +163,11 @@ class PlayerController implements PlayerFsmCtx {
 
   showSpinner(): void { this.overlay.showSpinner(); }
   hideSpinner(): void { this.overlay.hideSpinner(); }
-  showBar(): void { this.overlay.showBar(); this.syncPlayIcon(); }
+  showBar(): void { this.overlay.showBar(); this.panel.refreshButtons(); this.syncPlayIcon(); }
   hideBar(): void { this.overlay.hideBar(); }
   private syncPlayIcon(): void {
-    this.overlay.setIcon(this.videoEl && !this.videoEl.paused ? 'play' : 'pause');
+    if (this.videoEl && this.videoEl.paused) this.overlay.setIcon('pause');
+    else this.overlay.hideIcon();
   }
   showError(): void { /* errorView drives itself */ }
   setProgressActive(active: boolean): void {
@@ -177,13 +178,18 @@ class PlayerController implements PlayerFsmCtx {
   wasLastModeButtons(): boolean { return this.panel.wasLastModeButtons(); }
   togglePlay(): void {
     if (!this.videoEl || !this.playbackStarted) return;
-    if (this.videoEl.paused) {
-      this.videoEl.play();
-      this.state.paused = false;
-    } else {
-      this.videoEl.pause();
-      this.state.paused = true;
-    }
+    if (this.videoEl.paused) this.play(); else this.pause();
+  }
+  play(): void {
+    if (!this.videoEl || !this.playbackStarted || !this.videoEl.paused) return;
+    this.videoEl.play();
+    this.state.paused = false;
+    this.syncPlayIcon();
+  }
+  pause(): void {
+    if (!this.videoEl || !this.playbackStarted || this.videoEl.paused) return;
+    this.videoEl.pause();
+    this.state.paused = true;
     this.syncPlayIcon();
   }
   exit(): void { this.destroyPlayer(); router.goBack(); }
@@ -484,7 +490,9 @@ class PlayerController implements PlayerFsmCtx {
       case TvKey.Left: case TvKey.Rw: return { type: 'KEY_LEFT' };
       case TvKey.Right: case TvKey.Ff: return { type: 'KEY_RIGHT' };
       case TvKey.Enter: return { type: 'KEY_ENTER' };
-      case TvKey.PlayPause: case TvKey.Play: case TvKey.Pause: return { type: 'KEY_PLAY_PAUSE' };
+      case TvKey.PlayPause: return { type: 'KEY_PLAY_PAUSE' };
+      case TvKey.Play: return { type: 'KEY_PLAY' };
+      case TvKey.Pause: return { type: 'KEY_PAUSE' };
       case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop: return { type: 'KEY_BACK' };
       default: return null;
     }

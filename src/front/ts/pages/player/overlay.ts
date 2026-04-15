@@ -6,7 +6,7 @@ import Hls from 'hls.js';
 
 const olog = new Logger('overlay');
 
-export type HudIcon = 'play' | 'pause' | 'rw' | 'ff';
+export type HudIcon = 'pause' | 'rw' | 'ff';
 
 export interface FrameCounters {
   readonly total: number;
@@ -30,7 +30,7 @@ interface OverlayDeps {
 const PROGRESS_TICK_MS = 1000;
 
 const ICON_SYMBOLS: Readonly<Record<HudIcon, string>> = {
-  play: '▶', pause: '❚❚', rw: '◀◀', ff: '▶▶',
+  pause: '❚❚', rw: '◀◀', ff: '▶▶',
 };
 
 const getFrameCounters = (videoEl: HTMLVideoElement | null): FrameCounters | null => {
@@ -97,7 +97,11 @@ export class OverlayView {
   }
 
   setIcon(icon: HudIcon): void {
-    this.$icon.get().text(ICON_SYMBOLS[icon]);
+    this.$icon.get().text(ICON_SYMBOLS[icon]).removeClass('hidden');
+  }
+
+  hideIcon(): void {
+    this.$icon.get().addClass('hidden');
   }
 
   updateBadge(): void {

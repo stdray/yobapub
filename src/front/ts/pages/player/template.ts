@@ -16,6 +16,7 @@ const tplPlayerCompiled = doT.template(`
   <div class="player">
     <video></video>
     <div class="player__spinner"><div class="spinner__circle"></div></div>
+    <div class="player__icon hidden"></div>
     <div class="player__hud hidden">
       <div class="player__info"></div>
       <div class="player__gradient"></div>
@@ -23,7 +24,6 @@ const tplPlayerCompiled = doT.template(`
         <div class="player__title">{{=it.title}}</div>
         <div class="player__episode">{{=it.episode}}</div>
       </div>
-      <div class="player__icon">&#9654;</div>
       <div class="player__bar">
         <div class="player__bar-wrap">
           <div class="player__actions">

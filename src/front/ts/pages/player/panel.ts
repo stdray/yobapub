@@ -289,6 +289,8 @@ export class Panel {
     if (pos < SECTION_COUNT) { this.btnPos = pos; this.renderButtons(); }
   }
 
+  refreshButtons(): void { this.renderButtons(); }
+
   private renderButtons(): void {
     const $btns = this.$actionBtns.get();
     for (let i = 0; i < SECTION_COUNT; i++) {

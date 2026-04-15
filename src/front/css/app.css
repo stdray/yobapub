@@ -702,7 +702,7 @@ html, body {
   left: 0;
   right: 140px;
   height: 14px;
-  top: 96px;
+  top: 140px;
   background: rgba(255,255,255,0.4);
   border-radius: 4px;
   box-shadow: 0 0 0 2px #e94560;
@@ -724,7 +724,7 @@ html, body {
 .player__bar-pct {
   position: absolute;
   right: -38px;
-  top: 52px;
+  top: -31px;
   width: 76px;
   height: 76px;
   border-radius: 50%;
@@ -754,7 +754,7 @@ html, body {
 .player__bar-duration {
   position: absolute;
   right: 0;
-  top: 68px;
+  top: 112px;
   line-height: 70px;
   font-size: 28px;
   color: #ccc;
