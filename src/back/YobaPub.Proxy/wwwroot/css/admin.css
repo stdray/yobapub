@@ -74,7 +74,7 @@ th {
   background: #222; color: #aaa; padding: 6px 8px; text-align: left;
   position: sticky; top: 74px; font-weight: normal; border-bottom: 1px solid #333;
 }
-td { padding: 3px 8px; border-bottom: 1px solid #222; vertical-align: top; }
+td { padding: 3px 8px; border-bottom: 1px solid #222; vertical-align: top; position: relative; }
 
 tr.E td { background: #2a1010; }
 tr.W td { background: #2a2010; }
@@ -95,7 +95,7 @@ tr.row-old td { animation: row-old 4s ease-out; }
 .ts a { color: #777; text-decoration: none; }
 .ts a:hover { color: #aaa; }
 .ts a:visited { color: #777; }
-.dev { color: #6af; width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev { color: #6af; width: 90px; white-space: nowrap; }
 .ip { color: #7c7; width: 120px; white-space: nowrap; }
 .lvl { width: 30px; text-align: center; font-size: 11px; letter-spacing: .02em; }
 .lvl-Error       { color: #e66; }
@@ -173,12 +173,12 @@ tr.row-old td { animation: row-old 4s ease-out; }
 .filter-field__inc:hover { background: #145014; color: #8f8; }
 .filter-field__exc:hover { background: #501414; color: #f88; }
 
-.cell { position: relative; display: inline-block; }
+.cell { display: block; overflow: hidden; text-overflow: ellipsis; }
 .cell__inc, .cell__exc {
   visibility: hidden; text-decoration: none; font-size: 11px;
   padding: 0 4px; border-radius: 2px;
   line-height: 14px;
-  position: absolute; bottom: 100%; z-index: 10;
+  position: absolute; top: 2px; z-index: 10;
 }
 .cell__inc { color: #8f8; background: #0a2a0a; right: 22px; }
 .cell__exc { color: #f88; background: #2a0a0a; right: 0; }
