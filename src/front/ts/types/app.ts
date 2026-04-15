@@ -1,4 +1,4 @@
-export type RouteName = 'login' | 'watching' | 'bookmarks' | 'movie' | 'serial' | 'player' | 'settings' | 'novelties' | 'search' | 'tv' | 'tv-player' | 'history';
+export type RouteName = 'login' | 'watching' | 'bookmarks' | 'movie' | 'serial' | 'player' | 'settings' | 'novelties' | 'search' | 'tv' | 'tv-player' | 'history' | 'test-player';
 
 export interface RouteParams {
   id?: number;

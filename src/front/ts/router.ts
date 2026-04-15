@@ -129,6 +129,10 @@ class Router {
   readonly navigateTvPlayer = (channelId: number, channelTitle: string, channelStream: string): void => {
     this.navigate('tv-player', { channelId, channelTitle, channelStream });
   };
+
+  readonly navigateTestPlayer = (id: number): void => {
+    this.navigate('test-player', { id });
+  };
 }
 
 export const router = new Router();
