@@ -19,6 +19,7 @@ public class WebViewActivity extends Activity {
     private FrameLayout fullscreenContainer;
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
+    private WebChromeClient chromeClient;
 
     private void enterImmersive() {
         getWindow().getDecorView().setSystemUiVisibility(
@@ -61,6 +62,7 @@ public class WebViewActivity extends Activity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setUserAgentString(settings.getUserAgentString() + " SmartTV YobaPub");
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
         // Scale 1920px layout to fit actual screen width (computed once at startup)
         android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
@@ -78,7 +80,7 @@ public class WebViewActivity extends Activity {
         }, "NativeApp");
 
         webView.setWebViewClient(new WebViewClient());
-        webView.setWebChromeClient(new WebChromeClient() {
+        chromeClient = new WebChromeClient() {
             @Override
             public void onShowCustomView(View view, CustomViewCallback callback) {
                 if (customView != null) {
@@ -103,7 +105,8 @@ public class WebViewActivity extends Activity {
                 webView.setVisibility(View.VISIBLE);
                 enterImmersive();
             }
-        });
+        };
+        webView.setWebChromeClient(chromeClient);
         webView.loadUrl(BuildConfig.APP_URL);
     }
 
@@ -117,7 +120,7 @@ public class WebViewActivity extends Activity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (customView != null) {
-                webView.getWebChromeClient().onHideCustomView();
+                chromeClient.onHideCustomView();
                 return true;
             }
             // Inject keydown(keyCode=8) into WebView so JS page handlers can intercept it first.

@@ -12,7 +12,7 @@
         android:required="false" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:usesCleartextTraffic="true"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
@@ -21,9 +21,8 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- TWA launcher activity (requires Chrome) -->
         <activity
-            android:name="su.p3o.yobapub.LauncherActivity"
+            android:name="su.p3o.yobapub.WebViewActivity"
             android:exported="true"
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize">
@@ -35,23 +34,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-
-            <meta-data
-                android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="https://yobapub.3po.su" />
         </activity>
-
-        <!-- WebView fallback (when Chrome is unavailable) -->
-        <activity
-            android:name="su.p3o.yobapub.WebViewActivity"
-            android:exported="false"
-            android:screenOrientation="landscape"
-            android:configChanges="orientation|screenSize" />
-
-        <!-- TWA asset verification -->
-        <meta-data
-            android:name="asset_statements"
-            android:value='[{"relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "web", "site": "https://yobapub.3po.su"}}]' />
 
     </application>
 

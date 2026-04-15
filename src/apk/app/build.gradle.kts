@@ -23,9 +23,9 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            val ksPath = System.getenv("ANDROID_KEYSTORE_PATH")
-            if (ksPath != null) {
+        val ksPath = System.getenv("ANDROID_KEYSTORE_PATH")
+        if (ksPath != null) {
+            create("release") {
                 storeFile = file(ksPath)
                 storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("ANDROID_KEY_ALIAS")
@@ -46,7 +46,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
         debug {
             applicationIdSuffix = ".dev"
@@ -60,9 +60,4 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-}
-
-dependencies {
-    implementation("androidx.browser:browser:1.8.0")
-    implementation("androidx.leanback:leanback:1.0.0")
 }
