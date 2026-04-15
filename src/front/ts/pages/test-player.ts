@@ -8,6 +8,8 @@ import { Logger } from '../utils/log';
 import { loadItemWithWatching } from '../api/items';
 import { MediaService } from './player/media';
 import { VideoFile } from '../types/api';
+import { getRewrittenHlsUrl } from '../utils/hls-utils';
+import { ProxyCategory } from '../utils/storage';
 
 // Minimal HLS playback page for testing default hls.js behavior without any
 // of the main player's config/patches (no custom buffer limits, no pinning,
@@ -119,13 +121,13 @@ class TestPlayerPage implements Page {
             return;
           }
           const sorted = files.slice().sort((a, b) => b.w - a.w);
-          const url = pickHls4(sorted[0]);
-          if (!url) {
+          const rawUrl = pickHls4(sorted[0]);
+          if (!rawUrl) {
             log.error('no hls4 url on best file w={w} h={h}', { w: sorted[0].w, h: sorted[0].h });
             this.showMessage('Нет HLS4 URL');
             return;
           }
-          this.startPlayback(url);
+          this.startPlayback(getRewrittenHlsUrl(rawUrl, 0, ProxyCategory.Media));
         });
       },
       () => {
