@@ -1,14 +1,15 @@
-import $ from 'jquery';
 import * as doT from 'dot';
-import { Page, RouteParams } from '../types/app';
+import { RouteParams } from '../types/app';
 import { Item, ItemsResponse, Pagination } from '../types/api';
 import { searchItems } from '../api/items';
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { storage } from '../utils/storage';
-import { PageKeys, PageUtils } from '../utils/page';
+import { PageUtils } from '../utils/page';
 import { gridMove } from '../utils/grid';
 import { tplCard, tplEmptyText, renderRatings } from '../utils/templates';
+import { sidebar } from '../sidebar';
+import { SidebarPage } from './sidebar-page';
 
 interface KbKeyData {
   char: string;
@@ -103,9 +104,7 @@ const tplPreview = (data: {
 }): string =>
   tplPreviewCompiled(data);
 
-class SearchPage implements Page {
-  private readonly $root = $('#page-search');
-  private readonly keys = new PageKeys();
+class SearchPage extends SidebarPage {
   private query = '';
   private results: Item[] = [];
   private focusedIndex = 0;
@@ -120,8 +119,14 @@ class SearchPage implements Page {
   private currentLayout: 'ru' | 'en' = 'ru';
   private pagination: Pagination | null = null;
 
-  mount(params: RouteParams): void {
-    this.keys.bind((e) => this.handleKey(e));
+  constructor() { super('search'); }
+
+  protected onUnfocus(): void {
+    if (this.focusArea === 'keyboard') this.updateKeyboardFocus();
+    else this.updateResultsFocus();
+  }
+
+  protected onMount(params: RouteParams): void {
     if (params._searchState) {
       const s = params._searchState as SearchState;
       this.query = s.query;
@@ -153,10 +158,8 @@ class SearchPage implements Page {
     }
   }
 
-  unmount(): void {
+  protected onUnmount(): void {
     if (this.searchTimer !== null) { clearTimeout(this.searchTimer); this.searchTimer = null; }
-    this.keys.unbind();
-    PageUtils.clearPage(this.$root);
     this.results = [];
     this.pagination = null;
   }
@@ -177,7 +180,7 @@ class SearchPage implements Page {
     });
   }
 
-  private handleKey(e: JQuery.Event): void {
+  protected handleKey(e: JQuery.Event): void {
     if (this.focusArea === 'keyboard') {
       this.handleKeyboardKey(e);
     } else {
@@ -397,6 +400,7 @@ class SearchPage implements Page {
     switch (e.keyCode) {
       case TvKey.Left:
         if (this.kbCol > 0) { this.kbCol--; this.updateKeyboardFocus(); }
+        else { sidebar.focus(); }
         e.preventDefault(); break;
       case TvKey.Right:
         if (this.kbCol < row.length - 1) { this.kbCol++; this.updateKeyboardFocus(); }
@@ -421,11 +425,7 @@ class SearchPage implements Page {
       case TvKey.Enter:
         this.pressKey(row[this.kbCol]);
         e.preventDefault(); break;
-      case TvKey.Return:
-      case TvKey.Backspace:
-      case TvKey.Escape:
-        router.navigateToStartPage();
-        e.preventDefault(); break;
+      default: sidebar.backOrFocus(e);
     }
   }
 
@@ -470,11 +470,7 @@ class SearchPage implements Page {
         }
         e.preventDefault(); break;
       }
-      case TvKey.Return:
-      case TvKey.Backspace:
-      case TvKey.Escape:
-        router.navigateToStartPage();
-        e.preventDefault(); break;
+      default: sidebar.backOrFocus(e);
     }
   }
 }
