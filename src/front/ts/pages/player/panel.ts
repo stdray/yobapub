@@ -22,8 +22,8 @@ interface PanelButtonDef {
 // `Section` is what identifies the button in logic; `label` and `instant` feed
 // the template at render time.
 export const PANEL_BUTTONS: ReadonlyArray<PanelButtonDef> = [
-  { section: Section.PrevEp,  label: '⏮',            instant: true  },
-  { section: Section.NextEp,  label: '⏭',            instant: true  },
+  { section: Section.PrevEp,  label: 'Пред. серия',   instant: true  },
+  { section: Section.NextEp,  label: 'След. серия',   instant: true  },
   { section: Section.Audio,   label: 'Аудио',         instant: false },
   { section: Section.Subs,    label: 'Субтитры',      instant: false },
   { section: Section.Quality, label: 'Качество',      instant: false },
