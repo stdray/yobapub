@@ -3,6 +3,21 @@
     var q = Model.Query;
     var tz = UserSettingsStore.Get(User.Identity!.Name!).TimeZoneOffset;
 }
+@functions {
+    Microsoft.AspNetCore.Html.IHtmlContent Cell(string field, string value, string? display = null)
+    {
+        if (string.IsNullOrEmpty(value))
+            return Microsoft.AspNetCore.Html.HtmlString.Empty;
+        var text = display ?? value;
+        var safeValue = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(value);
+        var safeText = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(text);
+        return new Microsoft.AspNetCore.Html.HtmlString(
+            $"<span class=\"cell\">{safeText}" +
+            $"<a class=\"cell__inc\" href=\"#\" @click.prevent=\"$store.logs.addIncl('{field}', '{safeValue}')\">&#x2713;</a>" +
+            $"<a class=\"cell__exc\" href=\"#\" @click.prevent=\"$store.logs.addExcl('{field}', '{safeValue}')\">&#x2715;</a>" +
+            $"</span>");
+    }
+}
 <tr data-top-id="@Model.TopId" data-last-id="@Model.LastId" data-has-more="@(Model.HasMore ? "1" : "0")" class="hidden"></tr>
 @if (Model.Entries.Length == 0)
 {
@@ -15,24 +30,11 @@
     var cat = e.Category ?? "";
     <tr class="@cls">
         <td class="ts"><a href="/admin/logs/@e.Id">@e.ServerTs.FormatTime(tz)</a></td>
-        <td class="dev" title="@e.DeviceId">
-            <span class="cell">@devPrefix<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('DeviceId', '@e.DeviceId')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('DeviceId', '@e.DeviceId')">&#x2715;</a></span>
-        </td>
-        <td class="trace">
-            @if (!string.IsNullOrEmpty(e.TraceId))
-            {
-                <span class="cell">@e.TraceId<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('TraceId', '@e.TraceId')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('TraceId', '@e.TraceId')">&#x2715;</a></span>
-            }
-        </td>
-        <td class="ip">
-            <span class="cell">@e.ClientIp<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('ClientIp', '@e.ClientIp')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('ClientIp', '@e.ClientIp')">&#x2715;</a></span>
-        </td>
-        <td class="lvl lvl-@e.Level">
-            <span class="cell">@e.Level.LevelAbbr()<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('Level', '@e.Level')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('Level', '@e.Level')">&#x2715;</a></span>
-        </td>
-        <td class="cat" title="@cat">
-            <span class="cell">@cat.ShortName()<a class="cell__inc" href="#" @@click.prevent="$store.logs.addIncl('Category', '@cat')">&#x2713;</a><a class="cell__exc" href="#" @@click.prevent="$store.logs.addExcl('Category', '@cat')">&#x2715;</a></span>
-        </td>
+        <td class="dev" title="@e.DeviceId">@Cell("DeviceId", e.DeviceId, devPrefix)</td>
+        <td class="trace">@Cell("TraceId", e.TraceId)</td>
+        <td class="ip">@Cell("ClientIp", e.ClientIp)</td>
+        <td class="lvl lvl-@e.Level">@Cell("Level", e.Level, e.Level.LevelAbbr())</td>
+        <td class="cat" title="@cat">@Cell("Category", cat, cat.ShortName())</td>
         <td class="msg">@e.Message</td>
         <td class="act">
             <button class="copy-row-btn" type="button" title="Копировать"

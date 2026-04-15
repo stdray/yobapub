@@ -148,6 +148,20 @@ tr.row-old td { animation: row-old 4s ease-out; }
 }
 .active-filter a { color: #f66; text-decoration: none; margin-left: 4px; }
 .active-filter a:hover { color: #f88; }
+.active-filter.inc { color: #8f8; background: #0a2a0a; }
+.active-filter.exc { color: #f88; background: #2a0a0a; }
+
+.cell { position: relative; display: inline-block; padding-right: 2px; }
+.cell__inc, .cell__exc {
+  display: none; text-decoration: none; font-size: 11px;
+  padding: 0 4px; margin-left: 2px; border-radius: 2px;
+  line-height: 14px; vertical-align: middle;
+}
+.cell__inc { color: #8f8; background: #0a2a0a; }
+.cell__exc { color: #f88; background: #2a0a0a; }
+.cell__inc:hover { background: #145014; }
+.cell__exc:hover { background: #501414; }
+td:hover .cell__inc, td:hover .cell__exc { display: inline-block; }
 
 .dropdown { position: relative; display: inline-block; }
 .dropdown-toggle {
