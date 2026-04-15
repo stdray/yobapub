@@ -6,6 +6,8 @@ import { router } from '../router';
 import { TvKey, platform } from '../utils/platform';
 import { apiClient } from '../api/client';
 import { deviceApi } from '../api/device';
+import { sidebar } from '../sidebar';
+import { storage } from '../utils/storage';
 import { PageKeys, PageUtils } from '../utils/page';
 
 // --- templates ---
@@ -94,7 +96,10 @@ class LoginPage implements Page {
             apiClient.apiPost('/v1/device/notify', {
               title: info.title, hardware: info.hardware, software: info.software,
             });
-            deviceApi.checkVip();
+            deviceApi.checkVip().then((isVip: boolean) => {
+              if (!isVip) storage.downgradeProxyForNonVip();
+              sidebar.refresh();
+            });
             router.navigateWatching();
           },
           onExpired: () => { this.cleanup(); this.$root.html(tplExpired({})); },

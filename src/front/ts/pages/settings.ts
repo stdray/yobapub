@@ -414,7 +414,18 @@ class SettingsPage extends SidebarPage {
       storage.setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
     }
 
-    deviceApi.saveDeviceSettings(saveData);
+    slog.info('applyOption saving key={k} value={v}', { k: item.key, v: JSON.stringify(saveData[item.key]) });
+    deviceApi.saveDeviceSettings(saveData).then(
+      () => { slog.info('applyOption saved key={k}', { k: item.key }); },
+      (err: JQueryXHR | undefined) => {
+        slog.error('applyOption save failed key={k} status={s} text={t} resp={r}', {
+          k: item.key,
+          s: err && err.status !== undefined ? err.status : -1,
+          t: err && err.statusText ? String(err.statusText) : '',
+          r: err && err.responseText ? String(err.responseText).substring(0, 200) : '',
+        });
+      }
+    );
     this.closeOptions();
   }
 

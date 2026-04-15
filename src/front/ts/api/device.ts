@@ -110,14 +110,22 @@ class DeviceApi {
 
   readonly saveDeviceSettings = (settings: Record<string, number | string>): JQueryDeferred<void> => {
     const d = $.Deferred<void>();
+    dlog.info('saveDeviceSettings start payload={p}', { p: JSON.stringify(settings) });
     this.getDeviceId().then(
       (id: number) => {
-        apiClient.apiPostWithRefresh('/v1/device/' + id + '/settings', settings).then(
-          () => { d.resolve(); },
-          (err: JQueryXHR) => { d.reject(err); }
+        apiClient.apiPostWithRefresh<unknown, Record<string, number | string>>(
+          '/v1/device/' + id + '/settings', settings
+        ).then(
+          (res: unknown) => {
+            dlog.info('saveDeviceSettings ok resp={r}', {
+              r: res === undefined ? 'undefined' : JSON.stringify(res).substring(0, 200),
+            });
+            d.resolve();
+          },
+          (err: JQueryXHR) => { logXhr('saveDeviceSettings failed', err); d.reject(err); }
         );
       },
-      () => { d.reject(); }
+      () => { dlog.error('saveDeviceSettings: getDeviceId rejected'); d.reject(); }
     );
     return d;
   };
