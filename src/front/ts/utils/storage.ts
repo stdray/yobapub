@@ -66,7 +66,8 @@ const KEYS = {
   STREAMING_TYPE: 'kp_streaming_type',
   PROXY_CATS: 'kp_proxy_cats',
   START_PAGE: 'kp_start_page',
-  DEVICE_ID: 'kp_device_id'
+  DEVICE_ID: 'kp_device_id',
+  LEGACY_HLS: 'kp_legacy_hls'
 } as const;
 
 // Old per-flag keys — read once during migration, then removed.
@@ -279,6 +280,21 @@ export class Storage {
 
   setStartPage = (id: RouteName): void => {
     localStorage.setItem(KEYS.START_PAGE, id);
+  };
+
+  // --- Legacy HLS toggle ---
+  // Default is `true` — we ship hls.js 0.14.x as the safe baseline. Modern
+  // hls.js 1.5+ is opt-in via the "Старый телевизор" setting. Inline loader
+  // in index.html reads this key directly from localStorage (it runs before
+  // any TS code), so the key name must stay in sync.
+
+  isLegacyHls = (): boolean => {
+    const val = localStorage.getItem(KEYS.LEGACY_HLS);
+    return val === null || val === '1';
+  };
+
+  setLegacyHls = (enabled: boolean): void => {
+    localStorage.setItem(KEYS.LEGACY_HLS, enabled ? '1' : '0');
   };
 
   // --- URL rewriting ---

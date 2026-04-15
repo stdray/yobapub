@@ -103,7 +103,8 @@ module.exports = function (_env, argv) {
       new CopyWebpackPlugin({
         patterns: [
           { from: 'node_modules/jquery/dist/jquery.min.js', to: 'vendor/jquery.min.js' },
-          { from: 'node_modules/hls.js/dist/hls.js', to: 'vendor/hls.min.js' },
+          { from: 'node_modules/hls.js/dist/hls.js', to: 'vendor/hls-legacy.min.js' },
+          { from: 'node_modules/hls-modern/dist/hls.min.js', to: 'vendor/hls-modern.min.js' },
           { from: 'bootstrap.js', to: 'bootstrap.js' },
           { from: 'favicon-32.png', to: 'favicon-32.png' },
           { from: 'icon-192.png', to: 'icon-192.png' },

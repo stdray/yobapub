@@ -10,6 +10,7 @@ import { sidebar } from '../sidebar';
 import { SidebarPage } from './sidebar-page';
 import { Logger } from '../utils/log';
 import { arrayFind } from '../utils/array';
+import { showConfirmDialog } from '../utils/confirm-dialog';
 
 const slog = new Logger('settings-diag');
 
@@ -20,7 +21,7 @@ interface SettingOption {
   selected: number;
 }
 
-type SettingType = 'list' | 'checkbox' | 'readonly' | 'multicheck';
+type SettingType = 'list' | 'checkbox' | 'readonly' | 'multicheck' | 'action';
 
 interface SettingItem {
   key: string;
@@ -166,6 +167,26 @@ const buildVersionSetting = (): SettingItem => {
   return { key: '_version', label: 'Версия', type: 'readonly', value: formatAppVersion() };
 };
 
+const buildReloadSetting = (): SettingItem => {
+  return { key: '_reloadApp', label: 'Перезагрузить приложение', type: 'action', value: null };
+};
+
+// On known legacy platforms the setting is a no-op — the inline HLS loader
+// forces the legacy bundle regardless of the stored flag — so hide it to avoid
+// confusion.
+const isLegacyForced = (): boolean => {
+  const ua = navigator.userAgent || '';
+  const cm = ua.match(/Chrome\/(\d+)/);
+  if (cm && parseInt(cm[1], 10) < 47) return true;
+  if (/Web0S|webOS/i.test(ua) && !cm) return true;
+  return false;
+};
+
+const buildLegacyHlsSetting = (): SettingItem | null => {
+  if (isLegacyForced()) return null;
+  return { key: '_legacyHls', label: 'Старый телевизор', type: 'checkbox', value: storage.isLegacyHls() };
+};
+
 const buildStartPageSetting = (): SettingItem => {
   const savedId = storage.getStartPage();
   const opts: SettingOption[] = [];
@@ -184,6 +205,7 @@ const buildProxySetting = (isVip: boolean): SettingItem | null => {
 
 const getDisplayValue = (item: SettingItem): string => {
   if (item.type === 'readonly') return String(item.value ?? '');
+  if (item.type === 'action') return '▶';
   if (item.type === 'multicheck' && item.proxyCats) {
     const labels: string[] = [];
     for (let i = 0; i < item.proxyCats.length; i++) {
@@ -235,6 +257,9 @@ class SettingsPage extends SidebarPage {
 
           const ordered: SettingItem[] = [];
           ordered.push(buildVersionSetting());
+          ordered.push(buildReloadSetting());
+          const legacyItem = buildLegacyHlsSetting();
+          if (legacyItem) ordered.push(legacyItem);
           if (parsed.serverLocation) ordered.push(parsed.serverLocation);
           const proxy = buildProxySetting(vip);
           if (proxy) ordered.push(proxy);
@@ -291,6 +316,12 @@ class SettingsPage extends SidebarPage {
         e.preventDefault(); break;
       case TvKey.Enter:
         if (!item || item.type === 'readonly') { e.preventDefault(); break; }
+        if (item.type === 'action') {
+          if (item.key === '_reloadApp') {
+            showConfirmDialog('Перезагрузить приложение?', () => { location.reload(); });
+          }
+          e.preventDefault(); break;
+        }
         this.openOptions();
         e.preventDefault(); break;
       default: sidebar.backOrFocus(e);
@@ -386,6 +417,22 @@ class SettingsPage extends SidebarPage {
         storage.setDefaultQuality(item.options[this.focusedOptionIndex].id);
       }
       this.closeOptions();
+      return;
+    }
+
+    if (item.key === '_legacyHls') {
+      const oldVal = storage.isLegacyHls();
+      const newVal = this.focusedOptionIndex === 1;
+      if (oldVal === newVal) { this.closeOptions(); return; }
+      const logger = new Logger('hls-init');
+      logger.info('[settings] legacy hls toggled: {old}→{new}, reloading', { old: oldVal, new: newVal });
+      storage.setLegacyHls(newVal);
+      item.value = newVal;
+      this.closeOptions();
+      showConfirmDialog(
+        'Настройка применится после перезапуска приложения. Перезапустить сейчас?',
+        () => { location.reload(); }
+      );
       return;
     }
 

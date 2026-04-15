@@ -20,7 +20,26 @@
   })();
   </script>
   <script src="vendor/jquery.min.js"></script>
-  <script src="vendor/hls.min.js"></script>
+  <script>
+  // HLS bundle loader: picks legacy (0.14.x) or modern (1.5+) based on the
+  // "kp_legacy_hls" localStorage flag + hard overrides for known legacy platforms.
+  // Synchronous document.write keeps the script in the parser stream so the
+  // bundle finishes loading before webpack-injected app.js runs.
+  (function () {
+    var ua = navigator.userAgent || '';
+    var forceLegacy = false;
+    var cm = ua.match(/Chrome\/(\d+)/);
+    if (cm && parseInt(cm[1], 10) < 47) forceLegacy = true;
+    // webOS 1.x–2.x: WebKit, no Chrome token in UA
+    if (/Web0S|webOS/i.test(ua) && !cm) forceLegacy = true;
+
+    var setting = null;
+    try { setting = localStorage.getItem('kp_legacy_hls'); } catch (e) {}
+    var legacy = forceLegacy || setting === null || setting === '1';
+    var src = legacy ? 'vendor/hls-legacy.min.js' : 'vendor/hls-modern.min.js';
+    document.write('<script src="' + src + '"><\/script>');
+  })();
+  </script>
   <div id="app">
     <div id="sidebar" class="sidebar hidden"></div>
     <div id="pages">

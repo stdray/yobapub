@@ -24,6 +24,28 @@ import { Logger } from './utils/log';
 
 const initLog = new Logger('init-diag');
 const crashLog = new Logger('crash');
+const envLog = new Logger('env');
+
+(() => {
+  let tizenVer = 'n/a';
+  try {
+    if (typeof tizen !== 'undefined' && tizen.systeminfo) {
+      const cap = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
+      if (cap) tizenVer = String(cap);
+    }
+  } catch (_e) { /* ignore */ }
+  const mse = (window as unknown as { MediaSource?: { isTypeSupported: (t: string) => boolean } }).MediaSource;
+  const canType = (t: string): boolean => {
+    try { return !!(mse && mse.isTypeSupported(t)); } catch (_e) { return false; }
+  };
+  envLog.info('[env] ua={ua}', { ua: navigator.userAgent });
+  envLog.info('[env] tizen={v}', { v: tizenVer });
+  envLog.info('[env] mse hvc1={hvc1} hev1={hev1} avc1={avc1}', {
+    hvc1: canType('video/mp4; codecs="hvc1.1.6.L150.B0"'),
+    hev1: canType('video/mp4; codecs="hev1.1.6.L150.B0"'),
+    avc1: canType('video/mp4; codecs="avc1.640028"'),
+  });
+})();
 
 window.onerror = (message, source, lineno, colno, error): void => {
   crashLog.error('window.onerror {msg} at {src}:{line}:{col} stack={stack}', {

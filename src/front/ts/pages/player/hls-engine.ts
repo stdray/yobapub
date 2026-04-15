@@ -109,6 +109,12 @@ export class HlsEngine {
       quality: ctx.quality, audio: ctx.audio, sub: ctx.sub,
     });
 
+    const hlsVersion = (Hls as unknown as { version?: string }).version || 'unknown';
+    const isModern = /^1\./.test(hlsVersion);
+    log.info('[hls] version={v} mode={mode} isSupported={s}', {
+      v: hlsVersion, mode: isModern ? 'modern' : 'legacy', s: Hls.isSupported(),
+    });
+
     const rewrittenUrl = getRewrittenHlsUrl(originalUrl, ctx.audioIndex, ProxyCategory.Media);
     const hls = new Hls(cfg);
     this.hls = hls;
