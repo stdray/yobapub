@@ -809,8 +809,8 @@ html, body {
 
 .player__action-btn.focused {
   border-color: #fff;
-  background: rgba(255,255,255,0.3);
-  color: #fff;
+  background: #f5a623;
+  color: #000;
 }
 
 .player__action-btn.disabled {
