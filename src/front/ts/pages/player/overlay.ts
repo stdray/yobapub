@@ -1,4 +1,7 @@
 import { Lazy } from '../../utils/lazy';
+import { Logger } from '../../utils/log';
+
+const olog = new Logger('overlay');
 
 type OsdIcon = 'play' | 'pause' | 'rw' | 'ff';
 
@@ -50,13 +53,18 @@ export class OverlayView {
   }
 
   showBar(): void {
+    const autoHide = this.deps.canAutoHide();
+    olog.info('showBar autoHide={ah}', { ah: autoHide });
     this.$bar.get().removeClass('hidden');
     this.deps.info.show();
     this.deps.updateProgress();
     this.startProgressTimer();
     this.clearBarTimer();
-    if (this.deps.canAutoHide()) {
-      this.barTimer = window.setTimeout(() => this.hideBar(), BAR_AUTOHIDE_MS);
+    if (autoHide) {
+      this.barTimer = window.setTimeout(() => {
+        olog.info('bar auto-hide timer fired');
+        this.hideBar();
+      }, BAR_AUTOHIDE_MS);
     }
   }
 
@@ -65,6 +73,7 @@ export class OverlayView {
   }
 
   hideBar(): void {
+    olog.info('hideBar');
     this.stopProgressTimer();
     this.$bar.get().addClass('hidden');
     this.deps.info.hide();

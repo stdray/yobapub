@@ -420,6 +420,9 @@ class PlayerController {
 
   private readonly handleKey = (e: JQuery.Event): void => {
     const kc = this.getKeyCode(e);
+    plog.info('key kc={kc} panelFocused={pf} panelOpen={po} barVisible={bv}', {
+      kc, pf: this.panel.focused, po: this.panel.open, bv: this.overlay.barVisible,
+    });
     if (!this.videoEl) {
       if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
         this.destroyPlayer(); router.goBack(); e.preventDefault();

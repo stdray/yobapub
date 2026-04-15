@@ -2,7 +2,10 @@ import { AudioTrack, Subtitle, VideoFile } from '../../types/api';
 import { TvKey } from '../../utils/platform';
 import { Storage } from '../../utils/storage';
 import { Lazy } from '../../utils/lazy';
+import { Logger } from '../../utils/log';
 import { tplSidePanel } from './template';
+
+const log = new Logger('panel');
 
 const SECTION_LABELS = ['Аудио', 'Субтитры', 'Качество', 'Размер сабов'] as const;
 const SECTION_COUNT = SECTION_LABELS.length;
@@ -167,13 +170,16 @@ export class Panel {
   private resetIdle(): void {
     this.clearIdle();
     this.idleTimer = window.setTimeout(() => {
+      log.info('idle fired → unfocus (focused={f} listOpen={o})', { f: this.focused, o: this.listOpen });
       this.idleTimer = null;
       this.unfocus();
     }, IDLE_MS);
+    log.info('idle reset ({ms}ms) focused={f} listOpen={o}', { ms: IDLE_MS, f: this.focused, o: this.listOpen });
   }
 
   readonly clearIdle = (): void => {
     if (this.idleTimer !== null) {
+      log.info('idle cleared');
       clearTimeout(this.idleTimer);
       this.idleTimer = null;
     }
@@ -220,6 +226,7 @@ export class Panel {
   // --- focus / unfocus ---
 
   readonly focus = (): void => {
+    log.info('focus() called focused={f}', { f: this.focused });
     if (this.focused) return;
     this.focused = true;
     this.listOpen = false;
@@ -232,6 +239,7 @@ export class Panel {
   };
 
   private unfocus(): void {
+    log.info('unfocus() called focused={f} listOpen={o}', { f: this.focused, o: this.listOpen });
     if (!this.focused) return;
     this.clearIdle();
     if (this.listOpen) {
@@ -245,6 +253,7 @@ export class Panel {
   // --- side panel open / close ---
 
   private openSidePanel(): void {
+    log.info('openSidePanel section={s}', { s: this.btnIndex });
     this.resetIdle();
     this.listOpen = true;
     this.listSection = this.btnIndex;
@@ -261,6 +270,7 @@ export class Panel {
   }
 
   private closeSidePanel(): void {
+    log.info('closeSidePanel focused={f}', { f: this.focused });
     this.resetIdle();
     this.listOpen = false;
     const $sp = this.$sidePanel.get();
@@ -270,6 +280,7 @@ export class Panel {
   }
 
   private applySelection(): void {
+    log.info('applySelection section={s} idx={i}', { s: this.listSection, i: this.listIndex });
     this.resetIdle();
     if (this.listSection === 0) {
       this.cbs.onApplyAudio(this.listIndex);
@@ -288,6 +299,9 @@ export class Panel {
   // --- key handling ---
 
   readonly handleKey = (e: JQuery.Event, kc: number): void => {
+    log.info('handleKey kc={kc} focused={f} listOpen={o} btnIdx={b} listIdx={li}', {
+      kc, f: this.focused, o: this.listOpen, b: this.btnIndex, li: this.listIndex,
+    });
     this.resetIdle();
 
     if (this.listOpen) {
