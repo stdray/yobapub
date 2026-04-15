@@ -166,9 +166,10 @@ window.logsPage = () => ({
     hasMore: false,
     loading: false,
     _timer: null,
-    boot(topId, lastId) {
-      this.topId = topId || '';
-      this.lastId = lastId;
+    boot() {
+      const el = document.getElementById('page-content');
+      this.topId = el?.dataset.topId || '';
+      this.lastId = el?.dataset.lastId || null;
       this.readSentinel();
       window.addEventListener('logs:filters-changed', () => this.doSearch());
       this.$watch('autoRefresh', () => this.tick());

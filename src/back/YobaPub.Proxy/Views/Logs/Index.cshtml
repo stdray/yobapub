@@ -5,7 +5,9 @@
 }
 <div id="page-content"
      x-data="logsPage()"
-     x-init="boot(@Json.Serialize(Model.TopId), @Json.Serialize(Model.LastId))">
+     x-init="boot()"
+     data-top-id="@Model.TopId"
+     data-last-id="@Model.LastId">
 <header>
   <form class="filter-form" @@submit.prevent="doSearch()">
     <input type="text" x-model="search" placeholder="Поиск..." class="search-input"
