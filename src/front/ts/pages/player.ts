@@ -138,7 +138,6 @@ class PlayerController {
   });
   private readonly panel = new Panel(this.$root, {
     onAfterClose: () => { this.overlay.hideBar(); },
-    onTogglePlay: () => { this.togglePlayPause(); },
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
     onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
     onApplyQuality: (idx) => {
@@ -190,17 +189,7 @@ class PlayerController {
       subsEnabled: this.media.subs.length > 0,
       qualityEnabled: this.media.files.length > 1,
       subSizeEnabled: subsActive,
-      isPaused: this.videoEl ? this.videoEl.paused : this.state.paused,
     };
-  }
-
-  private togglePlayPause(): void {
-    if (!this.videoEl || !this.playbackStarted) return;
-    if (this.videoEl.paused) {
-      this.videoEl.play(); this.state.paused = false;
-    } else {
-      this.videoEl.pause(); this.state.paused = true;
-    }
   }
 
   private loadAndPlay(): void {

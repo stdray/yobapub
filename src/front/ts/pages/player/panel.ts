@@ -9,8 +9,6 @@ const log = new Logger('panel');
 
 const SECTION_LABELS = ['Аудио', 'Субтитры', 'Качество', 'Размер сабов'] as const;
 const SECTION_COUNT = SECTION_LABELS.length;
-const BTN_COUNT = SECTION_COUNT + 1; // index 0 = play/pause, 1..4 = sections
-const BTN_PLAY = 0;
 const IDLE_MS = 6000;
 const RESTORE_FOCUS_MS = 20000;
 
@@ -28,12 +26,10 @@ export interface PanelData {
   readonly subsEnabled: boolean;
   readonly qualityEnabled: boolean;
   readonly subSizeEnabled: boolean;
-  readonly isPaused: boolean;
 }
 
 interface PanelCallbacks {
   readonly onAfterClose: () => void;
-  readonly onTogglePlay: () => void;
   readonly onApplyAudio: (idx: number) => void;
   readonly onApplySub: (menuIdx: number) => void;
   readonly onApplyQuality: (idx: number) => void;
@@ -133,12 +129,12 @@ export class Panel {
   private readonly $sidePanel: Lazy<JQuery>;
 
   focused = false;
-  private btnIndex = BTN_PLAY;
+  private btnIndex = 0;
   private listOpen = false;
   private listIndex = 0;
   private listSection = 0;
   private idleTimer: number | null = null;
-  private lastBtnIndex = BTN_PLAY;
+  private lastBtnIndex = 0;
   private lastCloseAt = 0;
 
   constructor($root: JQuery, cbs: PanelCallbacks) {
@@ -172,11 +168,6 @@ export class Panel {
     return d.subSizeEnabled;
   }
 
-  private isButtonEnabled(btn: number): boolean {
-    if (btn === BTN_PLAY) return true;
-    return this.isSectionEnabled(btn - 1);
-  }
-
   // --- idle timer ---
 
   private resetIdle(): void {
@@ -201,13 +192,9 @@ export class Panel {
 
   private updateButtons(): void {
     const $btns = this.$actionBtns.get();
-    const d = this.cbs.getData();
-    for (let i = 0; i < BTN_COUNT; i++) {
+    for (let i = 0; i < SECTION_COUNT; i++) {
       const $btn = $btns.eq(i);
-      if (i === BTN_PLAY) {
-        $btn.text(d.isPaused ? '▶' : '❚❚');
-      }
-      const enabled = this.isButtonEnabled(i);
+      const enabled = this.isSectionEnabled(i);
       $btn.toggleClass('disabled', !enabled);
       if (i === this.btnIndex && this.focused && !this.listOpen) {
         $btn.addClass('focused');
@@ -247,12 +234,11 @@ export class Panel {
     this.focused = true;
     this.listOpen = false;
     const within = (Date.now() - this.lastCloseAt) < RESTORE_FOCUS_MS;
-    this.btnIndex = within ? this.lastBtnIndex : BTN_PLAY;
-    if (!this.isButtonEnabled(this.btnIndex)) {
-      this.btnIndex = BTN_PLAY;
-      let i = this.btnIndex;
-      while (i < BTN_COUNT && !this.isButtonEnabled(i)) i++;
-      if (i < BTN_COUNT) this.btnIndex = i;
+    this.btnIndex = within ? this.lastBtnIndex : 0;
+    if (!this.isSectionEnabled(this.btnIndex)) {
+      let i = 0;
+      while (i < SECTION_COUNT && !this.isSectionEnabled(i)) i++;
+      this.btnIndex = i < SECTION_COUNT ? i : 0;
     }
     this.updateButtons();
     this.resetIdle();
@@ -275,10 +261,10 @@ export class Panel {
   // --- side panel open / close ---
 
   private openSidePanel(): void {
-    log.info('openSidePanel btnIdx={s}', { s: this.btnIndex });
+    log.info('openSidePanel section={s}', { s: this.btnIndex });
     this.resetIdle();
     this.listOpen = true;
-    this.listSection = this.btnIndex - 1;
+    this.listSection = this.btnIndex;
     const items = this.getItems(this.listSection);
     this.listIndex = 0;
     for (let i = 0; i < items.length; i++) {
@@ -334,23 +320,18 @@ export class Panel {
     switch (kc) {
       case TvKey.Left: {
         let idx = this.btnIndex - 1;
-        while (idx >= 0 && !this.isButtonEnabled(idx)) idx--;
+        while (idx >= 0 && !this.isSectionEnabled(idx)) idx--;
         if (idx >= 0) { this.btnIndex = idx; this.updateButtons(); }
         e.preventDefault(); break;
       }
       case TvKey.Right: {
         let idx = this.btnIndex + 1;
-        while (idx < BTN_COUNT && !this.isButtonEnabled(idx)) idx++;
-        if (idx < BTN_COUNT) { this.btnIndex = idx; this.updateButtons(); }
+        while (idx < SECTION_COUNT && !this.isSectionEnabled(idx)) idx++;
+        if (idx < SECTION_COUNT) { this.btnIndex = idx; this.updateButtons(); }
         e.preventDefault(); break;
       }
       case TvKey.Enter:
-        if (this.btnIndex === BTN_PLAY) {
-          this.cbs.onTogglePlay();
-          this.updateButtons();
-        } else if (this.isButtonEnabled(this.btnIndex)) {
-          this.openSidePanel();
-        }
+        if (this.isSectionEnabled(this.btnIndex)) this.openSidePanel();
         e.preventDefault(); break;
       case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Down:
         this.unfocus(); e.preventDefault(); break;
@@ -379,11 +360,11 @@ export class Panel {
 
   readonly reset = (): void => {
     this.focused = false;
-    this.btnIndex = BTN_PLAY;
+    this.btnIndex = 0;
     this.listOpen = false;
     this.listIndex = 0;
     this.listSection = 0;
-    this.lastBtnIndex = BTN_PLAY;
+    this.lastBtnIndex = 0;
     this.lastCloseAt = 0;
     this.clearIdle();
   };

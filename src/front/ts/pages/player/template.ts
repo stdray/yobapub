@@ -14,11 +14,10 @@ const tplPlayerCompiled = doT.template(`
     <div class="player__bar hidden">
       <div class="player__bar-wrap">
         <div class="player__actions">
-          <div class="player__action-btn" data-btn="0">❚❚</div>
-          <div class="player__action-btn" data-btn="1">Аудио</div>
-          <div class="player__action-btn" data-btn="2">Субтитры</div>
-          <div class="player__action-btn" data-btn="3">Качество</div>
-          <div class="player__action-btn" data-btn="4">Размер сабов</div>
+          <div class="player__action-btn" data-section="0">Аудио</div>
+          <div class="player__action-btn" data-section="1">Субтитры</div>
+          <div class="player__action-btn" data-section="2">Качество</div>
+          <div class="player__action-btn" data-section="3">Размер сабов</div>
         </div>
         <div class="player__bar-progress">
           <div class="player__bar-value">
