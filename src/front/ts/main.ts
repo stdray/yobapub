@@ -115,9 +115,24 @@ const notifyDevice = (): void => {
   );
 };
 
+const primeDeviceSettings = (): void => {
+  deviceApi.getDeviceSettings().then(
+    (res) => {
+      if (res && res.settings) {
+        storage.setDeviceSettingsFromApi(res.settings);
+        initLog.info('primeDeviceSettings cached keys={keys}', {
+          keys: Object.keys(res.settings).join(','),
+        });
+      }
+    },
+    () => { /* errors already logged inside deviceApi */ }
+  );
+};
+
 initLog.info('main init hasToken={ht}', { ht: !!storage.getAccessToken() });
 if (storage.getAccessToken()) {
   notifyDevice();
+  primeDeviceSettings();
   deviceApi.checkVip().then((isVip: boolean) => {
     initLog.info('initial checkVip resolved vip={vip}', { vip: isVip });
     if (!isVip) storage.downgradeProxyForNonVip();

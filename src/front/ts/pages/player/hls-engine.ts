@@ -2,7 +2,7 @@ import Hls from 'hls.js';
 import { Logger } from '../../utils/log';
 import { extractHostname } from '../../utils/url';
 import { buildBaseHlsConfig, HlsConfig, logPlaybackStart, getRewrittenHlsUrl } from '../../utils/hls-utils';
-import { ProxyCategory } from '../../utils/storage';
+import { ProxyCategory, storage } from '../../utils/storage';
 
 interface HlsFragData {
   frag?: { sn: number; start: number; duration: number };
@@ -194,20 +194,36 @@ export class HlsEngine {
     const levels = hls.levels;
     if (!levels || levels.length <= 1 || !target) return;
 
+    const preferHevc = storage.getDeviceSettingBool('supportHevc');
+    const matchesTarget = (i: number): boolean =>
+      levels[i].height === target.h || levels[i].width === target.w;
+    const isHevc = (i: number): boolean => /^hvc1|^hev1/i.test(levels[i].videoCodec || '');
+
+    // Two-pass scan: when HEVC is enabled in device settings, first try to
+    // find an hvc1/hev1 variant at the target resolution. Fall back to the
+    // first matching variant of any codec otherwise. This makes the HEVC
+    // toggle actually affect playback on mixed manifests (hls4 mode) where
+    // both avc1 and hvc1 variants share the same height.
     let bestIdx = -1;
-    for (let i = 0; i < levels.length; i++) {
-      if (levels[i].height === target.h || levels[i].width === target.w) {
-        bestIdx = i;
-        break;
+    if (preferHevc) {
+      for (let i = 0; i < levels.length; i++) {
+        if (matchesTarget(i) && isHevc(i)) { bestIdx = i; break; }
+      }
+    }
+    if (bestIdx < 0) {
+      for (let i = 0; i < levels.length; i++) {
+        if (matchesTarget(i)) { bestIdx = i; break; }
       }
     }
 
     if (bestIdx >= 0) {
       hls.currentLevel = bestIdx;
-      this.deps.log.info('pinQualityLevel idx={idx} target={w}x{h} level={lw}x{lh} bitrate={br}', {
+      this.deps.log.info('pinQualityLevel idx={idx} target={w}x{h} level={lw}x{lh} codec={vc} bitrate={br} preferHevc={ph}', {
         idx: bestIdx, w: target.w, h: target.h,
         lw: levels[bestIdx].width, lh: levels[bestIdx].height,
+        vc: levels[bestIdx].videoCodec || null,
         br: levels[bestIdx].bitrate,
+        ph: preferHevc,
       });
     } else {
       this.deps.log.warn('pinQualityLevel: no matching level for {w}x{h}, levels={count}', {

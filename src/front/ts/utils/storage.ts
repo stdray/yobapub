@@ -1,4 +1,28 @@
 import { RouteName } from '../types/app';
+import { DeviceSetting } from '../types/api';
+
+type DeviceSettingValue = boolean | string | number;
+type DeviceSettingsMap = Record<string, DeviceSettingValue>;
+
+// Flatten a raw /v1/device/settings response into a plain key→value map:
+// checkbox → boolean, list → the selected option's id (string/number),
+// anything unexpected is skipped. This is what gets cached in localStorage.
+const flattenDeviceSettings = (raw: Record<string, DeviceSetting>): DeviceSettingsMap => {
+  const out: DeviceSettingsMap = {};
+  const keys = Object.keys(raw);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    const v = raw[k].value;
+    if (typeof v === 'boolean') out[k] = v;
+    else if (typeof v === 'number') out[k] = v !== 0;
+    else if (Array.isArray(v)) {
+      for (let j = 0; j < v.length; j++) {
+        if (v[j].selected) { out[k] = v[j].id; break; }
+      }
+    }
+  }
+  return out;
+};
 
 // Bitflag enum — categories are OR-combined into a single number stored in
 // localStorage. VIP_ONLY_CATS is the mask of premium categories, making the
@@ -67,7 +91,8 @@ const KEYS = {
   PROXY_CATS: 'kp_proxy_cats',
   START_PAGE: 'kp_start_page',
   DEVICE_ID: 'kp_device_id',
-  LEGACY_HLS: 'kp_legacy_hls'
+  LEGACY_HLS: 'kp_legacy_hls',
+  DEVICE_SETTINGS: 'kp_device_settings'
 } as const;
 
 // Old per-flag keys — read once during migration, then removed.
@@ -296,6 +321,40 @@ export class Storage {
   setLegacyHls = (enabled: boolean): void => {
     localStorage.setItem(KEYS.LEGACY_HLS, enabled ? '1' : '0');
   };
+
+  // --- Cached device settings (from /v1/device/{id}/settings) ---
+  // Flat { key: effectiveValue } map derived from the server response so any
+  // non-UI code (player, media layer) can read individual flags synchronously
+  // without re-fetching. VIP / proxy are a separate concern — they come from
+  // /v1/user, not device settings.
+
+  private readDeviceSettings = (): DeviceSettingsMap => {
+    try {
+      const raw = localStorage.getItem(KEYS.DEVICE_SETTINGS);
+      if (raw) return JSON.parse(raw) as DeviceSettingsMap;
+    } catch (_) { /* malformed — fall through */ }
+    return {};
+  };
+
+  private writeDeviceSettings = (map: DeviceSettingsMap): void => {
+    try {
+      localStorage.setItem(KEYS.DEVICE_SETTINGS, JSON.stringify(map));
+    } catch (_) { /* quota — ignore */ }
+  };
+
+  setDeviceSettingsFromApi = (settings: Record<string, DeviceSetting>): void => {
+    this.writeDeviceSettings(flattenDeviceSettings(settings));
+  };
+
+  setDeviceSetting = (key: string, value: DeviceSettingValue): void => {
+    const map = this.readDeviceSettings();
+    map[key] = value;
+    this.writeDeviceSettings(map);
+  };
+
+  getDeviceSetting = (key: string): DeviceSettingValue | undefined => this.readDeviceSettings()[key];
+
+  getDeviceSettingBool = (key: string): boolean => this.readDeviceSettings()[key] === true;
 
   // --- URL rewriting ---
 

@@ -171,19 +171,7 @@ const buildReloadSetting = (): SettingItem => {
   return { key: '_reloadApp', label: 'Перезагрузить приложение', type: 'action', value: null };
 };
 
-// On known legacy platforms the setting is a no-op — the inline HLS loader
-// forces the legacy bundle regardless of the stored flag — so hide it to avoid
-// confusion.
-const isLegacyForced = (): boolean => {
-  const ua = navigator.userAgent || '';
-  const cm = ua.match(/Chrome\/(\d+)/);
-  if (cm && parseInt(cm[1], 10) < 47) return true;
-  if (/Web0S|webOS/i.test(ua) && !cm) return true;
-  return false;
-};
-
-const buildLegacyHlsSetting = (): SettingItem | null => {
-  if (isLegacyForced()) return null;
+const buildLegacyHlsSetting = (): SettingItem => {
   return { key: '_legacyHls', label: 'Старый телевизор', type: 'checkbox', value: storage.isLegacyHls() };
 };
 
@@ -252,14 +240,16 @@ class SettingsPage extends SidebarPage {
           const vip: boolean = Array.isArray(isVip) ? isVip[0] : isVip;
           const parsed: Partial<Record<SettingKey, SettingItem>> = (data && data.settings)
             ? parseSettings(data.settings) : {};
-          if (data && data.settings) persistStreamingType(data.settings);
+          if (data && data.settings) {
+            storage.setDeviceSettingsFromApi(data.settings);
+            persistStreamingType(data.settings);
+          }
           if (!vip) storage.downgradeProxyForNonVip();
 
           const ordered: SettingItem[] = [];
           ordered.push(buildVersionSetting());
           ordered.push(buildReloadSetting());
-          const legacyItem = buildLegacyHlsSetting();
-          if (legacyItem) ordered.push(legacyItem);
+          ordered.push(buildLegacyHlsSetting());
           if (parsed.serverLocation) ordered.push(parsed.serverLocation);
           const proxy = buildProxySetting(vip);
           if (proxy) ordered.push(proxy);
@@ -462,6 +452,15 @@ class SettingsPage extends SidebarPage {
     if (item.key === 'streamingType' && item.options) {
       const stOpt = item.options[this.focusedOptionIndex];
       storage.setStreamingType(String(stOpt.label || stOpt.id).toLowerCase());
+    }
+
+    // Mirror the write into the cached device settings so a later
+    // synchronous read (e.g. pinQualityLevel reading supportHevc) sees the
+    // new value without waiting for a server round-trip.
+    if (item.type === 'list' && item.options) {
+      storage.setDeviceSetting(item.key, item.options[this.focusedOptionIndex].id);
+    } else if (item.type === 'checkbox') {
+      storage.setDeviceSetting(item.key, this.focusedOptionIndex === 1);
     }
 
     slog.info('applyOption saving key={k} value={v}', { k: item.key, v: JSON.stringify(saveData[item.key]) });

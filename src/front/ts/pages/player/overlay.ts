@@ -192,7 +192,7 @@ export class OverlayView {
       const vc = level.videoCodec;
       if (vc) {
         const short = /^hvc1|^hev1/i.test(vc) ? 'HEVC'
-          : /^avc1/i.test(vc) ? 'H.264'
+          : /^avc1/i.test(vc) ? 'H264'
           : vc.toUpperCase();
         line2.push(short);
       }
