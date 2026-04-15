@@ -20,7 +20,7 @@ export const getItemsPopular = (type: string): JQueryDeferred<ItemsResponse> =>
 export const searchItems = (
   query: string, page?: number, perpage?: number
 ): JQueryDeferred<ItemsResponse> => {
-  const params: { q: string; field: string; page?: number; perpage?: number } = { q: query, field: 'title' };
+  const params: { q: string; page?: number; perpage?: number } = { q: query };
   if (page !== undefined) params.page = page;
   if (perpage !== undefined) params.perpage = perpage;
   return apiClient.apiGetWithRefresh('/v1/items/search', params);
