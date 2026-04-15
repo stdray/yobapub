@@ -14,7 +14,6 @@ interface OverlayDeps {
 
 const BAR_AUTOHIDE_MS = 4000;
 const OSD_HIDE_MS = 700;
-const TOAST_HIDE_MS = 1500;
 const PROGRESS_TICK_MS = 1000;
 
 const OSD_SYMBOLS: Readonly<Record<OsdIcon, string>> = {
@@ -24,14 +23,12 @@ const OSD_SYMBOLS: Readonly<Record<OsdIcon, string>> = {
 export class OverlayView {
   private barTimer: number | null = null;
   private osdTimer: number | null = null;
-  private toastTimer: number | null = null;
   private progressTimer: number | null = null;
 
   private readonly $spinner: Lazy<JQuery>;
   private readonly $bar: Lazy<JQuery>;
   private readonly $osd: Lazy<JQuery>;
   private readonly $barSeek: Lazy<JQuery>;
-  private readonly $toast: Lazy<JQuery>;
 
   constructor(private readonly deps: OverlayDeps) {
     const $root = deps.$root;
@@ -39,7 +36,6 @@ export class OverlayView {
     this.$bar = new Lazy(() => $root.find('.player__header, .player__gradient, .player__bar'));
     this.$osd = new Lazy(() => $root.find('.player__osd'));
     this.$barSeek = new Lazy(() => $root.find('.player__bar-seek'));
-    this.$toast = new Lazy(() => $root.find('.player__toast'));
   }
 
   // Called after tplPlayer replaces the page DOM — the previous jQuery refs
@@ -49,7 +45,6 @@ export class OverlayView {
     this.$bar.reset();
     this.$osd.reset();
     this.$barSeek.reset();
-    this.$toast.reset();
   }
 
   showBar(): void {
@@ -89,16 +84,6 @@ export class OverlayView {
     }, OSD_HIDE_MS);
   }
 
-  showToast(text: string): void {
-    const $toast = this.$toast.get();
-    $toast.text(text).removeClass('hidden');
-    if (this.toastTimer !== null) clearTimeout(this.toastTimer);
-    this.toastTimer = window.setTimeout(() => {
-      $toast.addClass('hidden');
-      this.toastTimer = null;
-    }, TOAST_HIDE_MS);
-  }
-
   clearSeekLabel = (): void => { this.$barSeek.get().text(''); };
 
   showSpinner = (): void => { this.$spinner.get().show(); };
@@ -109,7 +94,6 @@ export class OverlayView {
     this.clearBarTimer();
     this.stopProgressTimer();
     if (this.osdTimer !== null) { clearTimeout(this.osdTimer); this.osdTimer = null; }
-    if (this.toastTimer !== null) { clearTimeout(this.toastTimer); this.toastTimer = null; }
     this.resetDomCache();
   }
 

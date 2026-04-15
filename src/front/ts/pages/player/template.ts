@@ -29,7 +29,6 @@ const tplPlayerCompiled = doT.template(`
       </div>
     </div>
     <div class="player__side-panel hidden"></div>
-    <div class="player__toast hidden"></div>
   </div>
 `);
 

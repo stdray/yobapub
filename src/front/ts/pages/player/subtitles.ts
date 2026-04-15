@@ -29,14 +29,6 @@ export const applySubSize = (): void => {
     '}';
 };
 
-export const changeSubSize = (dir: number, showToast: (text: string) => void): void => {
-  let size = storage.getSubSize();
-  size = Math.max(Storage.SUB_SIZE_MIN, Math.min(Storage.SUB_SIZE_MAX, size + dir * Storage.SUB_SIZE_STEP));
-  storage.setSubSize(size);
-  applySubSize();
-  showToast('Субтитры: ' + size + 'px');
-};
-
 const srtToVtt = (srt: string): string => {
   const vtt = 'WEBVTT\n\n' + srt
     .replace(/\r\n/g, '\n')

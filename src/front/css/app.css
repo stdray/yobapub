@@ -773,21 +773,6 @@ html, body {
   line-height: 1.4;
 }
 
-/* --- Toast --- */
-.player__toast {
-  position: absolute;
-  bottom: 160px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 12px 32px;
-  background: rgba(0, 0, 0, 0.75);
-  border-radius: 8px;
-  font-size: 26px;
-  color: #fff;
-  z-index: 12;
-  white-space: nowrap;
-}
-
 /* Action buttons above progress bar */
 .player__actions {
   display: flex;
