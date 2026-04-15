@@ -176,6 +176,7 @@ export class Panel {
   // the same button rather than starting over from the first section.
   private lastBtnPos = 0;
   private lastCloseAt = 0;
+  private lastMode: 'seek' | 'buttons' = 'seek';
 
   constructor($root: JQuery, cbs: PanelCallbacks) {
     this.cbs = cbs;
@@ -196,6 +197,23 @@ export class Panel {
     this.sideOpen = false;
     this.lastBtnPos = 0;
     this.lastCloseAt = 0;
+    this.lastMode = 'seek';
+  }
+
+  markSeekClosed(): void {
+    this.lastMode = 'seek';
+    this.lastCloseAt = Date.now();
+  }
+
+  markButtonsClosed(): void {
+    this.lastMode = 'buttons';
+    this.lastBtnPos = this.btnPos;
+    this.lastCloseAt = Date.now();
+  }
+
+  wasLastModeButtons(): boolean {
+    return this.lastMode === 'buttons'
+      && (Date.now() - this.lastCloseAt) < RESTORE_FOCUS_MS;
   }
 
   // --- queries ---
@@ -255,10 +273,6 @@ export class Panel {
   }
 
   unfocusButtons(): void {
-    if (this.btnsFocused) {
-      this.lastBtnPos = this.btnPos;
-      this.lastCloseAt = Date.now();
-    }
     this.btnsFocused = false;
     this.renderButtons();
   }

@@ -9,10 +9,10 @@ import { FsmDef } from '../../utils/fsm';
 export type PlayerState =
   | 'loading'
   | 'idle'
-  | 'barShown'
-  | 'panelFocused'
-  | 'sidePanelOpen'
+  | 'seekFocus'
   | 'seeking'
+  | 'buttonsFocus'
+  | 'sidePanelOpen'
   | 'error';
 
 export type PlayerEvent =
@@ -35,6 +35,7 @@ export interface PlayerFsmCtx {
   showBar(): void;
   hideBar(): void;
   showError(): void;
+  setProgressActive(active: boolean): void;
 
   // --- playback ---
   togglePlay(): void;
@@ -48,6 +49,11 @@ export interface PlayerFsmCtx {
   isCurrentPanelBtnEnabled(): boolean;
   isCurrentPanelBtnInstant(): boolean;
   applyInstantPanelBtn(): void;
+
+  // --- mode memory ---
+  markSeekClosed(): void;
+  markButtonsClosed(): void;
+  wasLastModeButtons(): boolean;
 
   // --- side panel (options list) ---
   openSidePanel(): void;
@@ -83,37 +89,57 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
     idle: {
       entry: (c) => c.hideBar(),
       on: {
-        KEY_UP:         'panelFocused',
+        KEY_UP: [
+          { cond: (c) => c.wasLastModeButtons(), target: 'buttonsFocus' },
+          { target: 'seekFocus' },
+        ],
         KEY_LEFT:       'seeking',
         KEY_RIGHT:      'seeking',
-        KEY_PLAY_PAUSE: { target: 'barShown', action: (c) => c.togglePlay() },
-        KEY_ENTER:      { target: 'barShown', action: (c) => c.togglePlay() },
+        KEY_PLAY_PAUSE: { target: 'seekFocus', action: (c) => c.togglePlay() },
+        KEY_ENTER:      { target: 'seekFocus', action: (c) => c.togglePlay() },
         BUFFERING:      'loading',
         FATAL_ERROR:    'error',
         KEY_BACK:       { action: (c) => c.exit() },
       },
     },
 
-    barShown: {
-      entry: (c) => c.showBar(),
-      after: { ms: UI_IDLE_MS, target: 'idle' },
+    seekFocus: {
+      entry: (c) => { c.showBar(); c.setProgressActive(true); },
+      after: { ms: UI_IDLE_MS, target: 'idle', action: (c) => c.markSeekClosed() },
       on: {
-        KEY_UP:         'panelFocused',
-        KEY_DOWN:       'idle',
+        KEY_UP:         'buttonsFocus',
+        KEY_DOWN:       { target: 'idle', action: (c) => c.markSeekClosed() },
         KEY_LEFT:       'seeking',
         KEY_RIGHT:      'seeking',
-        KEY_PLAY_PAUSE: { target: 'barShown', action: (c) => c.togglePlay() },
-        KEY_ENTER:      { target: 'barShown', action: (c) => c.togglePlay() },
-        KEY_BACK:       'idle',
+        KEY_PLAY_PAUSE: { target: 'seekFocus', action: (c) => c.togglePlay() },
+        KEY_ENTER:      { target: 'seekFocus', action: (c) => c.togglePlay() },
+        KEY_BACK:       { target: 'idle', action: (c) => c.markSeekClosed() },
         BUFFERING:      'loading',
         FATAL_ERROR:    'error',
       },
     },
 
-    panelFocused: {
-      entry: (c) => { c.showBar(); c.focusPanelButtons(); },
+    seeking: {
+      entry: (c) => { c.showBar(); c.setProgressActive(true); c.seekBegin(); },
+      after: {
+        ms: SEEK_COMMIT_MS,
+        target: 'seekFocus',
+        action: (c) => c.seekCommit(),
+      },
+      on: {
+        KEY_LEFT:  { action: (c) => c.seekStep(-1), reenterAfter: true },
+        KEY_RIGHT: { action: (c) => c.seekStep(+1), reenterAfter: true },
+        KEY_ENTER: { target: 'seekFocus', action: (c) => c.seekCommit() },
+        KEY_BACK:  { target: 'seekFocus', action: (c) => c.seekCancel() },
+        BUFFERING:   'loading',
+        FATAL_ERROR: 'error',
+      },
+    },
+
+    buttonsFocus: {
+      entry: (c) => { c.showBar(); c.setProgressActive(false); c.focusPanelButtons(); },
       exit:  (c) => c.unfocusPanelButtons(),
-      after: { ms: UI_IDLE_MS, target: 'idle' },
+      after: { ms: UI_IDLE_MS, target: 'idle', action: (c) => c.markButtonsClosed() },
       on: {
         KEY_LEFT:  { action: (c) => c.panelPrevBtn(), reenterAfter: true },
         KEY_RIGHT: { action: (c) => c.panelNextBtn(), reenterAfter: true },
@@ -127,8 +153,8 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
             cond: (c) => c.isCurrentPanelBtnEnabled(),
           },
         ],
-        KEY_DOWN:    'idle',
-        KEY_BACK:    'idle',
+        KEY_DOWN:    { target: 'seekFocus', action: (c) => c.markButtonsClosed() },
+        KEY_BACK:    { target: 'idle', action: (c) => c.markButtonsClosed() },
         BUFFERING:   'loading',
         FATAL_ERROR: 'error',
       },
@@ -141,28 +167,11 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
         KEY_UP:   { action: (c) => c.sideListPrev() },
         KEY_DOWN: { action: (c) => c.sideListNext() },
         KEY_ENTER: {
-          target: 'panelFocused',
+          target: 'buttonsFocus',
           action: (c) => c.applySideSelection(),
         },
-        KEY_LEFT:    'panelFocused',
-        KEY_BACK:    'panelFocused',
-        FATAL_ERROR: 'error',
-      },
-    },
-
-    seeking: {
-      entry: (c) => { c.showBar(); c.seekBegin(); },
-      after: {
-        ms: SEEK_COMMIT_MS,
-        target: 'barShown',
-        action: (c) => c.seekCommit(),
-      },
-      on: {
-        KEY_LEFT:  { action: (c) => c.seekStep(-1), reenterAfter: true },
-        KEY_RIGHT: { action: (c) => c.seekStep(+1), reenterAfter: true },
-        KEY_ENTER: { target: 'barShown', action: (c) => c.seekCommit() },
-        KEY_BACK:  { target: 'barShown', action: (c) => c.seekCancel() },
-        BUFFERING:   'loading',
+        KEY_LEFT:    'buttonsFocus',
+        KEY_BACK:    'buttonsFocus',
         FATAL_ERROR: 'error',
       },
     },

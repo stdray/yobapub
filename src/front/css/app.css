@@ -624,6 +624,28 @@ html, body {
   z-index: 5;
 }
 
+/* HUD — header, gradient, bar, info, central icon. Shown/hidden together. */
+.player__hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.player__icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 120px;
+  color: #e94560;
+  pointer-events: none;
+  z-index: 7;
+  text-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
 /* Gradient overlay top */
 .player__gradient {
   position: absolute;
@@ -656,19 +678,6 @@ html, body {
   margin-top: 8px;
 }
 
-/* OSD action icon (center) */
-.player__osd {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 120px;
-  color: #e94560;
-  pointer-events: none;
-  z-index: 7;
-  text-shadow: 0 0 20px rgba(0,0,0,0.5);
-}
-
 /* Progress bar (bottom gradient + bar) */
 .player__bar {
   position: absolute;
@@ -696,6 +705,12 @@ html, body {
   top: 96px;
   background: rgba(255,255,255,0.4);
   border-radius: 4px;
+  box-shadow: 0 0 0 2px #e94560;
+}
+
+.player__bar-progress.dimmed {
+  box-shadow: none;
+  opacity: 0.5;
 }
 
 .player__bar-value {
@@ -709,7 +724,7 @@ html, body {
 .player__bar-pct {
   position: absolute;
   right: -38px;
-  top: -38px;
+  top: 52px;
   width: 76px;
   height: 76px;
   border-radius: 50%;
@@ -723,14 +738,17 @@ html, body {
 }
 
 .player__bar-seek {
-  position: absolute;
-  top: -50px;
+  position: fixed;
+  top: 50%;
   left: 50%;
-  margin-left: -65px;
-  width: 130px;
-  font-size: 28px;
+  width: 400px;
+  margin-left: -200px;
+  margin-top: 90px;
+  font-size: 56px;
+  font-weight: bold;
   text-align: center;
-  color: #fff;
+  color: #e94560;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
 }
 
 .player__bar-duration {

@@ -23,7 +23,6 @@ import {
   Panel, PanelData, PANEL_BUTTONS, getAudioItems, getSubItems, getQualityItems, getSubSizeItems,
 } from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
-import { PlayerInfo } from './player/info';
 import { SeekController } from './player/seek';
 import { WatchProgressTracker } from './player/watch-tracker';
 import { OverlayView } from './player/overlay';
@@ -104,16 +103,6 @@ class PlayerController implements PlayerFsmCtx {
     onBeforeSwitch: () => { this.watchTracker.sendMarkTime(); this.destroyPlayer(); },
     onAfterSwitch: () => { this.loadAndPlay(); },
   });
-  private readonly info = new PlayerInfo(this.$root, {
-    files: () => this.media.files,
-    audios: () => this.media.audios,
-    subs: () => this.media.subs,
-    selectedQuality: () => this.state.quality,
-    selectedAudio: () => this.state.audio,
-    selectedSub: () => this.state.sub,
-    hlsInstance: () => this.engine.instance,
-    videoEl: () => this.videoEl,
-  });
   private readonly progressBar: ProgressBar = new ProgressBar({
     $root: this.$root,
     getVideoEl: () => this.videoEl,
@@ -128,8 +117,15 @@ class PlayerController implements PlayerFsmCtx {
   });
   private readonly overlay = new OverlayView({
     $root: this.$root,
-    info: this.info,
     updateProgress: () => this.progressBar.update(),
+    files: () => this.media.files,
+    audios: () => this.media.audios,
+    subs: () => this.media.subs,
+    selectedQuality: () => this.state.quality,
+    selectedAudio: () => this.state.audio,
+    selectedSub: () => this.state.sub,
+    hlsInstance: () => this.engine.instance,
+    videoEl: () => this.videoEl,
   });
   private readonly panel = new Panel(this.$root, {
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
@@ -155,7 +151,7 @@ class PlayerController implements PlayerFsmCtx {
       };
     },
     getDuration: () => this.progressBar.getDuration(),
-    getDroppedFrames: () => this.info.getDroppedFrames(),
+    getDroppedFrames: () => this.overlay.getDroppedFrames(),
     log: plog,
   });
 
@@ -167,20 +163,28 @@ class PlayerController implements PlayerFsmCtx {
 
   showSpinner(): void { this.overlay.showSpinner(); }
   hideSpinner(): void { this.overlay.hideSpinner(); }
-  showBar(): void { this.overlay.showBar(); }
+  showBar(): void { this.overlay.showBar(); this.syncPlayIcon(); }
   hideBar(): void { this.overlay.hideBar(); }
+  private syncPlayIcon(): void {
+    this.overlay.setIcon(this.videoEl && !this.videoEl.paused ? 'play' : 'pause');
+  }
   showError(): void { /* errorView drives itself */ }
+  setProgressActive(active: boolean): void {
+    this.$root.find('.player__bar-progress').toggleClass('dimmed', !active);
+  }
+  markSeekClosed(): void { this.panel.markSeekClosed(); }
+  markButtonsClosed(): void { this.panel.markButtonsClosed(); }
+  wasLastModeButtons(): boolean { return this.panel.wasLastModeButtons(); }
   togglePlay(): void {
     if (!this.videoEl || !this.playbackStarted) return;
     if (this.videoEl.paused) {
       this.videoEl.play();
       this.state.paused = false;
-      this.overlay.showOsd('play');
     } else {
       this.videoEl.pause();
       this.state.paused = true;
-      this.overlay.showOsd('pause');
     }
+    this.syncPlayIcon();
   }
   exit(): void { this.destroyPlayer(); router.goBack(); }
   focusPanelButtons(): void { this.panel.focusButtons(); }
@@ -199,13 +203,19 @@ class PlayerController implements PlayerFsmCtx {
   seekStep(dir: -1 | 1): void {
     this.seek.step(dir === 1 ? 'right' : 'left');
     this.progressBar.update();
-    this.overlay.showOsd(dir === 1 ? 'ff' : 'rw');
+    this.overlay.setIcon(dir === 1 ? 'ff' : 'rw');
   }
   seekCommit(): void {
     const pos = this.seek.commit();
     if (pos >= 0) this.continueWith({ position: pos });
+    this.syncPlayIcon();
   }
-  seekCancel(): void { this.seek.reset(); this.progressBar.update(); this.overlay.clearSeekLabel(); }
+  seekCancel(): void {
+    this.seek.reset();
+    this.progressBar.update();
+    this.overlay.clearSeekLabel();
+    this.syncPlayIcon();
+  }
 
   private reportFatal(): void {
     if (this.fsm) this.fsm.send({ type: 'FATAL_ERROR' });
@@ -306,7 +316,9 @@ class PlayerController implements PlayerFsmCtx {
         return;
       }
       plog.info('calling startPlayback q={q} a={a} sub={sub} pos={pos}', { q, a, sub, pos });
-      this.startPlayback({ quality: q, audio: a, sub, position: pos, paused: false }, itemTitle + ' - ' + this.media.title);
+      const epPrefix = (this.media.season !== undefined && this.media.episode !== undefined)
+        ? 'S' + this.media.season + 'E' + this.media.episode + ' ' : '';
+      this.startPlayback({ quality: q, audio: a, sub, position: pos, paused: false }, itemTitle + ' - ' + epPrefix + this.media.title);
     });
   }
 
@@ -400,7 +412,7 @@ class PlayerController implements PlayerFsmCtx {
     }
     this.overlay.hideSpinner();
     this.watchTracker.start();
-    this.info.updateBadge();
+    this.overlay.updateBadge();
     if (this.fsm) this.fsm.send({ type: 'SOURCE_READY' });
   }
 
@@ -411,7 +423,6 @@ class PlayerController implements PlayerFsmCtx {
     this.videoEl = this.$root.find('video')[0] as HTMLVideoElement;
     this.progressBar.resetElements();
     this.overlay.resetDomCache();
-    this.info.resetDomCache();
     this.panel.resetDomCache();
 
     const bindingsDeps: VideoBindingsDeps = {
