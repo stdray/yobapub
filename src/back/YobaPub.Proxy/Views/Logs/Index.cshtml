@@ -5,9 +5,9 @@
 }
 <div id="page-content"
      x-data="logsPage()"
-     x-init="init(@Json.Serialize(Model.TopId), @Json.Serialize(Model.LastId))">
+     x-init="boot(@Json.Serialize(Model.TopId), @Json.Serialize(Model.LastId))">
 <header>
-  <form class="filter-form" @@submit.prevent="search()">
+  <form class="filter-form" @@submit.prevent="doSearch()">
     <input type="text" x-model="search" placeholder="Поиск..." class="search-input"
            @@keydown.enter.prevent="doSearch()">
     <select x-model.number="pageSize" @@change="doSearch()">

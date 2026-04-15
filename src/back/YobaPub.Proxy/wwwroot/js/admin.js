@@ -102,14 +102,15 @@ const emptyFilters = () => {
   return f;
 };
 
-const buildQuery = (store, extra = {}) => {
+const buildQuery = (comp, extra = {}) => {
+  const store = window.Alpine.store('logs');
   const filters = FIELDS
     .filter((k) => store.filters[k].inc.length || store.filters[k].exc.length)
     .map((k) => ({ field: k, includes: store.filters[k].inc, excludes: store.filters[k].exc }));
   return {
     filters,
-    search: store.search,
-    pageSize: store.pageSize,
+    search: comp.search,
+    pageSize: comp.pageSize,
     ...extra,
   };
 };
@@ -123,8 +124,6 @@ const postJson = (url, body) =>
 
 const logsStoreDef = {
   filters: emptyFilters(),
-  search: '',
-  pageSize: 100,
   addIncl(field, value) {
     const arr = this.filters[field].inc;
     if (!arr.includes(value)) arr.push(value);
@@ -143,7 +142,6 @@ const logsStoreDef = {
   },
   resetAll() {
     this.filters = emptyFilters();
-    this.search = '';
     window.dispatchEvent(new CustomEvent('logs:filters-changed'));
   },
 };
@@ -159,10 +157,8 @@ document.addEventListener('alpine:init', registerLogsStore);
 registerLogsStore();
 
 window.logsPage = () => ({
-    get search() { return window.Alpine.store('logs').search; },
-    set search(v) { window.Alpine.store('logs').search = v; },
-    get pageSize() { return window.Alpine.store('logs').pageSize; },
-    set pageSize(v) { window.Alpine.store('logs').pageSize = v; },
+    search: '',
+    pageSize: 100,
     autoRefresh: false,
     status: '',
     topId: '',
@@ -170,12 +166,12 @@ window.logsPage = () => ({
     hasMore: false,
     loading: false,
     _timer: null,
-    init(topId, lastId) {
+    boot(topId, lastId) {
       this.topId = topId || '';
       this.lastId = lastId;
       this.readSentinel();
       window.addEventListener('logs:filters-changed', () => this.doSearch());
-      this.$watch?.('autoRefresh', () => this.tick());
+      this.$watch('autoRefresh', () => this.tick());
       this.tick();
       this.observeLoadMore();
     },
@@ -212,18 +208,17 @@ window.logsPage = () => ({
     async doSearch() {
       this.loading = true;
       try {
-        const r = await postJson('/admin/logs/search', buildQuery(window.Alpine.store('logs')));
+        const r = await postJson('/admin/logs/search', buildQuery(this));
         const html = await r.text();
         document.getElementById('logs-tbody').innerHTML = html;
         this.readSentinel();
       } finally { this.loading = false; }
     },
-    search() { this.doSearch(); },
     async loadMore() {
       if (!this.lastId) return;
       this.loading = true;
       try {
-        const r = await postJson('/admin/logs/search', buildQuery(window.Alpine.store('logs'), { before: this.lastId }));
+        const r = await postJson('/admin/logs/search', buildQuery(this, { before: this.lastId }));
         const html = await r.text();
         const tbody = document.getElementById('logs-tbody');
         const tmp = document.createElement('tbody');
@@ -244,7 +239,7 @@ window.logsPage = () => ({
     },
     async refresh() {
       if (!this.topId) return this.doSearch();
-      const r = await postJson('/admin/logs/search', buildQuery(window.Alpine.store('logs'), { after: this.topId }));
+      const r = await postJson('/admin/logs/search', buildQuery(this, { after: this.topId }));
       const html = await r.text();
       const tmp = document.createElement('tbody');
       tmp.innerHTML = html;
@@ -256,7 +251,7 @@ window.logsPage = () => ({
     },
     async download(limit) {
       Dropdowns.closeAll();
-      const r = await postJson('/admin/logs/download', { query: buildQuery(window.Alpine.store('logs')), limit });
+      const r = await postJson('/admin/logs/download', { query: buildQuery(this), limit });
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -267,14 +262,14 @@ window.logsPage = () => ({
     },
     async copy(limit) {
       Dropdowns.closeAll();
-      const r = await postJson('/admin/logs/tsv', { query: buildQuery(window.Alpine.store('logs')), limit });
+      const r = await postJson('/admin/logs/tsv', { query: buildQuery(this), limit });
       const text = await r.text();
       Clipboard.copy(text);
       this.flashStatus('Скопировано!');
     },
     async share(ttlDays) {
       Dropdowns.closeAll();
-      const r = await postJson('/admin/logs/share', { query: buildQuery(window.Alpine.store('logs')), ttlDays });
+      const r = await postJson('/admin/logs/share', { query: buildQuery(this), ttlDays });
       const res = await r.json();
       Clipboard.copy(`${res.url}/tsv`);
       this.flashStatus('TSV-ссылка скопирована');
