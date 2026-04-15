@@ -54,7 +54,7 @@ const tplDetail = (data: DetailData): string => tplDetailCompiled(data);
 
 // --- page ---
 
-type FocusArea = 'bookmarks' | 'watchlist' | 'play' | 'test';
+type FocusArea = 'bookmarks' | 'watchlist' | 'play';
 
 class MoviePage implements Page {
   private readonly $root = $('#page-movie');
@@ -78,8 +78,7 @@ class MoviePage implements Page {
     }
 
     const buttons = '<div class="btn" data-action="play">' +
-      (resumeTime > 0 ? 'Продолжить с ' + formatDuration(resumeTime) : 'Смотреть') + '</div>' +
-      '<div class="btn" data-action="test">Тестовый просмотр</div>';
+      (resumeTime > 0 ? 'Продолжить с ' + formatDuration(resumeTime) : 'Смотреть') + '</div>';
 
     this.$root.html(tplDetail({
       poster: storage.proxyPosterUrl(item.posters.big),
@@ -113,10 +112,8 @@ class MoviePage implements Page {
       this.$root.find('[data-action="bookmark"]').addClass('focused');
     } else if (this.focusArea === 'watchlist') {
       this.$root.find('[data-action="watchlist"]').addClass('focused');
-    } else if (this.focusArea === 'test') {
-      this.$root.find('[data-action="test"]').addClass('focused');
     } else {
-      this.$root.find('[data-action="play"]').addClass('focused');
+      this.$root.find('.btn').eq(0).addClass('focused');
     }
   }
 
@@ -137,7 +134,6 @@ class MoviePage implements Page {
       case 'bookmarks': this.handleBookmarksKey(e); break;
       case 'watchlist': this.handleWatchlistKey(e); break;
       case 'play': this.handlePlayKey(e); break;
-      case 'test': this.handleTestKey(e); break;
     }
   };
 
@@ -163,19 +159,8 @@ class MoviePage implements Page {
   private handlePlayKey(e: JQuery.Event): void {
     switch (e.keyCode) {
       case TvKey.Up: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Right: this.focusArea = 'test'; this.updateFocus(); e.preventDefault(); break;
       case TvKey.Enter:
         if (this.item) router.navigateMoviePlayer(this.item.id);
-        e.preventDefault(); break;
-    }
-  }
-
-  private handleTestKey(e: JQuery.Event): void {
-    switch (e.keyCode) {
-      case TvKey.Up: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Left: this.focusArea = 'play'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter:
-        if (this.item) router.navigateTestPlayer(this.item.id);
         e.preventDefault(); break;
     }
   }

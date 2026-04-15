@@ -17,7 +17,6 @@ import { searchPage } from './pages/search';
 import { tvPage } from './pages/tv';
 import { tvPlayerPage } from './pages/tv-player';
 import { historyPage } from './pages/history';
-import { testPlayerPage } from './pages/test-player';
 import { deviceApi } from './api/device';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
 import { sidebar } from './sidebar';
@@ -84,7 +83,6 @@ router.registerPage('search', searchPage);
 router.registerPage('tv', tvPage);
 router.registerPage('tv-player', tvPlayerPage);
 router.registerPage('history', historyPage);
-router.registerPage('test-player', testPlayerPage);
 
 router.onAfterNavigate((route) => {
   if (sidebar.isRoute(route)) {
