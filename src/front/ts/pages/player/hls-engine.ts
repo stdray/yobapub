@@ -165,7 +165,7 @@ export class HlsEngine {
     });
     this.hls.stopLoad();
     this.hls.startLoad(v.currentTime);
-    if (v.paused) v.play();
+    if (v.paused) v.play().catch(() => { /* interrupted by load/pause */ });
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     return true;
@@ -399,7 +399,7 @@ export class HlsEngine {
         log.warn('hls RECOVER via bufferAppendingError stopLoad+startLoad ct={ct} br={br}', diag);
         hls.stopLoad();
         hls.startLoad(v.currentTime);
-        if (v.paused) v.play();
+        if (v.paused) v.play().catch(() => { /* interrupted by load/pause */ });
         this.appendErrorCount = 0;
         this.hadBufferFullError = false;
       }

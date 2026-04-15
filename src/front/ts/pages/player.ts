@@ -197,7 +197,7 @@ class PlayerController implements PlayerFsmCtx {
   }
   play(): void {
     if (!this.videoEl || !this.playbackStarted || !this.videoEl.paused) return;
-    this.videoEl.play();
+    this.videoEl.play().catch(() => { /* interrupted by load/pause */ });
     this.state.paused = false;
     this.syncPlayIcon();
   }
@@ -429,7 +429,7 @@ class PlayerController implements PlayerFsmCtx {
     this.plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', {
       pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime,
     });
-    if (!this.state.paused) this.videoEl.play();
+    if (!this.state.paused) this.videoEl.play().catch(() => { /* interrupted by load/pause */ });
     this.playbackStarted = true;
     if (this.state.sub >= 0 && this.videoEl) {
       this.subtitleLoader.load(this.videoEl, this.$root, this.media.subs, this.state.sub);
