@@ -56,7 +56,7 @@ const LABELS: Readonly<Record<SettingKey, string>> = {
 };
 
 const ORDER_AFTER_PROXY: ReadonlyArray<SettingKey> = [
-  'streamingType', 'supportSsl', 'supportHevc', 'supportHdr', 'support4k', 'mixedPlaylist'
+  'supportHevc', 'streamingType', 'supportSsl', 'supportHdr', 'support4k', 'mixedPlaylist'
 ];
 
 const tplPageCompiled = doT.template(`
