@@ -315,7 +315,7 @@ export interface DeviceSettingOption {
 export interface DeviceSetting {
   readonly label?: string;
   readonly type: string;
-  readonly value: boolean | ReadonlyArray<DeviceSettingOption>;
+  readonly value: boolean | number | ReadonlyArray<DeviceSettingOption>;
 }
 
 export interface DeviceSettingsResponse {

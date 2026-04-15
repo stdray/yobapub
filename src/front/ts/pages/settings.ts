@@ -138,7 +138,10 @@ const parseSettings = (raw: Record<string, DeviceSetting>): Partial<Record<Setti
     if (setting.type === 'list') {
       result[key] = { key, label, type: 'list', value: null, options: parseListOptions(key, setting) };
     } else {
-      const val = typeof setting.value === 'boolean' ? setting.value : null;
+      const raw = setting.value;
+      const val = typeof raw === 'boolean' ? raw
+        : typeof raw === 'number' ? raw !== 0
+        : null;
       result[key] = { key, label, type: 'checkbox', value: val };
     }
   }
