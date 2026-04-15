@@ -20,7 +20,7 @@ import { TrackNavigator } from './player/track-navigator';
 import { PlayerErrorView } from './player/error-view';
 import { ProgressBar } from './player/progress';
 import {
-  Panel, PanelData, getAudioItems, getSubItems, getQualityItems, getSubSizeItems,
+  Panel, PanelData, PANEL_BUTTONS, getAudioItems, getSubItems, getQualityItems, getSubSizeItems,
 } from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
 import { PlayerInfo } from './player/info';
@@ -138,6 +138,8 @@ class PlayerController implements PlayerFsmCtx {
       if (idx !== this.state.quality) this.continueWith({ quality: idx });
     },
     onApplySubSize: (size) => { storage.setSubSize(size); applySubSize(); },
+    onPrevEpisode: () => { this.trackNavigator.navigate(-1); },
+    onNextEpisode: () => { this.trackNavigator.navigate(1); },
     onSavePrefs: () => { this.doSavePrefs(); },
     getData: () => this.getPanelData(),
   });
@@ -186,6 +188,8 @@ class PlayerController implements PlayerFsmCtx {
   panelPrevBtn(): void { this.panel.prevBtn(); }
   panelNextBtn(): void { this.panel.nextBtn(); }
   isCurrentPanelBtnEnabled(): boolean { return this.panel.isCurrentBtnEnabled(); }
+  isCurrentPanelBtnInstant(): boolean { return this.panel.isCurrentBtnInstant(); }
+  applyInstantPanelBtn(): void { this.panel.applyInstantButton(); }
   openSidePanel(): void { this.panel.openSideList(); }
   closeSidePanel(): void { this.panel.closeSideList(); }
   sideListPrev(): void { this.panel.sideListPrev(); }
@@ -230,6 +234,8 @@ class PlayerController implements PlayerFsmCtx {
       subsEnabled: this.media.subs.length > 0,
       qualityEnabled: this.media.files.length > 1,
       subSizeEnabled: subsActive,
+      prevEpisodeEnabled: this.trackNavigator.canNavigate(-1),
+      nextEpisodeEnabled: this.trackNavigator.canNavigate(1),
     };
   }
 
@@ -401,7 +407,7 @@ class PlayerController implements PlayerFsmCtx {
   private playUrl(url: string, title: string): void {
     const itemTitle = title.split(' - ')[0] || title;
     const epTitle = title.indexOf(' - ') >= 0 ? title.substring(title.indexOf(' - ') + 3) : '';
-    this.$root.html(tplPlayer({ title: itemTitle, episode: epTitle }));
+    this.$root.html(tplPlayer({ title: itemTitle, episode: epTitle, buttons: PANEL_BUTTONS }));
     this.videoEl = this.$root.find('video')[0] as HTMLVideoElement;
     this.progressBar.resetElements();
     this.overlay.resetDomCache();

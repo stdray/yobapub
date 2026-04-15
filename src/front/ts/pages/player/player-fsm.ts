@@ -46,6 +46,8 @@ export interface PlayerFsmCtx {
   panelPrevBtn(): void;
   panelNextBtn(): void;
   isCurrentPanelBtnEnabled(): boolean;
+  isCurrentPanelBtnInstant(): boolean;
+  applyInstantPanelBtn(): void;
 
   // --- side panel (options list) ---
   openSidePanel(): void;
@@ -115,10 +117,16 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
       on: {
         KEY_LEFT:  { action: (c) => c.panelPrevBtn(), reenterAfter: true },
         KEY_RIGHT: { action: (c) => c.panelNextBtn(), reenterAfter: true },
-        KEY_ENTER: {
-          target: 'sidePanelOpen',
-          cond: (c) => c.isCurrentPanelBtnEnabled(),
-        },
+        KEY_ENTER: [
+          {
+            cond: (c) => c.isCurrentPanelBtnEnabled() && c.isCurrentPanelBtnInstant(),
+            action: (c) => c.applyInstantPanelBtn(),
+          },
+          {
+            target: 'sidePanelOpen',
+            cond: (c) => c.isCurrentPanelBtnEnabled(),
+          },
+        ],
         KEY_DOWN:    'idle',
         KEY_BACK:    'idle',
         BUFFERING:   'loading',

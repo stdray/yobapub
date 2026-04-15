@@ -1,5 +1,17 @@
 import * as doT from 'dot';
 
+interface PlayerTplButton {
+  readonly section: number;
+  readonly label: string;
+  readonly instant: boolean;
+}
+
+interface PlayerTplData {
+  readonly title: string;
+  readonly episode: string;
+  readonly buttons: ReadonlyArray<PlayerTplButton>;
+}
+
 const tplPlayerCompiled = doT.template(`
   <div class="player">
     <video></video>
@@ -14,10 +26,9 @@ const tplPlayerCompiled = doT.template(`
     <div class="player__bar hidden">
       <div class="player__bar-wrap">
         <div class="player__actions">
-          <div class="player__action-btn" data-section="0">Аудио</div>
-          <div class="player__action-btn" data-section="1">Субтитры</div>
-          <div class="player__action-btn" data-section="2">Качество</div>
-          <div class="player__action-btn" data-section="3">Размер сабов</div>
+          {{~it.buttons :b}}
+            <div class="player__action-btn{{?b.instant}} hidden{{?}}" data-section="{{=b.section}}">{{=b.label}}</div>
+          {{~}}
         </div>
         <div class="player__bar-progress">
           <div class="player__bar-value">
@@ -32,8 +43,7 @@ const tplPlayerCompiled = doT.template(`
   </div>
 `);
 
-export const tplPlayer = (data: { readonly title: string; readonly episode: string }): string =>
-  tplPlayerCompiled(data);
+export const tplPlayer = (data: PlayerTplData): string => tplPlayerCompiled(data);
 
 interface ErrorScreenData {
   readonly prefix: 'player' | 'tv-player';

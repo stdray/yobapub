@@ -27,7 +27,7 @@ export interface FsmStateDef<S extends string, C, E extends { readonly type: str
     readonly action?: FsmAction<C, E>;
   };
   readonly on?: {
-    readonly [K in E['type']]?: S | FsmTransition<S, C, E>;
+    readonly [K in E['type']]?: S | FsmTransition<S, C, E> | ReadonlyArray<FsmTransition<S, C, E>>;
   };
 }
 
@@ -74,11 +74,16 @@ export class Fsm<S extends string, C, E extends { readonly type: string }> {
     if (!on) return;
     const raw = on[event.type as E['type']];
     if (raw === undefined) return;
-    const t: FsmTransition<S, C, E> = typeof raw === 'string'
-      ? { target: raw as S }
-      : raw as FsmTransition<S, C, E>;
-    if (t.cond && !t.cond(this.ctx, event)) return;
-    this.applyTransition(t, event, stateDef);
+    const candidates: ReadonlyArray<FsmTransition<S, C, E>> = typeof raw === 'string'
+      ? [{ target: raw as S }]
+      : Array.isArray(raw) ? raw as ReadonlyArray<FsmTransition<S, C, E>>
+        : [raw as FsmTransition<S, C, E>];
+    for (let i = 0; i < candidates.length; i++) {
+      const t = candidates[i];
+      if (t.cond && !t.cond(this.ctx, event)) continue;
+      this.applyTransition(t, event, stateDef);
+      return;
+    }
   }
 
   stop(): void {

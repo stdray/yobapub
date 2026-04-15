@@ -3,8 +3,42 @@ import { Storage } from '../../utils/storage';
 import { Lazy } from '../../utils/lazy';
 import { tplSidePanel } from './template';
 
-const SECTION_LABELS = ['Аудио', 'Субтитры', 'Качество', 'Размер сабов'] as const;
-const SECTION_COUNT = SECTION_LABELS.length;
+export const enum Section {
+  PrevEp = 0,
+  NextEp = 1,
+  Audio = 2,
+  Subs = 3,
+  Quality = 4,
+  SubSize = 5,
+}
+
+interface PanelButtonDef {
+  readonly section: Section;
+  readonly label: string;
+  readonly instant: boolean;
+}
+
+// Single source of truth for the action-button row. UI order = array order.
+// `Section` is what identifies the button in logic; `label` and `instant` feed
+// the template at render time.
+export const PANEL_BUTTONS: ReadonlyArray<PanelButtonDef> = [
+  { section: Section.PrevEp,  label: '⏮',            instant: true  },
+  { section: Section.NextEp,  label: '⏭',            instant: true  },
+  { section: Section.Audio,   label: 'Аудио',         instant: false },
+  { section: Section.Subs,    label: 'Субтитры',      instant: false },
+  { section: Section.Quality, label: 'Качество',      instant: false },
+  { section: Section.SubSize, label: 'Размер сабов',  instant: false },
+];
+
+const SECTION_COUNT = PANEL_BUTTONS.length;
+
+const findBtn = (section: Section): PanelButtonDef => {
+  for (let i = 0; i < PANEL_BUTTONS.length; i++) {
+    if (PANEL_BUTTONS[i].section === section) return PANEL_BUTTONS[i];
+  }
+  throw new Error('unknown section: ' + section);
+};
+
 const RESTORE_FOCUS_MS = 20000;
 
 interface LabeledItem {
@@ -21,6 +55,8 @@ export interface PanelData {
   readonly subsEnabled: boolean;
   readonly qualityEnabled: boolean;
   readonly subSizeEnabled: boolean;
+  readonly prevEpisodeEnabled: boolean;
+  readonly nextEpisodeEnabled: boolean;
 }
 
 interface PanelCallbacks {
@@ -28,6 +64,8 @@ interface PanelCallbacks {
   readonly onApplySub: (menuIdx: number) => void;
   readonly onApplyQuality: (idx: number) => void;
   readonly onApplySubSize: (size: number) => void;
+  readonly onPrevEpisode: () => void;
+  readonly onNextEpisode: () => void;
   readonly onSavePrefs: () => void;
   readonly getData: () => PanelData;
 }
@@ -128,15 +166,15 @@ export class Panel {
   private readonly $actionBtns: Lazy<JQuery>;
   private readonly $sidePanel: Lazy<JQuery>;
 
-  private btnIndex = 0;
+  private btnPos = 0;
   private listIndex = 0;
-  private listSection = 0;
+  private listSection: Section = Section.PrevEp;
   private btnsFocused = false;
   private sideOpen = false;
 
   // 20-sec memory: if user reopens the panel within this window we return to
-  // the same button rather than starting over from section 0.
-  private lastBtnIndex = 0;
+  // the same button rather than starting over from the first section.
+  private lastBtnPos = 0;
   private lastCloseAt = 0;
 
   constructor($root: JQuery, cbs: PanelCallbacks) {
@@ -151,35 +189,55 @@ export class Panel {
   }
 
   reset(): void {
-    this.btnIndex = 0;
+    this.btnPos = 0;
     this.listIndex = 0;
-    this.listSection = 0;
+    this.listSection = Section.PrevEp;
     this.btnsFocused = false;
     this.sideOpen = false;
-    this.lastBtnIndex = 0;
+    this.lastBtnPos = 0;
     this.lastCloseAt = 0;
   }
 
   // --- queries ---
 
-  private isSectionEnabled(section: number): boolean {
+  private currentSection(): Section {
+    return PANEL_BUTTONS[this.btnPos].section;
+  }
+
+  private isSectionEnabled(section: Section): boolean {
     const d = this.cbs.getData();
-    if (section === 0) return d.audioEnabled;
-    if (section === 1) return d.subsEnabled;
-    if (section === 2) return d.qualityEnabled;
-    return d.subSizeEnabled;
+    switch (section) {
+      case Section.PrevEp:  return d.prevEpisodeEnabled;
+      case Section.NextEp:  return d.nextEpisodeEnabled;
+      case Section.Audio:   return d.audioEnabled;
+      case Section.Subs:    return d.subsEnabled;
+      case Section.Quality: return d.qualityEnabled;
+      case Section.SubSize: return d.subSizeEnabled;
+    }
   }
 
   isCurrentBtnEnabled(): boolean {
-    return this.isSectionEnabled(this.btnIndex);
+    return this.isSectionEnabled(this.currentSection());
   }
 
-  private getItems(section: number): ReadonlyArray<LabeledItem> {
+  isCurrentBtnInstant(): boolean {
+    return PANEL_BUTTONS[this.btnPos].instant;
+  }
+
+  applyInstantButton(): void {
+    const s = this.currentSection();
+    if (s === Section.PrevEp) this.cbs.onPrevEpisode();
+    else if (s === Section.NextEp) this.cbs.onNextEpisode();
+  }
+
+  private getItems(section: Section): ReadonlyArray<LabeledItem> {
     const d = this.cbs.getData();
-    if (section === 0) return d.audioItems;
-    if (section === 1) return d.subItems;
-    if (section === 2) return d.qualityItems;
-    return d.subSizeItems;
+    switch (section) {
+      case Section.Audio:   return d.audioItems;
+      case Section.Subs:    return d.subItems;
+      case Section.Quality: return d.qualityItems;
+      default:              return d.subSizeItems;
+    }
   }
 
   // --- button row focus ---
@@ -187,18 +245,18 @@ export class Panel {
   focusButtons(): void {
     this.btnsFocused = true;
     const within = (Date.now() - this.lastCloseAt) < RESTORE_FOCUS_MS;
-    this.btnIndex = within ? this.lastBtnIndex : 0;
-    if (!this.isSectionEnabled(this.btnIndex)) {
+    this.btnPos = within ? this.lastBtnPos : 0;
+    if (!this.isSectionEnabled(this.currentSection())) {
       let i = 0;
-      while (i < SECTION_COUNT && !this.isSectionEnabled(i)) i++;
-      this.btnIndex = i < SECTION_COUNT ? i : 0;
+      while (i < SECTION_COUNT && !this.isSectionEnabled(PANEL_BUTTONS[i].section)) i++;
+      this.btnPos = i < SECTION_COUNT ? i : 0;
     }
     this.renderButtons();
   }
 
   unfocusButtons(): void {
     if (this.btnsFocused) {
-      this.lastBtnIndex = this.btnIndex;
+      this.lastBtnPos = this.btnPos;
       this.lastCloseAt = Date.now();
     }
     this.btnsFocused = false;
@@ -206,23 +264,29 @@ export class Panel {
   }
 
   prevBtn(): void {
-    let idx = this.btnIndex - 1;
-    while (idx >= 0 && !this.isSectionEnabled(idx)) idx--;
-    if (idx >= 0) { this.btnIndex = idx; this.renderButtons(); }
+    let pos = this.btnPos - 1;
+    while (pos >= 0 && !this.isSectionEnabled(PANEL_BUTTONS[pos].section)) pos--;
+    if (pos >= 0) { this.btnPos = pos; this.renderButtons(); }
   }
 
   nextBtn(): void {
-    let idx = this.btnIndex + 1;
-    while (idx < SECTION_COUNT && !this.isSectionEnabled(idx)) idx++;
-    if (idx < SECTION_COUNT) { this.btnIndex = idx; this.renderButtons(); }
+    let pos = this.btnPos + 1;
+    while (pos < SECTION_COUNT && !this.isSectionEnabled(PANEL_BUTTONS[pos].section)) pos++;
+    if (pos < SECTION_COUNT) { this.btnPos = pos; this.renderButtons(); }
   }
 
   private renderButtons(): void {
     const $btns = this.$actionBtns.get();
     for (let i = 0; i < SECTION_COUNT; i++) {
+      const def = PANEL_BUTTONS[i];
       const $btn = $btns.eq(i);
-      $btn.toggleClass('disabled', !this.isSectionEnabled(i));
-      const on = i === this.btnIndex && this.btnsFocused && !this.sideOpen;
+      const enabled = this.isSectionEnabled(def.section);
+      if (def.instant) {
+        $btn.toggleClass('hidden', !enabled);
+      } else {
+        $btn.toggleClass('disabled', !enabled);
+      }
+      const on = i === this.btnPos && this.btnsFocused && !this.sideOpen;
       if (on) $btn.addClass('focused'); else $btn.removeClass('focused');
     }
   }
@@ -231,7 +295,7 @@ export class Panel {
 
   openSideList(): void {
     this.sideOpen = true;
-    this.listSection = this.btnIndex;
+    this.listSection = this.currentSection();
     const items = this.getItems(this.listSection);
     this.listIndex = 0;
     for (let i = 0; i < items.length; i++) {
@@ -271,19 +335,23 @@ export class Panel {
     const items = this.getItems(this.listSection);
     const item = items[this.listIndex];
     if (!item || item.selected) return;
-    if (this.listSection === 0) this.cbs.onApplyAudio(this.listIndex);
-    else if (this.listSection === 1) this.cbs.onApplySub(this.listIndex);
-    else if (this.listSection === 2) this.cbs.onApplyQuality(this.listIndex);
-    else {
-      const size = Storage.SUB_SIZE_MIN + this.listIndex * Storage.SUB_SIZE_STEP;
-      this.cbs.onApplySubSize(size);
+    switch (this.listSection) {
+      case Section.Audio:   this.cbs.onApplyAudio(this.listIndex); break;
+      case Section.Subs:    this.cbs.onApplySub(this.listIndex); break;
+      case Section.Quality: this.cbs.onApplyQuality(this.listIndex); break;
+      case Section.SubSize: {
+        const size = Storage.SUB_SIZE_MIN + this.listIndex * Storage.SUB_SIZE_STEP;
+        this.cbs.onApplySubSize(size);
+        break;
+      }
+      default: return;
     }
     this.cbs.onSavePrefs();
   }
 
   private renderSideList(): void {
     const items = this.getItems(this.listSection);
-    const title = SECTION_LABELS[this.listSection];
+    const title = findBtn(this.listSection).label;
     const $sp = this.$sidePanel.get();
     $sp.html(tplSidePanel({ title, items, focusedIndex: this.listIndex }));
     this.scrollToFocused($sp);
