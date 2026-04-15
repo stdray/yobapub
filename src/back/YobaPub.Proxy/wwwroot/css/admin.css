@@ -180,8 +180,8 @@ tr.row-old td { animation: row-old 4s ease-out; }
   line-height: 14px;
   position: absolute; bottom: 100%; z-index: 10;
 }
-.cell__inc { color: #8f8; background: #0a2a0a; left: 0; }
-.cell__exc { color: #f88; background: #2a0a0a; left: 22px; }
+.cell__inc { color: #8f8; background: #0a2a0a; right: 22px; }
+.cell__exc { color: #f88; background: #2a0a0a; right: 0; }
 .cell__inc:hover { background: #145014; }
 .cell__exc:hover { background: #501414; }
 td:hover .cell__inc, td:hover .cell__exc { visibility: visible; }
