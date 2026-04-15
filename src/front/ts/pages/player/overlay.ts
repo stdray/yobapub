@@ -9,10 +9,8 @@ interface OverlayDeps {
   readonly $root: JQuery;
   readonly info: { show(): void; hide(): void };
   readonly updateProgress: () => void;
-  readonly canAutoHide: () => boolean;
 }
 
-const BAR_AUTOHIDE_MS = 4000;
 const OSD_HIDE_MS = 700;
 const PROGRESS_TICK_MS = 1000;
 
@@ -21,7 +19,6 @@ const OSD_SYMBOLS: Readonly<Record<OsdIcon, string>> = {
 };
 
 export class OverlayView {
-  private barTimer: number | null = null;
   private osdTimer: number | null = null;
   private progressTimer: number | null = null;
 
@@ -48,23 +45,11 @@ export class OverlayView {
   }
 
   showBar(): void {
-    const autoHide = this.deps.canAutoHide();
-    olog.info('showBar autoHide={ah}', { ah: autoHide });
+    olog.info('showBar');
     this.$bar.get().removeClass('hidden');
     this.deps.info.show();
     this.deps.updateProgress();
     this.startProgressTimer();
-    this.clearBarTimer();
-    if (autoHide) {
-      this.barTimer = window.setTimeout(() => {
-        olog.info('bar auto-hide timer fired');
-        this.hideBar();
-      }, BAR_AUTOHIDE_MS);
-    }
-  }
-
-  get barVisible(): boolean {
-    return !this.$bar.get().first().hasClass('hidden');
   }
 
   hideBar(): void {
@@ -91,7 +76,6 @@ export class OverlayView {
   hideSpinner = (): void => { this.$spinner.get().hide(); };
 
   dispose(): void {
-    this.clearBarTimer();
     this.stopProgressTimer();
     if (this.osdTimer !== null) { clearTimeout(this.osdTimer); this.osdTimer = null; }
     this.resetDomCache();
@@ -104,9 +88,5 @@ export class OverlayView {
 
   private stopProgressTimer(): void {
     if (this.progressTimer !== null) { clearInterval(this.progressTimer); this.progressTimer = null; }
-  }
-
-  private clearBarTimer(): void {
-    if (this.barTimer !== null) { clearTimeout(this.barTimer); this.barTimer = null; }
   }
 }

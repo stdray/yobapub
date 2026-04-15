@@ -24,11 +24,13 @@ import {
 } from './player/panel';
 import { restoreQualityIndex, restoreAudioIndex, restoreSubIndex, saveCurrentPrefs, getTitlePrefs } from './player/preferences';
 import { PlayerInfo } from './player/info';
-import { SeekController, SeekDirection } from './player/seek';
+import { SeekController } from './player/seek';
 import { WatchProgressTracker } from './player/watch-tracker';
 import { OverlayView } from './player/overlay';
 import { installCtLogShim } from './player/ct-debug';
 import { bindVideoEvents, VideoBindingsDeps } from './player/video-bindings';
+import { Fsm } from '../utils/fsm';
+import { playerMachine, PlayerFsmCtx, PlayerState, PlayerEvent } from './player/player-fsm';
 
 const plog = new Logger('player');
 
@@ -70,7 +72,7 @@ const defaultPlayState = (): PlayState => ({
 
 // --- PlayerController ---
 
-class PlayerController {
+class PlayerController implements PlayerFsmCtx {
   private readonly $root = $('#page-player');
   private readonly keys = new PageKeys();
 
@@ -82,7 +84,7 @@ class PlayerController {
     getVideoEl: () => this.videoEl,
     getPlaybackStarted: () => this.playbackStarted,
     onReady: () => this.onSourceReady(),
-    onFatalError: (data: HlsFatalErrorData) => this.errorView.showHlsFatalError(data),
+    onFatalError: (data: HlsFatalErrorData) => { this.reportFatal(); this.errorView.showHlsFatalError(data); },
     log: plog,
   });
   private readonly errorView = new PlayerErrorView({
@@ -122,22 +124,14 @@ class PlayerController {
   private readonly seek: SeekController = new SeekController({
     getVideoEl: () => this.videoEl,
     getDuration: () => this.progressBar.getDuration(),
-    onTick: (dir: SeekDirection) => {
-      this.progressBar.update();
-      this.overlay.showOsd(dir === 'right' ? 'ff' : 'rw');
-      this.overlay.showBar();
-    },
-    onApply: (pos: number) => { this.continueWith({ position: pos }); this.overlay.showBar(); },
     log: plog,
   });
   private readonly overlay = new OverlayView({
     $root: this.$root,
     info: this.info,
     updateProgress: () => this.progressBar.update(),
-    canAutoHide: () => !this.panel.focused && !this.seek.active,
   });
   private readonly panel = new Panel(this.$root, {
-    onAfterClose: () => { this.overlay.hideBar(); },
     onApplyAudio: (idx) => { this.continueWith({ audio: idx }); },
     onApplySub: (menuIdx) => { this.continueWith({ sub: menuIdx - 1 }); },
     onApplyQuality: (idx) => {
@@ -165,6 +159,53 @@ class PlayerController {
 
   // Flags
   private playbackStarted = false;
+  private fsm: Fsm<PlayerState, PlayerFsmCtx, PlayerEvent> | null = null;
+
+  // --- PlayerFsmCtx ---
+
+  showSpinner(): void { this.overlay.showSpinner(); }
+  hideSpinner(): void { this.overlay.hideSpinner(); }
+  showBar(): void { this.overlay.showBar(); }
+  hideBar(): void { this.overlay.hideBar(); }
+  showError(): void { /* errorView drives itself */ }
+  togglePlay(): void {
+    if (!this.videoEl || !this.playbackStarted) return;
+    if (this.videoEl.paused) {
+      this.videoEl.play();
+      this.state.paused = false;
+      this.overlay.showOsd('play');
+    } else {
+      this.videoEl.pause();
+      this.state.paused = true;
+      this.overlay.showOsd('pause');
+    }
+  }
+  exit(): void { this.destroyPlayer(); router.goBack(); }
+  focusPanelButtons(): void { this.panel.focusButtons(); }
+  unfocusPanelButtons(): void { this.panel.unfocusButtons(); }
+  panelPrevBtn(): void { this.panel.prevBtn(); }
+  panelNextBtn(): void { this.panel.nextBtn(); }
+  isCurrentPanelBtnEnabled(): boolean { return this.panel.isCurrentBtnEnabled(); }
+  openSidePanel(): void { this.panel.openSideList(); }
+  closeSidePanel(): void { this.panel.closeSideList(); }
+  sideListPrev(): void { this.panel.sideListPrev(); }
+  sideListNext(): void { this.panel.sideListNext(); }
+  applySideSelection(): void { this.panel.applyCurrentSelection(); }
+  seekBegin(): void { this.seek.begin(); this.progressBar.update(); }
+  seekStep(dir: -1 | 1): void {
+    this.seek.step(dir === 1 ? 'right' : 'left');
+    this.progressBar.update();
+    this.overlay.showOsd(dir === 1 ? 'ff' : 'rw');
+  }
+  seekCommit(): void {
+    const pos = this.seek.commit();
+    if (pos >= 0) this.continueWith({ position: pos });
+  }
+  seekCancel(): void { this.seek.reset(); this.progressBar.update(); this.overlay.clearSeekLabel(); }
+
+  private reportFatal(): void {
+    if (this.fsm) this.fsm.send({ type: 'FATAL_ERROR' });
+  }
 
   // --- Helpers ---
 
@@ -226,13 +267,13 @@ class PlayerController {
         msg: err && err.message ? err.message : String(e),
         stack: err && err.stack ? err.stack.substring(0, 600) : '',
       });
-      this.errorView.showMessage('Ошибка разбора медиа-данных');
+      this.reportFatal(); this.errorView.showMessage('Ошибка разбора медиа-данных');
       return;
     }
 
     if (!found) {
       plog.error('loadAndPlay: findEpisode/findVideo returned null');
-      this.errorView.showMessage('Видео не найдено');
+      this.reportFatal(); this.errorView.showMessage('Видео не найдено');
       return;
     }
     plog.info('loadAndPlay found mid={mid} title={title} audios={audios}', {
@@ -255,7 +296,7 @@ class PlayerController {
 
       if (this.media.files.length === 0) {
         plog.error('loadAndPlay: no files — showing Видео не найдено');
-        this.errorView.showMessage('Видео не найдено');
+        this.reportFatal(); this.errorView.showMessage('Видео не найдено');
         return;
       }
       plog.info('calling startPlayback q={q} a={a} sub={sub} pos={pos}', { q, a, sub, pos });
@@ -353,8 +394,8 @@ class PlayerController {
     }
     this.overlay.hideSpinner();
     this.watchTracker.start();
-    this.overlay.showBar();
     this.info.updateBadge();
+    if (this.fsm) this.fsm.send({ type: 'SOURCE_READY' });
   }
 
   private playUrl(url: string, title: string): void {
@@ -377,6 +418,7 @@ class PlayerController {
       sourceUrl: url,
       log: plog,
       onBack: () => router.goBack(),
+      onFatalError: () => this.reportFatal(),
     };
     bindVideoEvents(this.videoEl, bindingsDeps);
 
@@ -388,7 +430,7 @@ class PlayerController {
     this.watchTracker.sendMarkTime();
     this.watchTracker.stop();
     this.overlay.dispose();
-    this.panel.clearIdle();
+    this.panel.reset();
     this.seek.reset();
     this.overlay.clearSeekLabel();
     this.engine.destroy();
@@ -418,74 +460,29 @@ class PlayerController {
     return (orig && orig.keyCode) ? orig.keyCode : (e.keyCode || 0);
   }
 
+  private keyToEvent(kc: number): PlayerEvent | null {
+    switch (kc) {
+      case TvKey.Up: return { type: 'KEY_UP' };
+      case TvKey.Down: return { type: 'KEY_DOWN' };
+      case TvKey.Left: case TvKey.Rw: return { type: 'KEY_LEFT' };
+      case TvKey.Right: case TvKey.Ff: return { type: 'KEY_RIGHT' };
+      case TvKey.Enter: return { type: 'KEY_ENTER' };
+      case TvKey.PlayPause: case TvKey.Play: case TvKey.Pause: return { type: 'KEY_PLAY_PAUSE' };
+      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop: return { type: 'KEY_BACK' };
+      default: return null;
+    }
+  }
+
   private readonly handleKey = (e: JQuery.Event): void => {
     const kc = this.getKeyCode(e);
-    plog.info('key kc={kc} panelFocused={pf} panelOpen={po} barVisible={bv}', {
-      kc, pf: this.panel.focused, po: this.panel.open, bv: this.overlay.barVisible,
+    if (kc === TvKey.TrackNext) { this.trackNavigator.navigate(1); e.preventDefault(); return; }
+    if (kc === TvKey.TrackPrev) { this.trackNavigator.navigate(-1); e.preventDefault(); return; }
+    const ev = this.keyToEvent(kc);
+    if (!ev) return;
+    plog.info('key kc={kc} state={st} ev={ev}', {
+      kc, st: this.fsm ? this.fsm.state : 'null', ev: ev.type,
     });
-    if (!this.videoEl) {
-      if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
-        this.destroyPlayer(); router.goBack(); e.preventDefault();
-      }
-      return;
-    }
-
-    if (this.panel.focused) {
-      this.panel.handleKey(e, kc);
-      return;
-    }
-
-    switch (kc) {
-      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop:
-        if (kc !== TvKey.Stop && this.overlay.barVisible) {
-          this.overlay.hideBar();
-        } else {
-          this.destroyPlayer(); router.goBack();
-        }
-        break;
-
-      case TvKey.Enter: case TvKey.PlayPause:
-        if (!this.playbackStarted) break;
-        if (this.videoEl.paused) {
-          plog.info('key Enter/PlayPause paused → play (was paused={paused} videoElPaused={vp})', {
-            paused: this.state.paused, vp: this.videoEl.paused,
-          });
-          this.videoEl.play(); this.state.paused = false; this.overlay.showOsd('play');
-        } else {
-          plog.info('key Enter/PlayPause play → paused (was paused={paused} videoElPaused={vp})', {
-            paused: this.state.paused, vp: this.videoEl.paused,
-          });
-          this.videoEl.pause(); this.state.paused = true; this.overlay.showOsd('pause');
-        }
-        this.overlay.showBar(); break;
-
-      case TvKey.Play:
-        plog.info('key Play (was paused={paused} videoElPaused={vp})', { paused: this.state.paused, vp: this.videoEl.paused });
-        if (this.videoEl.paused) { this.videoEl.play(); this.state.paused = false; this.overlay.showOsd('play'); this.overlay.showBar(); }
-        break;
-      case TvKey.Pause:
-        plog.info('key Pause (was paused={paused} videoElPaused={vp})', { paused: this.state.paused, vp: this.videoEl.paused });
-        this.videoEl.pause(); this.state.paused = true; this.overlay.showOsd('pause'); this.overlay.showBar(); break;
-
-      case TvKey.Left: case TvKey.Rw:
-        this.seek.start('left'); break;
-      case TvKey.Right: case TvKey.Ff:
-        this.seek.start('right'); break;
-
-      case TvKey.TrackNext:
-        this.trackNavigator.navigate(1); break;
-      case TvKey.TrackPrev:
-        this.trackNavigator.navigate(-1); break;
-
-      case TvKey.Up:
-        this.panel.focus();
-        this.overlay.showBar();
-        break;
-      case TvKey.Down:
-        if (this.overlay.barVisible) this.overlay.hideBar();
-        break;
-
-    }
+    if (this.fsm) this.fsm.send(ev);
     e.preventDefault();
   };
 
@@ -493,6 +490,7 @@ class PlayerController {
 
   mount(params: RouteParams): void {
     this.resetState();
+    this.fsm = new Fsm<PlayerState, PlayerFsmCtx, PlayerEvent>(playerMachine, this);
     this.media.season = params.season;
     this.media.episode = params.episode;
     this.media.video = params.video;
@@ -518,11 +516,13 @@ class PlayerController {
             msg: err && err.message ? err.message : String(e),
             stack: err && err.stack ? err.stack.substring(0, 600) : '',
           });
+          this.reportFatal();
           this.errorView.showMessage('Ошибка инициализации плеера');
         }
       },
       () => {
         plog.error('mount loadItemWithWatching failed');
+        this.reportFatal();
         this.errorView.showMessage('Ошибка загрузки');
       }
     );
@@ -531,6 +531,7 @@ class PlayerController {
   }
 
   unmount(): void {
+    if (this.fsm) { this.fsm.stop(); this.fsm = null; }
     this.destroyPlayer();
     this.keys.unbind();
     PageUtils.clearPage(this.$root);

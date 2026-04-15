@@ -1,15 +1,10 @@
 import { AudioTrack, Subtitle, VideoFile } from '../../types/api';
-import { TvKey } from '../../utils/platform';
 import { Storage } from '../../utils/storage';
 import { Lazy } from '../../utils/lazy';
-import { Logger } from '../../utils/log';
 import { tplSidePanel } from './template';
-
-const log = new Logger('panel');
 
 const SECTION_LABELS = ['Аудио', 'Субтитры', 'Качество', 'Размер сабов'] as const;
 const SECTION_COUNT = SECTION_LABELS.length;
-const IDLE_MS = 6000;
 const RESTORE_FOCUS_MS = 20000;
 
 interface LabeledItem {
@@ -29,7 +24,6 @@ export interface PanelData {
 }
 
 interface PanelCallbacks {
-  readonly onAfterClose: () => void;
   readonly onApplyAudio: (idx: number) => void;
   readonly onApplySub: (menuIdx: number) => void;
   readonly onApplyQuality: (idx: number) => void;
@@ -123,17 +117,25 @@ export const getSubSizeItems = (currentSize: number): LabeledItem[] => {
   return items;
 };
 
+// --- Panel view ---
+//
+// Dumb view over the action-button row and the side-panel list. Owns only
+// rendering state (current button index, list index, memory of last used
+// button). All user-input / timer / focus-orchestration logic lives in the
+// player FSM — this class just renders what it's told to render.
 export class Panel {
   private readonly cbs: PanelCallbacks;
   private readonly $actionBtns: Lazy<JQuery>;
   private readonly $sidePanel: Lazy<JQuery>;
 
-  focused = false;
   private btnIndex = 0;
-  private listOpen = false;
   private listIndex = 0;
   private listSection = 0;
-  private idleTimer: number | null = null;
+  private btnsFocused = false;
+  private sideOpen = false;
+
+  // 20-sec memory: if user reopens the panel within this window we return to
+  // the same button rather than starting over from section 0.
   private lastBtnIndex = 0;
   private lastCloseAt = 0;
 
@@ -143,22 +145,22 @@ export class Panel {
     this.$sidePanel = new Lazy(() => $root.find('.player__side-panel'));
   }
 
-  get open(): boolean { return this.listOpen; }
-
   resetDomCache(): void {
     this.$actionBtns.reset();
     this.$sidePanel.reset();
   }
 
-  // --- queries ---
-
-  private getItems(section: number): ReadonlyArray<LabeledItem> {
-    const d = this.cbs.getData();
-    if (section === 0) return d.audioItems;
-    if (section === 1) return d.subItems;
-    if (section === 2) return d.qualityItems;
-    return d.subSizeItems;
+  reset(): void {
+    this.btnIndex = 0;
+    this.listIndex = 0;
+    this.listSection = 0;
+    this.btnsFocused = false;
+    this.sideOpen = false;
+    this.lastBtnIndex = 0;
+    this.lastCloseAt = 0;
   }
+
+  // --- queries ---
 
   private isSectionEnabled(section: number): boolean {
     const d = this.cbs.getData();
@@ -168,43 +170,118 @@ export class Panel {
     return d.subSizeEnabled;
   }
 
-  // --- idle timer ---
-
-  private resetIdle(): void {
-    this.clearIdle();
-    this.idleTimer = window.setTimeout(() => {
-      log.info('idle fired → unfocus (focused={f} listOpen={o})', { f: this.focused, o: this.listOpen });
-      this.idleTimer = null;
-      this.unfocus();
-    }, IDLE_MS);
-    log.info('idle reset ({ms}ms) focused={f} listOpen={o}', { ms: IDLE_MS, f: this.focused, o: this.listOpen });
+  isCurrentBtnEnabled(): boolean {
+    return this.isSectionEnabled(this.btnIndex);
   }
 
-  readonly clearIdle = (): void => {
-    if (this.idleTimer !== null) {
-      log.info('idle cleared');
-      clearTimeout(this.idleTimer);
-      this.idleTimer = null;
+  private getItems(section: number): ReadonlyArray<LabeledItem> {
+    const d = this.cbs.getData();
+    if (section === 0) return d.audioItems;
+    if (section === 1) return d.subItems;
+    if (section === 2) return d.qualityItems;
+    return d.subSizeItems;
+  }
+
+  // --- button row focus ---
+
+  focusButtons(): void {
+    this.btnsFocused = true;
+    const within = (Date.now() - this.lastCloseAt) < RESTORE_FOCUS_MS;
+    this.btnIndex = within ? this.lastBtnIndex : 0;
+    if (!this.isSectionEnabled(this.btnIndex)) {
+      let i = 0;
+      while (i < SECTION_COUNT && !this.isSectionEnabled(i)) i++;
+      this.btnIndex = i < SECTION_COUNT ? i : 0;
     }
-  };
+    this.renderButtons();
+  }
 
-  // --- render ---
+  unfocusButtons(): void {
+    if (this.btnsFocused) {
+      this.lastBtnIndex = this.btnIndex;
+      this.lastCloseAt = Date.now();
+    }
+    this.btnsFocused = false;
+    this.renderButtons();
+  }
 
-  private updateButtons(): void {
+  prevBtn(): void {
+    let idx = this.btnIndex - 1;
+    while (idx >= 0 && !this.isSectionEnabled(idx)) idx--;
+    if (idx >= 0) { this.btnIndex = idx; this.renderButtons(); }
+  }
+
+  nextBtn(): void {
+    let idx = this.btnIndex + 1;
+    while (idx < SECTION_COUNT && !this.isSectionEnabled(idx)) idx++;
+    if (idx < SECTION_COUNT) { this.btnIndex = idx; this.renderButtons(); }
+  }
+
+  private renderButtons(): void {
     const $btns = this.$actionBtns.get();
     for (let i = 0; i < SECTION_COUNT; i++) {
       const $btn = $btns.eq(i);
-      const enabled = this.isSectionEnabled(i);
-      $btn.toggleClass('disabled', !enabled);
-      if (i === this.btnIndex && this.focused && !this.listOpen) {
-        $btn.addClass('focused');
-      } else {
-        $btn.removeClass('focused');
-      }
+      $btn.toggleClass('disabled', !this.isSectionEnabled(i));
+      const on = i === this.btnIndex && this.btnsFocused && !this.sideOpen;
+      if (on) $btn.addClass('focused'); else $btn.removeClass('focused');
     }
   }
 
-  private renderSidePanel(): void {
+  // --- side list ---
+
+  openSideList(): void {
+    this.sideOpen = true;
+    this.listSection = this.btnIndex;
+    const items = this.getItems(this.listSection);
+    this.listIndex = 0;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].selected) { this.listIndex = i; break; }
+    }
+    this.renderSideList();
+    this.renderButtons();
+    const $sp = this.$sidePanel.get();
+    $sp.removeClass('hidden');
+    setTimeout(() => { $sp.addClass('active'); }, 20);
+  }
+
+  closeSideList(): void {
+    this.sideOpen = false;
+    const $sp = this.$sidePanel.get();
+    $sp.removeClass('active');
+    setTimeout(() => { $sp.addClass('hidden'); }, 200);
+    this.renderButtons();
+  }
+
+  sideListPrev(): void {
+    if (this.listIndex > 0) {
+      this.listIndex--;
+      this.renderSideList();
+    }
+  }
+
+  sideListNext(): void {
+    const items = this.getItems(this.listSection);
+    if (this.listIndex < items.length - 1) {
+      this.listIndex++;
+      this.renderSideList();
+    }
+  }
+
+  applyCurrentSelection(): void {
+    const items = this.getItems(this.listSection);
+    const item = items[this.listIndex];
+    if (!item || item.selected) return;
+    if (this.listSection === 0) this.cbs.onApplyAudio(this.listIndex);
+    else if (this.listSection === 1) this.cbs.onApplySub(this.listIndex);
+    else if (this.listSection === 2) this.cbs.onApplyQuality(this.listIndex);
+    else {
+      const size = Storage.SUB_SIZE_MIN + this.listIndex * Storage.SUB_SIZE_STEP;
+      this.cbs.onApplySubSize(size);
+    }
+    this.cbs.onSavePrefs();
+  }
+
+  private renderSideList(): void {
     const items = this.getItems(this.listSection);
     const title = SECTION_LABELS[this.listSection];
     const $sp = this.$sidePanel.get();
@@ -225,147 +302,4 @@ export class Panel {
       container.scrollTop = bot - container.clientHeight;
     }
   }
-
-  // --- focus / unfocus ---
-
-  readonly focus = (): void => {
-    log.info('focus() called focused={f} sinceClose={dt}', { f: this.focused, dt: Date.now() - this.lastCloseAt });
-    if (this.focused) return;
-    this.focused = true;
-    this.listOpen = false;
-    const within = (Date.now() - this.lastCloseAt) < RESTORE_FOCUS_MS;
-    this.btnIndex = within ? this.lastBtnIndex : 0;
-    if (!this.isSectionEnabled(this.btnIndex)) {
-      let i = 0;
-      while (i < SECTION_COUNT && !this.isSectionEnabled(i)) i++;
-      this.btnIndex = i < SECTION_COUNT ? i : 0;
-    }
-    this.updateButtons();
-    this.resetIdle();
-  };
-
-  private unfocus(): void {
-    log.info('unfocus() called focused={f} listOpen={o}', { f: this.focused, o: this.listOpen });
-    if (!this.focused) return;
-    this.clearIdle();
-    if (this.listOpen) {
-      this.closeSidePanel();
-    }
-    this.lastBtnIndex = this.btnIndex;
-    this.lastCloseAt = Date.now();
-    this.focused = false;
-    this.updateButtons();
-    this.cbs.onAfterClose();
-  }
-
-  // --- side panel open / close ---
-
-  private openSidePanel(): void {
-    log.info('openSidePanel section={s}', { s: this.btnIndex });
-    this.resetIdle();
-    this.listOpen = true;
-    this.listSection = this.btnIndex;
-    const items = this.getItems(this.listSection);
-    this.listIndex = 0;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].selected) { this.listIndex = i; break; }
-    }
-    this.renderSidePanel();
-    this.updateButtons();
-    const $sp = this.$sidePanel.get();
-    $sp.removeClass('hidden');
-    setTimeout(() => { $sp.addClass('active'); }, 20);
-  }
-
-  private closeSidePanel(): void {
-    log.info('closeSidePanel focused={f}', { f: this.focused });
-    this.resetIdle();
-    this.listOpen = false;
-    const $sp = this.$sidePanel.get();
-    $sp.removeClass('active');
-    setTimeout(() => { $sp.addClass('hidden'); }, 200);
-    this.updateButtons();
-  }
-
-  private applySelection(): void {
-    log.info('applySelection section={s} idx={i}', { s: this.listSection, i: this.listIndex });
-    this.resetIdle();
-    if (this.listSection === 0) {
-      this.cbs.onApplyAudio(this.listIndex);
-    } else if (this.listSection === 1) {
-      this.cbs.onApplySub(this.listIndex);
-    } else if (this.listSection === 2) {
-      this.cbs.onApplyQuality(this.listIndex);
-    } else {
-      const size = Storage.SUB_SIZE_MIN + this.listIndex * Storage.SUB_SIZE_STEP;
-      this.cbs.onApplySubSize(size);
-    }
-    this.cbs.onSavePrefs();
-    this.renderSidePanel();
-  }
-
-  // --- key handling ---
-
-  readonly handleKey = (e: JQuery.Event, kc: number): void => {
-    log.info('handleKey kc={kc} focused={f} listOpen={o} btnIdx={b} listIdx={li}', {
-      kc, f: this.focused, o: this.listOpen, b: this.btnIndex, li: this.listIndex,
-    });
-    this.resetIdle();
-
-    if (this.listOpen) {
-      this.handleListKey(e, kc);
-      return;
-    }
-
-    switch (kc) {
-      case TvKey.Left: {
-        let idx = this.btnIndex - 1;
-        while (idx >= 0 && !this.isSectionEnabled(idx)) idx--;
-        if (idx >= 0) { this.btnIndex = idx; this.updateButtons(); }
-        e.preventDefault(); break;
-      }
-      case TvKey.Right: {
-        let idx = this.btnIndex + 1;
-        while (idx < SECTION_COUNT && !this.isSectionEnabled(idx)) idx++;
-        if (idx < SECTION_COUNT) { this.btnIndex = idx; this.updateButtons(); }
-        e.preventDefault(); break;
-      }
-      case TvKey.Enter:
-        if (this.isSectionEnabled(this.btnIndex)) this.openSidePanel();
-        e.preventDefault(); break;
-      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Down:
-        this.unfocus(); e.preventDefault(); break;
-    }
-  };
-
-  private handleListKey(e: JQuery.Event, kc: number): void {
-    const items = this.getItems(this.listSection);
-    switch (kc) {
-      case TvKey.Up:
-        if (this.listIndex > 0) { this.listIndex--; this.renderSidePanel(); }
-        e.preventDefault(); break;
-      case TvKey.Down:
-        if (this.listIndex < items.length - 1) { this.listIndex++; this.renderSidePanel(); }
-        e.preventDefault(); break;
-      case TvKey.Enter:
-        if (items[this.listIndex] && !items[this.listIndex].selected) {
-          this.applySelection();
-        }
-        this.closeSidePanel();
-        e.preventDefault(); break;
-      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Left:
-        this.closeSidePanel(); e.preventDefault(); break;
-    }
-  }
-
-  readonly reset = (): void => {
-    this.focused = false;
-    this.btnIndex = 0;
-    this.listOpen = false;
-    this.listIndex = 0;
-    this.listSection = 0;
-    this.lastBtnIndex = 0;
-    this.lastCloseAt = 0;
-    this.clearIdle();
-  };
 }
