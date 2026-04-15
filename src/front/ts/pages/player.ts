@@ -181,7 +181,7 @@ class PlayerController implements PlayerFsmCtx {
   showBar(): void { this.overlay.showBar(); this.panel.refreshButtons(); this.syncPlayIcon(); }
   hideBar(): void { this.overlay.hideBar(); }
   private syncPlayIcon(): void {
-    if (this.videoEl && this.videoEl.paused) this.overlay.setIcon('pause');
+    if (this.state.paused) this.overlay.setIcon('pause');
     else this.overlay.hideIcon();
   }
   showError(): void { /* errorView drives itself */ }
