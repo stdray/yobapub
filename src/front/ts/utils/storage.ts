@@ -20,10 +20,10 @@ const ALL_CATS: ReadonlyArray<ProxyCategory> = [
 ];
 
 const PROXY_CATEGORY_LABELS: Readonly<Record<ProxyCategory, string>> = {
-  [ProxyCategory.Posters]:   'Прокси: постеры',
-  [ProxyCategory.Subtitles]: 'Прокси: субтитры',
-  [ProxyCategory.Tv]:        'Прокси: ТВ',
-  [ProxyCategory.Media]:     'Прокси: видео/аудио',
+  [ProxyCategory.Posters]:   'постеры',
+  [ProxyCategory.Subtitles]: 'субтитры',
+  [ProxyCategory.Tv]:        'ТВ',
+  [ProxyCategory.Media]:     'видео/аудио',
 };
 
 export const proxyCategoryLabel = (cat: ProxyCategory): string => PROXY_CATEGORY_LABELS[cat];
