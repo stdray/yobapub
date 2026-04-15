@@ -182,12 +182,13 @@ const buildProxySetting = (isVip: boolean): SettingItem | null => {
 const getDisplayValue = (item: SettingItem): string => {
   if (item.type === 'readonly') return String(item.value ?? '');
   if (item.type === 'multicheck' && item.proxyCats) {
-    let enabled = 0;
+    const labels: string[] = [];
     for (let i = 0; i < item.proxyCats.length; i++) {
-      if (storage.isProxyEnabled(item.proxyCats[i])) enabled++;
+      if (storage.isProxyEnabled(item.proxyCats[i])) {
+        labels.push(proxyCategoryLabel(item.proxyCats[i]));
+      }
     }
-    if (enabled === 0) return 'Выкл';
-    return enabled + ' из ' + item.proxyCats.length;
+    return labels.length === 0 ? 'Выкл' : labels.join(', ');
   }
   if (item.type === 'list' && item.options) {
     for (let i = 0; i < item.options.length; i++) {
