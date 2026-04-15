@@ -49,6 +49,10 @@ class Router {
     this.exitHandler = fn;
   };
 
+  readonly triggerExit = (): void => {
+    if (this.exitHandler) this.exitHandler();
+  };
+
   readonly goBack = (): boolean => {
     if (this.navHistory.length === 0) {
       if (this.exitHandler) this.exitHandler();

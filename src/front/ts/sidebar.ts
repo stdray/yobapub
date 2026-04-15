@@ -144,7 +144,7 @@ class Sidebar {
       case TvKey.Return:
       case TvKey.Backspace:
       case TvKey.Escape:
-        if (this.activeRoute === 'watching') {
+        if (this.activeRoute && this.isRoute(this.activeRoute)) {
           this.lastBackTime = Date.now();
         }
         this.focus();
@@ -216,12 +216,12 @@ class Sidebar {
       case TvKey.Return:
       case TvKey.Backspace:
       case TvKey.Escape: {
-        if (this.activeRoute === 'watching') {
+        if (this.activeRoute && this.isRoute(this.activeRoute)) {
           const now = Date.now();
           if (now - this.lastBackTime < DOUBLE_BACK_MS) {
             this.lastBackTime = 0;
             this.unfocus();
-            router.goBack();
+            router.triggerExit();
           } else {
             this.lastBackTime = now;
           }
