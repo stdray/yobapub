@@ -782,14 +782,14 @@ html, body {
 .player__actions > * + * { margin-left: 16px; }
 
 .player__action-btn {
-  padding: 0 24px;
-  font-size: 22px;
-  line-height: 52px;
+  padding: 0 32px;
+  font-size: 26px;
+  line-height: 64px;
   white-space: nowrap;
-  background: rgba(255,255,255,0.15);
+  background: rgba(0,0,0,0.7);
   border: 2px solid transparent;
   border-radius: 6px;
-  color: #ccc;
+  color: #eee;
 }
 
 .player__action-btn.focused {

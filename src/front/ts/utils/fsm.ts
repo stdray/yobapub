@@ -13,6 +13,9 @@ export interface FsmTransition<S extends string, C, E> {
   readonly target?: S;
   readonly cond?: (ctx: C, event: E) => boolean;
   readonly action?: FsmAction<C, E>;
+  // Internal transition (no target) that should still rearm the current
+  // state's `after` timer — e.g. user navigation that counts as activity.
+  readonly reenterAfter?: boolean;
 }
 
 export interface FsmStateDef<S extends string, C, E extends { readonly type: string }> {
@@ -88,9 +91,14 @@ export class Fsm<S extends string, C, E extends { readonly type: string }> {
 
   private applyTransition(t: FsmTransition<S, C, E>, event: E, fromDef: FsmStateDef<S, C, E>): void {
     const target = t.target;
-    // Internal transition: action only, no exit/entry, do not reset after-timer.
+    // Internal transition: action only, no exit/entry. Optionally rearms
+    // the after-timer to count this event as activity.
     if (target === undefined) {
       if (t.action) t.action(this.ctx, event);
+      if (t.reenterAfter) {
+        this.clearAfter();
+        this.armAfter(fromDef);
+      }
       if (this.listener) this.listener(this.current, event);
       return;
     }

@@ -61,7 +61,7 @@ export interface PlayerFsmCtx {
   seekCancel(): void;
 }
 
-const UI_IDLE_MS = 5000;
+const UI_IDLE_MS = 15000;
 const SEEK_COMMIT_MS = 2000;
 
 export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
@@ -113,8 +113,8 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
       exit:  (c) => c.unfocusPanelButtons(),
       after: { ms: UI_IDLE_MS, target: 'idle' },
       on: {
-        KEY_LEFT:  { action: (c) => c.panelPrevBtn() },
-        KEY_RIGHT: { action: (c) => c.panelNextBtn() },
+        KEY_LEFT:  { action: (c) => c.panelPrevBtn(), reenterAfter: true },
+        KEY_RIGHT: { action: (c) => c.panelNextBtn(), reenterAfter: true },
         KEY_ENTER: {
           target: 'sidePanelOpen',
           cond: (c) => c.isCurrentPanelBtnEnabled(),
@@ -150,8 +150,8 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
         action: (c) => c.seekCommit(),
       },
       on: {
-        KEY_LEFT:  { action: (c) => c.seekStep(-1) },
-        KEY_RIGHT: { action: (c) => c.seekStep(+1) },
+        KEY_LEFT:  { action: (c) => c.seekStep(-1), reenterAfter: true },
+        KEY_RIGHT: { action: (c) => c.seekStep(+1), reenterAfter: true },
         KEY_ENTER: { target: 'barShown', action: (c) => c.seekCommit() },
         KEY_BACK:  { target: 'barShown', action: (c) => c.seekCancel() },
         BUFFERING:   'loading',
