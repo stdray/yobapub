@@ -1,13 +1,13 @@
-import $ from 'jquery';
 import * as doT from 'dot';
-import { Page, RouteParams } from '../types/app';
+import { RouteParams } from '../types/app';
 import { deviceApi } from '../api/device';
 import { DeviceSetting, DeviceSettingsResponse } from '../types/api';
 import { TvKey, platform } from '../utils/platform';
 import { storage, Storage, QualityId, ProxyCategory, proxyCategoryLabel } from '../utils/storage';
-import { PageKeys, PageUtils } from '../utils/page';
+import { PageUtils } from '../utils/page';
 import { formatAppVersion } from '../utils/format';
-import { router } from '../router';
+import { sidebar } from '../sidebar';
+import { SidebarPage } from './sidebar-page';
 import { Logger } from '../utils/log';
 import { arrayFind } from '../utils/array';
 
@@ -20,13 +20,15 @@ interface SettingOption {
   selected: number;
 }
 
+type SettingType = 'list' | 'checkbox' | 'readonly' | 'multicheck';
+
 interface SettingItem {
   key: string;
   label: string;
-  type: string;
+  type: SettingType;
   value: number | string | boolean | null;
   options?: SettingOption[];
-  proxyCat?: ProxyCategory;
+  proxyCats?: ProxyCategory[];
 }
 
 type SettingKey =
@@ -53,6 +55,10 @@ const LABELS: Readonly<Record<SettingKey, string>> = {
   mixedPlaylist: 'Смешанный плейлист',
 };
 
+const ORDER_AFTER_PROXY: ReadonlyArray<SettingKey> = [
+  'supportHevc', 'streamingType', 'supportSsl', 'supportHdr', 'support4k', 'mixedPlaylist'
+];
+
 const tplPageCompiled = doT.template(`
   <div class="settings-page">
     <div class="settings-page__title">Настройки</div>
@@ -64,17 +70,9 @@ const tplPage = (data: { readonly items: string }): string =>
   tplPageCompiled(data);
 
 const tplSettingItemCompiled = doT.template(`
-  <div class="sitem{{?it.focused}} focused{{?}}{{?it.stepper}} sitem--stepper{{?}}" data-idx="{{=it.idx}}">
+  <div class="sitem{{?it.focused}} focused{{?}}" data-idx="{{=it.idx}}">
     <span class="sitem__label">{{=it.label}}</span>
-    {{?it.stepper}}
-      <span class="sitem__stepper">
-        <span class="sitem__step-btn sitem__step-btn--minus">&minus;</span>
-        <span class="sitem__step-val">{{=it.value}}</span>
-        <span class="sitem__step-btn sitem__step-btn--plus">+</span>
-      </span>
-    {{??}}
-      <span class="sitem__value">{{=it.value}}</span>
-    {{?}}
+    <span class="sitem__value">{{=it.value}}</span>
   </div>
 `);
 
@@ -83,7 +81,6 @@ interface SettingItemData {
   readonly label: string;
   readonly value: string;
   readonly focused: boolean;
-  readonly stepper: boolean;
 }
 
 const tplSettingItem = (data: SettingItemData): string =>
@@ -130,8 +127,8 @@ const persistStreamingType = (settings: Record<string, DeviceSetting>): void => 
   storage.setStreamingType(String(sel.label || sel.id).toLowerCase());
 };
 
-const parseSettings = (raw: Record<string, DeviceSetting>): SettingItem[] => {
-  const items: SettingItem[] = [];
+const parseSettings = (raw: Record<string, DeviceSetting>): Partial<Record<SettingKey, SettingItem>> => {
+  const result: Partial<Record<SettingKey, SettingItem>> = {};
   const keys = Object.keys(raw);
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
@@ -139,13 +136,13 @@ const parseSettings = (raw: Record<string, DeviceSetting>): SettingItem[] => {
     const setting = raw[key];
     const label = LABELS[key] || (setting.label || key);
     if (setting.type === 'list') {
-      items.push({ key, label, type: 'list', value: null, options: parseListOptions(key, setting) });
+      result[key] = { key, label, type: 'list', value: null, options: parseListOptions(key, setting) };
     } else {
       const val = typeof setting.value === 'boolean' ? setting.value : null;
-      items.push({ key, label, type: 'checkbox', value: val });
+      result[key] = { key, label, type: 'checkbox', value: val };
     }
   }
-  return items;
+  return result;
 };
 
 const buildQualitySetting = (): SettingItem => {
@@ -166,10 +163,6 @@ const buildVersionSetting = (): SettingItem => {
   return { key: '_version', label: 'Версия', type: 'readonly', value: formatAppVersion() };
 };
 
-const buildSubSizeSetting = (): SettingItem => ({
-  key: '_subSize', label: 'Размер субтитров', type: 'stepper', value: storage.getSubSize()
-});
-
 const buildStartPageSetting = (): SettingItem => {
   const savedId = storage.getStartPage();
   const opts: SettingOption[] = [];
@@ -180,30 +173,22 @@ const buildStartPageSetting = (): SettingItem => {
   return { key: '_startPage', label: 'Стартовая страница', type: 'list', value: null, options: opts };
 };
 
-const buildProxyCatSetting = (cat: ProxyCategory): SettingItem => ({
-  key: '_proxyCat_' + cat,
-  label: proxyCategoryLabel(cat),
-  type: 'checkbox',
-  value: storage.isProxyEnabled(cat) ? 1 : 0,
-  proxyCat: cat,
-});
-
-const buildProxyCatSettings = (isVip: boolean): SettingItem[] => {
-  const available = storage.getAvailableProxyCategories(isVip);
-  const items: SettingItem[] = [];
-  for (let i = 0; i < available.length; i++) {
-    items.push(buildProxyCatSetting(available[i]));
-  }
-  return items;
+const buildProxySetting = (isVip: boolean): SettingItem | null => {
+  const cats = storage.getAvailableProxyCategories(isVip);
+  if (cats.length === 0) return null;
+  return { key: '_proxy', label: 'Прокси', type: 'multicheck', value: null, proxyCats: cats.slice() };
 };
 
 const getDisplayValue = (item: SettingItem): string => {
   if (item.type === 'readonly') return String(item.value ?? '');
-  if (item.type === 'stepper') {
-    const v = item.value as number;
-    let lbl = v + 'px';
-    if (v === Storage.DEFAULT_SUB_SIZE) lbl += ' (стандарт)';
-    return lbl;
+  if (item.type === 'multicheck' && item.proxyCats) {
+    const labels: string[] = [];
+    for (let i = 0; i < item.proxyCats.length; i++) {
+      if (storage.isProxyEnabled(item.proxyCats[i])) {
+        labels.push(proxyCategoryLabel(item.proxyCats[i]));
+      }
+    }
+    return labels.length === 0 ? 'Выкл' : labels.join(', ');
   }
   if (item.type === 'list' && item.options) {
     for (let i = 0; i < item.options.length; i++) {
@@ -214,52 +199,50 @@ const getDisplayValue = (item: SettingItem): string => {
   return item.value ? 'Вкл' : 'Выкл';
 };
 
-class SettingsPage implements Page {
-  private readonly $root = $('#page-settings');
-  private readonly keys = new PageKeys();
+class SettingsPage extends SidebarPage {
   private allSettings: SettingItem[] = [];
   private focusedIndex = 0;
   private focusedOptionIndex = 0;
   private optionsOpen = false;
 
-  mount(_params: RouteParams): void {
+  constructor() { super('settings'); }
+
+  protected onUnfocus(): void {
+    this.render();
+  }
+
+  protected onMount(_params: RouteParams): void {
     this.allSettings = [];
     this.focusedIndex = 0;
     this.optionsOpen = false;
-    this.keys.bind((e) => this.handleKey(e));
     PageUtils.showSpinnerIn(this.$root);
 
     slog.info('mount start');
     $.when(deviceApi.getDeviceSettings(), deviceApi.checkVip(true)).then(
       (...args: unknown[]) => {
         try {
-          slog.info('settings+vip resolved argsLen={n}', { n: args.length });
           const res = args[0] as [DeviceSettingsResponse, string, JQueryXHR] | DeviceSettingsResponse;
           const isVip = args[1] as [boolean, string, JQueryXHR] | boolean;
           const data: DeviceSettingsResponse = Array.isArray(res) ? res[0] : res;
           const vip: boolean = Array.isArray(isVip) ? isVip[0] : isVip;
-          slog.info('parsed hasData={hd} hasSettings={hs} vip={vip}', {
-            hd: !!data, hs: !!(data && data.settings), vip,
-          });
-          if (data && data.settings) {
-            slog.info('before parseSettings');
-            this.allSettings = parseSettings(data.settings);
-            slog.info('parseSettings ok count={n}', { n: this.allSettings.length });
-            persistStreamingType(data.settings);
-          }
+          const parsed: Partial<Record<SettingKey, SettingItem>> = (data && data.settings)
+            ? parseSettings(data.settings) : {};
+          if (data && data.settings) persistStreamingType(data.settings);
           if (!vip) storage.downgradeProxyForNonVip();
-          slog.info('before unshift builders');
-          const proxyCats = buildProxyCatSettings(vip);
-          for (let pi = proxyCats.length - 1; pi >= 0; pi--) {
-            this.allSettings.unshift(proxyCats[pi]);
+
+          const ordered: SettingItem[] = [];
+          ordered.push(buildVersionSetting());
+          if (parsed.serverLocation) ordered.push(parsed.serverLocation);
+          const proxy = buildProxySetting(vip);
+          if (proxy) ordered.push(proxy);
+          ordered.push(buildQualitySetting());
+          ordered.push(buildStartPageSetting());
+          for (let i = 0; i < ORDER_AFTER_PROXY.length; i++) {
+            const item = parsed[ORDER_AFTER_PROXY[i]];
+            if (item) ordered.push(item);
           }
-          this.allSettings.unshift(buildSubSizeSetting());
-          this.allSettings.unshift(buildQualitySetting());
-          this.allSettings.unshift(buildStartPageSetting());
-          this.allSettings.unshift(buildVersionSetting());
-          slog.info('before render count={n}', { n: this.allSettings.length });
+          this.allSettings = ordered;
           this.render();
-          slog.info('render ok');
         } catch (e) {
           const err = e as Error;
           slog.error('settings handler threw: {msg} stack={stack}', {
@@ -281,13 +264,11 @@ class SettingsPage implements Page {
     );
   }
 
-  unmount(): void {
-    this.keys.unbind();
-    PageUtils.clearPage(this.$root);
+  protected onUnmount(): void {
     this.allSettings = [];
   }
 
-  private handleKey(e: JQuery.Event): void {
+  protected handleKey(e: JQuery.Event): void {
     if (this.optionsOpen) {
       this.handleOptionsKey(e);
       return;
@@ -296,9 +277,6 @@ class SettingsPage implements Page {
     const item = this.allSettings[this.focusedIndex];
 
     switch (e.keyCode) {
-      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
-        router.navigateToStartPage();
-        e.preventDefault(); break;
       case TvKey.Up:
         if (this.focusedIndex > 0) { this.focusedIndex--; this.render(); }
         e.preventDefault(); break;
@@ -306,18 +284,13 @@ class SettingsPage implements Page {
         if (this.focusedIndex < this.allSettings.length - 1) { this.focusedIndex++; this.render(); }
         e.preventDefault(); break;
       case TvKey.Left:
-        if (item && item.type === 'stepper') { this.stepSubSize(-1); }
-        else if (item && item.type === 'list') { this.cycleListOption(-1); }
-        else if (item && item.type === 'checkbox') { this.toggleCheckbox(); }
-        e.preventDefault(); break;
-      case TvKey.Right:
-        if (item && item.type === 'stepper') { this.stepSubSize(1); }
-        else if (item && item.type === 'list') { this.cycleListOption(1); }
-        else if (item && item.type === 'checkbox') { this.toggleCheckbox(); }
+        sidebar.focus();
         e.preventDefault(); break;
       case TvKey.Enter:
-        if (item && (item.type === 'stepper' || item.type === 'readonly')) { e.preventDefault(); break; }
-        this.openOptions(); e.preventDefault(); break;
+        if (!item || item.type === 'readonly') { e.preventDefault(); break; }
+        this.openOptions();
+        e.preventDefault(); break;
+      default: sidebar.backOrFocus(e);
     }
   }
 
@@ -328,8 +301,7 @@ class SettingsPage implements Page {
         idx: i,
         label: this.allSettings[i].label,
         value: getDisplayValue(this.allSettings[i]),
-        focused: !this.optionsOpen && i === this.focusedIndex,
-        stepper: this.allSettings[i].type === 'stepper'
+        focused: !this.optionsOpen && i === this.focusedIndex
       });
     }
     this.$root.html(tplPage({ items: html }));
@@ -343,26 +315,25 @@ class SettingsPage implements Page {
     const item = this.allSettings[this.focusedIndex];
     if (!item) return;
 
-    if (item.type === 'list' && item.options) {
-      const opts = item.options.map((o) => ({
-        label: o.label, selected: o.selected === 1
+    let opts: ReadonlyArray<{ readonly label: string; readonly selected: boolean }>;
+    if (item.type === 'multicheck' && item.proxyCats) {
+      opts = item.proxyCats.map((cat) => ({
+        label: proxyCategoryLabel(cat),
+        selected: storage.isProxyEnabled(cat)
       }));
-      this.$root.find('.settings-page__list').append(
-        '<div class="soptions-overlay">' +
-        tplOptions({ title: item.label, options: opts, focused: this.focusedOptionIndex }) +
-        '</div>'
-      );
+    } else if (item.type === 'list' && item.options) {
+      opts = item.options.map((o) => ({ label: o.label, selected: o.selected === 1 }));
     } else {
-      const checkOpts = [
+      opts = [
         { label: 'Выкл', selected: !item.value },
         { label: 'Вкл', selected: !!item.value }
       ];
-      this.$root.find('.settings-page__list').append(
-        '<div class="soptions-overlay">' +
-        tplOptions({ title: item.label, options: checkOpts, focused: this.focusedOptionIndex }) +
-        '</div>'
-      );
     }
+    this.$root.find('.settings-page__list').append(
+      '<div class="soptions-overlay">' +
+      tplOptions({ title: item.label, options: opts, focused: this.focusedOptionIndex }) +
+      '</div>'
+    );
   }
 
   private closeOptions(): void {
@@ -377,7 +348,9 @@ class SettingsPage implements Page {
 
     this.optionsOpen = true;
 
-    if (item.type === 'list' && item.options) {
+    if (item.type === 'multicheck') {
+      this.focusedOptionIndex = 0;
+    } else if (item.type === 'list' && item.options) {
       this.focusedOptionIndex = 0;
       for (let i = 0; i < item.options.length; i++) {
         if (item.options[i].selected) { this.focusedOptionIndex = i; break; }
@@ -386,6 +359,15 @@ class SettingsPage implements Page {
       this.focusedOptionIndex = item.value ? 1 : 0;
     }
 
+    this.renderOptions();
+  }
+
+  private toggleProxyAt(idx: number): void {
+    const item = this.allSettings[this.focusedIndex];
+    if (!item || !item.proxyCats) return;
+    const cat = item.proxyCats[idx];
+    storage.setProxyEnabled(cat, !storage.isProxyEnabled(cat));
+    this.$root.find('.soptions-overlay').remove();
     this.renderOptions();
   }
 
@@ -415,14 +397,6 @@ class SettingsPage implements Page {
       return;
     }
 
-    if (item.proxyCat !== undefined) {
-      const enabled = this.focusedOptionIndex === 1;
-      item.value = enabled ? 1 : 0;
-      storage.setProxyEnabled(item.proxyCat, enabled);
-      this.closeOptions();
-      return;
-    }
-
     const saveData: Record<string, number | string> = {};
 
     if (item.type === 'list' && item.options) {
@@ -444,42 +418,10 @@ class SettingsPage implements Page {
     this.closeOptions();
   }
 
-  private stepSubSize(dir: number): void {
-    const item = this.allSettings[this.focusedIndex];
-    if (!item || item.key !== '_subSize') return;
-    let size = item.value as number;
-    size = Math.max(Storage.SUB_SIZE_MIN, Math.min(Storage.SUB_SIZE_MAX, size + dir * Storage.SUB_SIZE_STEP));
-    item.value = size;
-    storage.setSubSize(size);
-    this.render();
-  }
-
-  private toggleCheckbox(): void {
-    const item = this.allSettings[this.focusedIndex];
-    if (!item || item.type !== 'checkbox') return;
-    this.focusedOptionIndex = item.value ? 0 : 1;
-    this.applyOption();
-  }
-
-  private cycleListOption(dir: number): void {
-    const item = this.allSettings[this.focusedIndex];
-    if (!item || item.type !== 'list' || !item.options || item.options.length === 0) return;
-
-    let currentIdx = 0;
-    for (let i = 0; i < item.options.length; i++) {
-      if (item.options[i].selected) { currentIdx = i; break; }
-    }
-
-    const len = item.options.length;
-    const newIdx = (currentIdx + dir + len) % len;
-
-    this.focusedOptionIndex = newIdx;
-    this.applyOption();
-  }
-
   private handleOptionsKey(e: JQuery.Event): void {
     const item = this.allSettings[this.focusedIndex];
-    const count = (item.type === 'list' && item.options) ? item.options.length : 2;
+    const count = item.type === 'multicheck' && item.proxyCats ? item.proxyCats.length
+      : (item.type === 'list' && item.options) ? item.options.length : 2;
 
     switch (e.keyCode) {
       case TvKey.Up:
@@ -497,7 +439,9 @@ class SettingsPage implements Page {
         }
         e.preventDefault(); break;
       case TvKey.Enter:
-        this.applyOption(); e.preventDefault(); break;
+        if (item.type === 'multicheck') { this.toggleProxyAt(this.focusedOptionIndex); }
+        else { this.applyOption(); }
+        e.preventDefault(); break;
       case TvKey.Return: case TvKey.Backspace: case TvKey.Escape:
         this.closeOptions(); e.preventDefault(); break;
     }

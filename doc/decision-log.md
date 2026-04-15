@@ -13,6 +13,42 @@
 
 ---
 
+## 2026-04-15 14:30 — 4K HEVC на Tizen 3.0: звук есть, картинка зависает
+
+**Решение:** зафиксировано как ограничение платформы. Tizen 3.0 не тянет 4K HEVC через MSE.
+
+**Причина:** лог `tZtBoLRIgEulyLxtvUyzEg` — сессия на Tizen 3.0 (WebKit/538.1). Манифест mixed HEVC+AVC, 8 levels.
+`pinQualityLevel` выбрал level=6 (3840×1600 HEVC hvc1.2.4.L150.B0 @ 2.4Mbps). Фрагменты грузятся и буферизуются успешно (sn=1..7, 0.1-70.1), звук идёт, markTime тикает, но картинка зависшая/корявая.
+
+При этом 1080p HEVC на том же устройстве работает (лог `xoqnm2gQxUOQpDF3uBYtuQ`: level=4,
+1920×1072 HEVC @ 7.4Mbps — воспроизводится, хотя с bufferStalledError).
+
+Вывод: аппаратный HEVC-декодер Tizen 3.0 справляется с 1080p, но не тянет 4K
+через MSE-путь. Возможные причины: SourceBuffer не справляется
+с объёмом данных, или декодер не поддерживает 4K HEVC Level 5.
+
+**Данные:**
+- 4K HEVC (сломано): https://yobapub.3po.su/s/logs/tZtBoLRIgEulyLxtvUyzEg/tsv
+- 1080p HEVC (работает): https://yobapub.3po.su/s/logs/xoqnm2gQxUOQpDF3uBYtuQ/tsv
+
+**Результат:** подтверждено. Нужно: (1) ограничить максимальное разрешение на старых Tizen, (2) в mixed-codec
+манифесте `pinQualityLevel` должен учитывать кодек, (3) добавить настройку
+«Старый телевизор» для fallback.
+
+---
+
+## 2026-04-15 14:00 — HEVC работает на Tizen 3.0 через hls.js 0.14
+
+**Решение:** зафиксировано как факт для плана обновления hls.js (`doc/hls-upgrade-plan.md`). Обновлена таблица платформ: Tizen 3.0 помечен как MSE HEVC ✓.
+
+**Причина:** лог с реального устройства (device `35b24341`, Tizen 3.0) показывает успешное воспроизведение HEVC через MSE с hls.js 0.14.x: `LEVEL_SWITCHED level=4 1920x1072 bitrate=7472613 videoCodec=hvc1.2.4.L150.B0 audioCodec=mp4a.40.2`. hls.js 0.14 не парсит HEVC-кодеки сам, но передаёт codec string из манифеста в MediaSource, а Chromium 47 (Tizen 3.0) принимает и декодирует его аппаратно. Наблюдаются частые bufferStalledError (~30s интервал).
+
+**Данные:** https://yobapub.3po.su/s/logs/xoqnm2gQxUOQpDF3uBYtuQ/tsv
+
+**Результат:** подтверждено. Обновление hls.js нужно не для самой возможности HEVC, а для улучшения стабильности (HEVC-aware ABR, корректный буферный менеджмент, 4K-уровни).
+
+---
+
 ## 2026-04-14 12:37 — replace recoverMediaError with stopLoad+startLoad for bufferStalledError
 
 **Решение:** в `hls-engine.ts` убран вызов `recoverMediaError()` при `bufferStalledError + hadBufferFullError`. Теперь все stall-сценарии единообразно используют `stopLoad+startLoad(ct)`. Порог: 2 stall'а при `hadBufferFullError`, 3 без.

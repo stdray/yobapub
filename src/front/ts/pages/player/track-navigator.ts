@@ -15,6 +15,35 @@ interface TrackNavigatorDeps {
 export class TrackNavigator {
   constructor(private readonly deps: TrackNavigatorDeps) {}
 
+  canNavigate(dir: number): boolean {
+    const item = this.deps.getItem();
+    if (!item) return false;
+    const season = this.deps.getSeason();
+    const episode = this.deps.getEpisode();
+    if (season !== undefined && episode !== undefined) {
+      if (!item.seasons) return false;
+      const si = arrayFindIndex(item.seasons, (s) => s.number === season);
+      if (si < 0) return false;
+      const s = item.seasons[si];
+      const ei = arrayFindIndex(s.episodes, (ep) => ep.number === episode);
+      if (ei < 0) return false;
+      const nextEi = ei + dir;
+      if (nextEi >= 0 && nextEi < s.episodes.length) return true;
+      const nextSi = si + dir;
+      if (nextSi >= 0 && nextSi < item.seasons.length) {
+        const ns = item.seasons[nextSi];
+        return ns.episodes.length > 0;
+      }
+      return false;
+    }
+    const video = this.deps.getVideo();
+    if (video !== undefined && item.videos) {
+      const nv = video + dir;
+      return nv >= 1 && nv <= item.videos.length;
+    }
+    return false;
+  }
+
   navigate(dir: number): boolean {
     const item = this.deps.getItem();
     if (!item) return false;

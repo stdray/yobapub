@@ -15,6 +15,7 @@ export interface VideoBindingsDeps {
   readonly sourceUrl: string;
   readonly log: Logger;
   readonly onBack: () => void;
+  readonly onFatalError: () => void;
 }
 
 export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDeps): void => {
@@ -83,6 +84,6 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
       hlsBitrate: curLevel ? curLevel.bitrate : null,
     });
     if (engine.tryRecoverVideoError()) return;
-    if (v) errorView.showPlaybackError(v.error, sourceUrl);
+    if (v) { deps.onFatalError(); errorView.showPlaybackError(v.error, sourceUrl); }
   });
 };
