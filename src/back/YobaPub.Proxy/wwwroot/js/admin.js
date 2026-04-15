@@ -245,8 +245,14 @@ window.logsPage = () => ({
       tmp.innerHTML = html;
       const sentinel = tmp.querySelector('tr[data-top-id]');
       if (sentinel) { this.topId = sentinel.dataset.topId || this.topId; sentinel.remove(); }
+      // Skip empty-result rows from auto-refresh
+      const emptyRow = tmp.querySelector('td.empty');
+      if (emptyRow) return;
       const tbody = document.getElementById('logs-tbody');
       const firstReal = tbody.querySelector('tr:not([data-top-id])');
+      // Remove "no entries" placeholder if present
+      const placeholder = tbody.querySelector('td.empty');
+      if (placeholder) placeholder.parentElement.remove();
       while (tmp.lastChild) tbody.insertBefore(tmp.lastChild, firstReal);
     },
     async download(limit) {
