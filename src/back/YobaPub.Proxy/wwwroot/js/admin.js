@@ -160,7 +160,7 @@ window.logsPage = () => ({
     search: '',
     pageSize: 100,
     showFilters: false,
-    autoRefresh: false,
+    autoRefresh: true,
     status: '',
     topId: '',
     lastId: null,
