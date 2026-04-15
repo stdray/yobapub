@@ -121,35 +121,44 @@ const postJson = (url, body) =>
     body: JSON.stringify(body),
   });
 
-document.addEventListener('alpine:init', () => {
-  window.Alpine.store('logs', {
-    filters: emptyFilters(),
-    search: '',
-    pageSize: 100,
-    addIncl(field, value) {
-      const arr = this.filters[field].inc;
-      if (!arr.includes(value)) arr.push(value);
-      window.dispatchEvent(new CustomEvent('logs:filters-changed'));
-    },
-    addExcl(field, value) {
-      const arr = this.filters[field].exc;
-      if (!arr.includes(value)) arr.push(value);
-      window.dispatchEvent(new CustomEvent('logs:filters-changed'));
-    },
-    removeChip(field, mode, value) {
-      const arr = this.filters[field][mode];
-      const i = arr.indexOf(value);
-      if (i >= 0) arr.splice(i, 1);
-      window.dispatchEvent(new CustomEvent('logs:filters-changed'));
-    },
-    resetAll() {
-      this.filters = emptyFilters();
-      this.search = '';
-      window.dispatchEvent(new CustomEvent('logs:filters-changed'));
-    },
-  });
+const logsStoreDef = {
+  filters: emptyFilters(),
+  search: '',
+  pageSize: 100,
+  addIncl(field, value) {
+    const arr = this.filters[field].inc;
+    if (!arr.includes(value)) arr.push(value);
+    window.dispatchEvent(new CustomEvent('logs:filters-changed'));
+  },
+  addExcl(field, value) {
+    const arr = this.filters[field].exc;
+    if (!arr.includes(value)) arr.push(value);
+    window.dispatchEvent(new CustomEvent('logs:filters-changed'));
+  },
+  removeChip(field, mode, value) {
+    const arr = this.filters[field][mode];
+    const i = arr.indexOf(value);
+    if (i >= 0) arr.splice(i, 1);
+    window.dispatchEvent(new CustomEvent('logs:filters-changed'));
+  },
+  resetAll() {
+    this.filters = emptyFilters();
+    this.search = '';
+    window.dispatchEvent(new CustomEvent('logs:filters-changed'));
+  },
+};
 
-  window.logsPage = () => ({
+const registerLogsStore = () => {
+  if (!window.Alpine || !window.Alpine.store) return false;
+  try { if (window.Alpine.store('logs')) return true; } catch (_) { /* not registered yet */ }
+  window.Alpine.store('logs', logsStoreDef);
+  return true;
+};
+
+document.addEventListener('alpine:init', registerLogsStore);
+registerLogsStore();
+
+window.logsPage = () => ({
     get search() { return window.Alpine.store('logs').search; },
     set search(v) { window.Alpine.store('logs').search = v; },
     get pageSize() { return window.Alpine.store('logs').pageSize; },
@@ -279,4 +288,3 @@ document.addEventListener('alpine:init', () => {
       setTimeout(() => { if (this.status === text) this.status = ''; }, FLASH_DURATION);
     },
   });
-});
