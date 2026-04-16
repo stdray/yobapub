@@ -45,8 +45,6 @@ export class HlsEngine {
   private hlsUrl_ = '';
   private appendErrorCount = 0;
   private hadBufferFullError = false;
-  private firstFragSnapped = false;
-  private pendingStartSeek = 0;
   private stallCount = 0;
 
   constructor(private readonly deps: HlsEngineDeps) {}
@@ -70,8 +68,6 @@ export class HlsEngine {
   destroy(): void {
     if (this.adapter) { this.adapter.destroy(); this.adapter = null; }
     this.hlsUrl_ = '';
-    this.firstFragSnapped = false;
-    this.pendingStartSeek = 0;
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     this.stallCount = 0;
@@ -80,8 +76,6 @@ export class HlsEngine {
   load(videoEl: HTMLVideoElement, originalUrl: string, ctx: HlsLoadContext): void {
     this.hlsUrl_ = originalUrl;
     if (this.adapter) { this.adapter.destroy(); this.adapter = null; }
-    this.firstFragSnapped = false;
-    this.pendingStartSeek = ctx.startPosition > 0 ? ctx.startPosition : 0;
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     this.stallCount = 0;
@@ -101,38 +95,23 @@ export class HlsEngine {
     });
 
     const rewrittenUrl = getRewrittenHlsUrl(originalUrl, ctx.audioIndex, ProxyCategory.Media);
-    const adapter = createHlsAdapter(cfg);
+    const adapter = createHlsAdapter(cfg, log);
     this.adapter = adapter;
-    this.wireEvents(adapter, ctx.qualityTarget);
+    this.wireEvents(adapter, videoEl, ctx);
     adapter.loadSource(rewrittenUrl);
     adapter.attachMedia(videoEl);
   }
 
   onVideoSeeking(): void {
     const v = this.deps.getVideoEl();
-    if (this.firstFragSnapped || !v || v.buffered.length === 0) return;
-    const bStart = v.buffered.start(0);
-    if (v.currentTime < bStart && bStart - v.currentTime < 1) {
-      this.firstFragSnapped = true;
-      const target = bStart + 0.05;
-      this.deps.log.info('startupSeekSnap ct={ct} bStart={bStart} -> {target}', {
-        ct: v.currentTime, bStart, target,
-      });
-      v.currentTime = target;
-    }
+    if (!v || !this.adapter) return;
+    this.adapter.onVideoSeeking(v);
   }
 
   onVideoCanplay(): void {
     const v = this.deps.getVideoEl();
-    if (!v) return;
-    if (this.pendingStartSeek !== 0 || this.firstFragSnapped) return;
-    if (v.buffered.length === 0 || v.currentTime >= v.buffered.start(0)) return;
-    const target = v.buffered.start(0) + 0.05;
-    this.firstFragSnapped = true;
-    this.deps.log.info('startSeek pts-snap target={target} from ct={ct} br={br}', {
-      target, ct: v.currentTime, br: formatBuffered(v),
-    });
-    v.currentTime = target;
+    if (!v || !this.adapter) return;
+    this.adapter.onVideoCanplay(v);
   }
 
   onVideoPlaying(): void {
@@ -158,10 +137,9 @@ export class HlsEngine {
 
   private buildConfig(): HlsConfig {
     const cfg = buildBaseHlsConfig();
-    // Do NOT set cfg.startPosition: hls.js _seekToStartPos fires that seek during decoder
-    // warmup on Tizen 2.3 WebKit, which corrupts A/V sync. We start from 0 and perform a
-    // manual "user-style" seek on canplay — that path is verified to heal (see decision log
-    // 2026-04-13 19:45 and 17:55). Bandwidth cost: one fragment from the beginning.
+    // autoStartLoad is off so MANIFEST_PARSED can pin quality before load starts;
+    // the adapter decides how to apply startPosition (direct on modern, FRAG_BUFFERED
+    // dance on legacy).
     cfg.autoStartLoad = false;
     cfg.maxBufferHole = 1.0;
     cfg.highBufferWatchdogPeriod = 10;
@@ -232,7 +210,7 @@ export class HlsEngine {
     return false;
   }
 
-  private wireEvents(adapter: HlsAdapter, qualityTarget: { readonly w: number; readonly h: number } | null): void {
+  private wireEvents(adapter: HlsAdapter, videoEl: HTMLVideoElement, ctx: HlsLoadContext): void {
     const log = this.deps.log;
 
     adapter.onFragLoading((frag: HlsFragInfo) => {
@@ -261,27 +239,6 @@ export class HlsEngine {
         ct: v ? v.currentTime : -1,
         br: formatBuffered(v),
       });
-      // Resume: apply pending start seek only once real data is in SourceBuffer so the
-      // assignment causes hls.js to stopLoad+startLoad+flush and fetch the target fragment
-      // from scratch (decoder-reset path). Seeking before the buffer is populated is
-      // indistinguishable from hls.js _seekToStartPos and triggers the Tizen 2.3 A/V desync.
-      if (this.pendingStartSeek > 0 && v && v.buffered.length > 0) {
-        const target = this.pendingStartSeek;
-        this.pendingStartSeek = 0;
-        this.firstFragSnapped = true;
-        log.info('startSeek target={target} from ct={ct} br={br}', {
-          target, ct: v.currentTime, br: formatBuffered(v),
-        });
-        // Stop loading before seek to prevent hls.js from continuing to fetch
-        // the next sequential fragment. After currentTime assignment hls.js
-        // will restart loading around the seek target automatically.
-        adapter.stopLoad();
-        v.currentTime = target;
-        adapter.startLoad(target);
-        // Drop the [0..firstFragEnd] range left over from sn=1 (see note in
-        // buildConfig about startPosition).
-        adapter.flushBuffer(0, target - 1);
-      }
     });
 
     adapter.onLevelSwitching((s) => {
@@ -329,11 +286,11 @@ export class HlsEngine {
           + ' vc=' + (l.videoCodec || '?') + ' ac=' + (l.audioCodec || '?'),
         ).join(', '),
       });
-      this.pinQualityLevel(adapter, qualityTarget);
-      // autoStartLoad is disabled in config — start loading only after pin to avoid
-      // hls.js kicking off a load on level 0/auto and then switching (double LEVEL_SWITCHING).
-      // Always load from the beginning; real start position is applied as a runtime seek in canplay.
-      adapter.startLoad(0);
+      this.pinQualityLevel(adapter, ctx.qualityTarget);
+      // Pin quality first so hls.js doesn't trigger a spurious LEVEL_SWITCHING on load
+      // start. Then hand off to the adapter, which applies startPosition in its own
+      // version-appropriate way (direct on modern, FRAG_BUFFERED dance on legacy).
+      adapter.startPlayback(videoEl, ctx.startPosition);
       this.deps.onReady();
     });
 

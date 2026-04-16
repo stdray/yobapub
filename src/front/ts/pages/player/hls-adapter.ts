@@ -1,4 +1,5 @@
 import Hls from 'hls.js';
+import { Logger } from '../../utils/log';
 
 // HlsAdapter — thin wrapper over an `Hls` instance that hides the differences
 // between hls.js 0.14.x (legacy) and 1.5+ (modern) from the player code.
@@ -138,9 +139,22 @@ const toStats = (s: RawStats | undefined): HlsFragStats | null => {
 export abstract class HlsAdapter {
   protected readonly hls: Hls;
 
-  constructor(cfg: Partial<Hls.Config>) {
+  constructor(cfg: Partial<Hls.Config>, protected readonly log: Logger) {
     this.hls = new Hls(cfg);
   }
+
+  // Start playback from a saved position. Default (modern) path: hls.js seeks
+  // natively via startLoad(startPos). Legacy overrides this with a FRAG_BUFFERED
+  // dance to work around Tizen 2.3 A/V desync on `_seekToStartPos` (see
+  // HlsAdapterLegacy + decision log 2026-04-13).
+  startPlayback(_video: HTMLVideoElement, startPos: number): void {
+    this.hls.startLoad(startPos);
+  }
+
+  // Hooks for <video> events. Legacy uses these to snap currentTime past the
+  // first-fragment PTS boundary; modern doesn't need them.
+  onVideoSeeking(_video: HTMLVideoElement): void { /* no-op on modern */ }
+  onVideoCanplay(_video: HTMLVideoElement): void { /* no-op on modern */ }
 
   get version(): string { return Hls.version || 'unknown'; }
 
@@ -266,6 +280,59 @@ export abstract class HlsAdapter {
 // -------- Subclasses: only normalizeError differs --------
 
 export class HlsAdapterLegacy extends HlsAdapter {
+  // Tizen 2.3: hls.js 0.14 `_seekToStartPos` fires a seek during decoder warmup
+  // that corrupts A/V sync. We start from 0, wait for the first fragment to land
+  // in SourceBuffer, then do a user-style seek to the saved position and manually
+  // flush [0..target-1]. See decision log 2026-04-13 19:45 / 17:55.
+  private firstFragSnapped = false;
+  private pendingStartSeek = 0;
+
+  startPlayback(video: HTMLVideoElement, startPos: number): void {
+    this.pendingStartSeek = startPos > 0 ? startPos : 0;
+    this.firstFragSnapped = false;
+    this.hls.on(Hls.Events.FRAG_BUFFERED, (): void => this.applyPendingStartSeek(video));
+    this.hls.startLoad(0);
+  }
+
+  onVideoSeeking(v: HTMLVideoElement): void {
+    if (this.firstFragSnapped || v.buffered.length === 0) return;
+    const bStart = v.buffered.start(0);
+    if (v.currentTime < bStart && bStart - v.currentTime < 1) {
+      this.firstFragSnapped = true;
+      const target = bStart + 0.05;
+      this.log.info('startupSeekSnap ct={ct} bStart={bStart} -> {target}', {
+        ct: v.currentTime, bStart, target,
+      });
+      v.currentTime = target;
+    }
+  }
+
+  onVideoCanplay(v: HTMLVideoElement): void {
+    if (this.pendingStartSeek !== 0 || this.firstFragSnapped) return;
+    if (v.buffered.length === 0 || v.currentTime >= v.buffered.start(0)) return;
+    const target = v.buffered.start(0) + 0.05;
+    this.firstFragSnapped = true;
+    this.log.info('startSeek pts-snap target={target} from ct={ct}', {
+      target, ct: v.currentTime,
+    });
+    v.currentTime = target;
+  }
+
+  private applyPendingStartSeek(v: HTMLVideoElement): void {
+    if (this.pendingStartSeek <= 0 || v.buffered.length === 0) return;
+    const target = this.pendingStartSeek;
+    this.pendingStartSeek = 0;
+    this.firstFragSnapped = true;
+    this.log.info('startSeek target={target} from ct={ct}', { target, ct: v.currentTime });
+    // Stop loading before seek so hls.js doesn't keep fetching the next sequential
+    // fragment from the beginning; restart at the seek target after the assignment.
+    this.hls.stopLoad();
+    v.currentTime = target;
+    this.hls.startLoad(target);
+    // Drop the [0..target-1] leftover buffered from sn=1.
+    this.flushBuffer(0, target - 1);
+  }
+
   protected normalizeError(raw: unknown): HlsError {
     const d = raw as HlsErrorDataLegacy;
     return {
@@ -297,5 +364,5 @@ export class HlsAdapterModern extends HlsAdapter {
 
 export const isModernHls = (): boolean => !/^0\./.test(Hls.version || '');
 
-export const createHlsAdapter = (cfg: Partial<Hls.Config>): HlsAdapter =>
-  isModernHls() ? new HlsAdapterModern(cfg) : new HlsAdapterLegacy(cfg);
+export const createHlsAdapter = (cfg: Partial<Hls.Config>, log: Logger): HlsAdapter =>
+  isModernHls() ? new HlsAdapterModern(cfg, log) : new HlsAdapterLegacy(cfg, log);

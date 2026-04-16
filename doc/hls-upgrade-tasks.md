@@ -85,19 +85,15 @@
   `message`), ровно то, что реально читают `hls-error.ts` и `hls-engine.ts`,
   а не полный upstream `ErrorData`.
 
-- [ ] **Реализовать `HlsError`** — узкий тип ошибки плеера (см. выше)
-- [ ] **Реализовать базовый `HlsAdapter`** — общий код без `normalizeError`
-- [ ] **Реализовать `HlsAdapterLegacy`** (обёртка над существующим кодом)
-  - `normalizeError`: читать `data.reason`, `data.response?.code`
-- [ ] **Реализовать `HlsAdapterModern`**
-  - `normalizeError`: читать `data.context?.response?.status`, игнорировать
-    `errorAction`/`error` (или пробрасывать `data.error.message` в `HlsError.message`)
-- [ ] **Перевести на адаптер**:
-  - [ ] `player.ts`
-  - [ ] `player/hls.ts`
-  - [ ] `player/panel.ts`
-  - [ ] `utils/hls-proxy.ts`
-  - [ ] `utils/hls-error.ts`
+- [x] **Реализовать `HlsError`** — узкий тип ошибки плеера (см. выше)
+- [x] **Реализовать базовый `HlsAdapter`** — общий код без `normalizeError`
+- [x] **Реализовать `HlsAdapterLegacy`** — `normalizeError` по `data.reason`/`data.response?.code`,
+  плюс legacy-only start-seek workaround (`startPlayback` / `onVideoSeeking` / `onVideoCanplay`)
+- [x] **Реализовать `HlsAdapterModern`** — `normalizeError` по `data.context?.response?.status`,
+  `data.error?.message`; `startPlayback` — тривиальный `hls.startLoad(startPos)`
+- [x] **Перевести на адаптер**: `hls-engine.ts`, `player.ts`, `player/overlay.ts`,
+  `player/error-view.ts`, `player/video-bindings.ts`, `utils/hls-utils.ts`
+  (коммит `de4dc84`). `tv-player.ts` — отдельно (остался прямой `Hls`).
 
 - [ ] **Типы**
   - [ ] `@types/hls.js@0.13` оставляем для legacy-имплементации
@@ -106,21 +102,16 @@
   - [ ] Если это тянет много внутренних типов — пишем свой минимальный
     `HlsLike`-интерфейс (~30–50 членов). `unknown` + type guards на границе адаптера
 
-- [ ] **Start seek без костылей на modern**
-  - На legacy мы стартуем с `currentTime=0`, ждём первый фрагмент в SourceBuffer,
-    прыгаем на `resumeTime` и вручную флашим `[0..target-1]` через
-    `BUFFER_FLUSHING`. Причина — Tizen 2.3: `_seekToStartPos` в 0.14 стреляет
-    seek во время прогрева декодера и ломает A/V sync (см. `buildBaseHlsConfig`
-    и decision log). Поэтому `cfg.startPosition` не используем.
-  - На modern этих замуток быть не должно: `HlsAdapterModern` стартует сразу
-    с `config.startPosition = resumeTime` (или `hls.startLoad(resumeTime)`),
-    никакого стартового seek из нуля, никакого ручного `BUFFER_FLUSHING`,
-    никакого `pendingStartSeek`/`firstFragSnapped`. Вся эта логика живёт только
-    в `HlsAdapterLegacy`.
+- [x] **Start seek без костылей на modern**
+  - Вся legacy-логика (`pendingStartSeek` / `firstFragSnapped` / ручной
+    `BUFFER_FLUSHING` / snap в `onVideoSeeking`+`onVideoCanplay`) переехала
+    в `HlsAdapterLegacy.startPlayback`/`onVideoSeeking`/`onVideoCanplay`.
+  - `HlsAdapterModern` использует базовый `startPlayback`, который делает
+    просто `hls.startLoad(startPos)`. Никаких костылей.
+  - `HlsEngine` держит только делегации `adapter.onVideoSeeking/onVideoCanplay`.
   - Проверить на Этапе 2 Фазы 4, что A/V sync на Tizen 3.0+/Android TV при
-    старте с ненулевой позиции действительно в порядке (ради чего и затевали
-    legacy-костыль). Если всплывёт — завести отдельную задачу, не тащить
-    legacy-обходы в modern по умолчанию.
+    старте с ненулевой позиции действительно в порядке. Если всплывёт —
+    завести отдельную задачу, не тащить legacy-обходы в modern по умолчанию.
 
 - [ ] **`patch-hls.js`**
   - [ ] Старый патч оставляем только для legacy-бандла
