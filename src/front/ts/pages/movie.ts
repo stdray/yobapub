@@ -4,12 +4,56 @@ import { Page, RouteParams } from '../types/app';
 import { loadItemWithWatching } from '../api/items';
 import { Item, WatchingInfoItem } from '../types/api';
 import { router } from '../router';
-import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { renderRatings, renderPersonnel } from '../utils/templates';
 import { formatDuration } from '../utils/format';
 import { storage } from '../utils/storage';
 import { DetailControls } from '../utils/detail-controls';
+import { Fsm, FsmDef } from '../utils/fsm';
+import { DetailKeyEvent, toDetailEvent } from '../utils/platform';
+
+// --- fsm ---
+
+type MovieFocus = 'bookmarks' | 'watched' | 'play';
+
+interface MovieFsmCtx {
+  prevFolder(): void;
+  nextFolder(): void;
+  toggleBookmark(): void;
+  toggleWatched(): void;
+  playMovie(): void;
+  goBack(): void;
+}
+
+const movieMachine: FsmDef<MovieFocus, MovieFsmCtx, DetailKeyEvent> = {
+  initial: 'play',
+  states: {
+    bookmarks: {
+      on: {
+        KEY_LEFT: { action: (c) => c.prevFolder() },
+        KEY_RIGHT: { action: (c) => c.nextFolder() },
+        KEY_DOWN: 'watched',
+        KEY_ENTER: { action: (c) => c.toggleBookmark() },
+        KEY_BACK: 'play',
+      },
+    },
+    watched: {
+      on: {
+        KEY_UP: 'bookmarks',
+        KEY_DOWN: 'play',
+        KEY_ENTER: { action: (c) => c.toggleWatched() },
+        KEY_BACK: { action: (c) => c.goBack() },
+      },
+    },
+    play: {
+      on: {
+        KEY_UP: 'watched',
+        KEY_ENTER: { action: (c) => c.playMovie() },
+        KEY_BACK: { action: (c) => c.goBack() },
+      },
+    },
+  },
+};
 
 // --- template ---
 
@@ -54,16 +98,30 @@ const tplDetail = (data: DetailData): string => tplDetailCompiled(data);
 
 // --- page ---
 
-type FocusArea = 'bookmarks' | 'watched' | 'play';
-
-class MoviePage implements Page {
+class MoviePage implements Page, MovieFsmCtx {
   private readonly $root = $('#page-movie');
   private readonly keys = new PageKeys();
   private readonly controls = new DetailControls(this.$root);
 
   private item: Item | null = null;
   private watching: WatchingInfoItem | null = null;
-  private focusArea: FocusArea = 'play';
+  private fsm!: Fsm<MovieFocus, MovieFsmCtx, DetailKeyEvent>;
+
+  // --- MovieFsmCtx ---
+
+  prevFolder(): void { this.controls.prevFolder(); }
+  nextFolder(): void { this.controls.nextFolder(); }
+  toggleBookmark(): void { this.controls.toggleBookmark(); }
+
+  toggleWatched(): void {
+    if (this.item) this.controls.toggleWatchedStatus(this.item.id, 1);
+  }
+
+  playMovie(): void {
+    if (this.item) router.navigateMoviePlayer(this.item.id);
+  }
+
+  goBack(): void { router.goBack(); }
 
   // --- render ---
 
@@ -96,7 +154,6 @@ class MoviePage implements Page {
       personnel: renderPersonnel(item),
     }));
 
-    this.focusArea = 'play';
     this.updateFocus();
     this.controls.loadBookmarks(item.id);
   }
@@ -107,9 +164,9 @@ class MoviePage implements Page {
     this.$root.find('.btn').removeClass('focused');
     this.$root.find('.detail__rating.focusable').removeClass('focused');
 
-    if (this.focusArea === 'bookmarks') {
+    if (this.fsm.state === 'bookmarks') {
       this.$root.find('[data-action="bookmark"]').addClass('focused');
-    } else if (this.focusArea === 'watched') {
+    } else if (this.fsm.state === 'watched') {
       this.$root.find('[data-action="watched"]').addClass('focused');
     } else {
       this.$root.find('.btn').eq(0).addClass('focused');
@@ -119,50 +176,11 @@ class MoviePage implements Page {
   // --- keys ---
 
   private readonly handleKey = (e: JQuery.Event): void => {
-    if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace || e.keyCode === TvKey.Escape) {
-      if (this.focusArea === 'bookmarks') {
-        this.focusArea = 'play'; this.updateFocus();
-      } else {
-        router.goBack();
-      }
-      e.preventDefault();
-      return;
-    }
-
-    switch (this.focusArea) {
-      case 'bookmarks': this.handleBookmarksKey(e); break;
-      case 'watched': this.handleWatchedKey(e); break;
-      case 'play': this.handlePlayKey(e); break;
-    }
+    const ev = toDetailEvent(e.keyCode!);
+    if (!ev) return;
+    this.fsm.send(ev);
+    e.preventDefault();
   };
-
-  private handleBookmarksKey(e: JQuery.Event): void {
-    switch (e.keyCode) {
-      case TvKey.Left: this.controls.prevFolder(); e.preventDefault(); break;
-      case TvKey.Right: this.controls.nextFolder(); e.preventDefault(); break;
-      case TvKey.Down: this.focusArea = 'watched'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter: this.controls.toggleBookmark(); e.preventDefault(); break;
-    }
-  }
-
-  private handleWatchedKey(e: JQuery.Event): void {
-    switch (e.keyCode) {
-      case TvKey.Up: this.focusArea = 'bookmarks'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Down: this.focusArea = 'play'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter:
-        if (this.item) this.controls.toggleWatchedStatus(this.item.id, 1);
-        e.preventDefault(); break;
-    }
-  }
-
-  private handlePlayKey(e: JQuery.Event): void {
-    switch (e.keyCode) {
-      case TvKey.Up: this.focusArea = 'watched'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter:
-        if (this.item) router.navigateMoviePlayer(this.item.id);
-        e.preventDefault(); break;
-    }
-  }
 
   // --- Page ---
 
@@ -170,6 +188,8 @@ class MoviePage implements Page {
     this.item = null;
     this.watching = null;
     this.controls.reset();
+    this.fsm = new Fsm(movieMachine, this as MovieFsmCtx);
+    this.fsm.setListener(() => this.updateFocus());
     PageUtils.showSpinnerIn(this.$root);
 
     loadItemWithWatching(params.id!,
@@ -190,6 +210,7 @@ class MoviePage implements Page {
 
   unmount(): void {
     this.keys.unbind();
+    this.fsm.stop();
     PageUtils.clearPage(this.$root);
     this.item = null;
     this.watching = null;

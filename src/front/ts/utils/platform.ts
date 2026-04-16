@@ -147,3 +147,30 @@ class Platform {
 }
 
 export const platform = new Platform();
+
+const navKeyMap: Readonly<Record<number, string>> = {
+  [TvKey.Up]: 'KEY_UP',
+  [TvKey.Down]: 'KEY_DOWN',
+  [TvKey.Left]: 'KEY_LEFT',
+  [TvKey.Right]: 'KEY_RIGHT',
+  [TvKey.Enter]: 'KEY_ENTER',
+  [TvKey.Return]: 'KEY_BACK',
+  [TvKey.Backspace]: 'KEY_BACK',
+  [TvKey.Escape]: 'KEY_BACK',
+};
+
+export const keyToEventType = (keyCode: number): string | null =>
+  navKeyMap[keyCode] || null;
+
+export type DetailKeyEvent =
+  | { readonly type: 'KEY_UP' }
+  | { readonly type: 'KEY_DOWN' }
+  | { readonly type: 'KEY_LEFT' }
+  | { readonly type: 'KEY_RIGHT' }
+  | { readonly type: 'KEY_ENTER' }
+  | { readonly type: 'KEY_BACK' };
+
+export const toDetailEvent = (keyCode: number): DetailKeyEvent | null => {
+  const type = navKeyMap[keyCode] as DetailKeyEvent['type'] | undefined;
+  return type ? { type } : null;
+};

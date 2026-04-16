@@ -4,12 +4,89 @@ import { Page, RouteParams } from '../types/app';
 import { loadItemWithWatching } from '../api/items';
 import { Item, Season, WatchingInfoItem } from '../types/api';
 import { router } from '../router';
-import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { renderRatings, renderPersonnel } from '../utils/templates';
 import { formatTimeShort } from '../utils/format';
 import { storage } from '../utils/storage';
 import { DetailControls } from '../utils/detail-controls';
+import { Fsm, FsmDef } from '../utils/fsm';
+import { DetailKeyEvent, toDetailEvent } from '../utils/platform';
+
+// --- fsm ---
+
+type SerialFocus = 'bookmarks' | 'watchlist' | 'play' | 'seasons' | 'episodes';
+
+interface SerialFsmCtx {
+  prevFolder(): void;
+  nextFolder(): void;
+  toggleBookmark(): void;
+  toggleWatchlist(): void;
+  playResume(): void;
+  goBack(): void;
+  hasSeasons(): boolean;
+  hasEpisodes(): boolean;
+  prevSeason(): void;
+  nextSeason(): void;
+  selectSeason(): void;
+  resetEpisodeFocus(): void;
+  isFirstEpisode(): boolean;
+  isLastEpisode(): boolean;
+  prevEpisode(): void;
+  nextEpisode(): void;
+  playEpisode(): void;
+}
+
+const serialMachine: FsmDef<SerialFocus, SerialFsmCtx, DetailKeyEvent> = {
+  initial: 'play',
+  states: {
+    bookmarks: {
+      on: {
+        KEY_LEFT: { action: (c) => c.prevFolder() },
+        KEY_RIGHT: { action: (c) => c.nextFolder() },
+        KEY_DOWN: 'watchlist',
+        KEY_ENTER: { action: (c) => c.toggleBookmark() },
+        KEY_BACK: 'play',
+      },
+    },
+    watchlist: {
+      on: {
+        KEY_UP: 'bookmarks',
+        KEY_DOWN: 'play',
+        KEY_ENTER: { action: (c) => c.toggleWatchlist() },
+        KEY_BACK: { action: (c) => c.goBack() },
+      },
+    },
+    play: {
+      on: {
+        KEY_UP: 'watchlist',
+        KEY_DOWN: { target: 'seasons', cond: (c) => c.hasSeasons() },
+        KEY_ENTER: { action: (c) => c.playResume() },
+        KEY_BACK: { action: (c) => c.goBack() },
+      },
+    },
+    seasons: {
+      on: {
+        KEY_LEFT: { action: (c) => c.prevSeason() },
+        KEY_RIGHT: { action: (c) => c.nextSeason() },
+        KEY_UP: 'play',
+        KEY_DOWN: { target: 'episodes', cond: (c) => c.hasEpisodes(), action: (c) => c.resetEpisodeFocus() },
+        KEY_ENTER: { action: (c) => c.selectSeason() },
+        KEY_BACK: { action: (c) => c.goBack() },
+      },
+    },
+    episodes: {
+      on: {
+        KEY_DOWN: { cond: (c) => !c.isLastEpisode(), action: (c) => c.nextEpisode() },
+        KEY_UP: [
+          { cond: (c) => !c.isFirstEpisode(), action: (c) => c.prevEpisode() },
+          { target: 'seasons' },
+        ],
+        KEY_ENTER: { action: (c) => c.playEpisode() },
+        KEY_BACK: { action: (c) => c.goBack() },
+      },
+    },
+  },
+};
 
 // --- templates ---
 
@@ -88,19 +165,74 @@ const tplEpisode = (data: EpisodeData): string => tplEpisodeCompiled(data);
 
 // --- page ---
 
-type FocusArea = 'bookmarks' | 'watchlist' | 'play' | 'seasons' | 'episodes';
-
-class SerialPage implements Page {
+class SerialPage implements Page, SerialFsmCtx {
   private readonly $root = $('#page-serial');
   private readonly keys = new PageKeys();
   private readonly controls = new DetailControls(this.$root);
 
   private item: Item | null = null;
   private watching: WatchingInfoItem | null = null;
-  private focusArea: FocusArea = 'play';
+  private fsm!: Fsm<SerialFocus, SerialFsmCtx, DetailKeyEvent>;
   private selectedSeason = 0;
   private focusedEpisode = 0;
   private focusedSeasonTab = 0;
+
+  // --- SerialFsmCtx ---
+
+  prevFolder(): void { this.controls.prevFolder(); }
+  nextFolder(): void { this.controls.nextFolder(); }
+  toggleBookmark(): void { this.controls.toggleBookmark(); }
+
+  toggleWatchlist(): void {
+    if (this.item) this.controls.toggleWatchlist(this.item.id);
+  }
+
+  playResume(): void {
+    if (!this.item) return;
+    const resume = this.findResumeEpisode();
+    if (resume) {
+      router.navigateSerialPlayer(this.item.id, resume.season, resume.episode);
+    } else if (this.seasons.length > 0 && this.seasons[0].episodes.length > 0) {
+      router.navigateSerialPlayer(this.item.id, this.seasons[0].number, this.seasons[0].episodes[0].number);
+    }
+  }
+
+  goBack(): void { router.goBack(); }
+
+  hasSeasons(): boolean { return this.seasons.length > 0; }
+
+  hasEpisodes(): boolean {
+    const s = this.seasons[this.selectedSeason];
+    return !!s && s.episodes.length > 0;
+  }
+
+  prevSeason(): void {
+    if (this.focusedSeasonTab > 0) { this.focusedSeasonTab--; this.switchSeason(this.focusedSeasonTab); }
+  }
+
+  nextSeason(): void {
+    if (this.focusedSeasonTab < this.seasons.length - 1) { this.focusedSeasonTab++; this.switchSeason(this.focusedSeasonTab); }
+  }
+
+  selectSeason(): void { this.switchSeason(this.focusedSeasonTab); }
+
+  resetEpisodeFocus(): void { this.focusedEpisode = 0; }
+
+  isFirstEpisode(): boolean { return this.focusedEpisode === 0; }
+
+  isLastEpisode(): boolean { return this.focusedEpisode >= this.$root.find('.episode').length - 1; }
+
+  prevEpisode(): void { this.focusedEpisode--; }
+
+  nextEpisode(): void { this.focusedEpisode++; }
+
+  playEpisode(): void {
+    const s = this.seasons[this.selectedSeason];
+    if (this.item && s) {
+      const ep = s.episodes[this.focusedEpisode];
+      if (ep) router.navigateSerialPlayer(this.item.id, s.number, ep.number);
+    }
+  }
 
   // --- data helpers ---
 
@@ -204,7 +336,6 @@ class SerialPage implements Page {
     }));
 
     this.focusedSeasonTab = this.selectedSeason;
-    this.focusArea = 'play';
     this.focusedEpisode = resumeEp ? resumeEp.episodeIdx : 0;
 
     this.updateFocus();
@@ -226,7 +357,7 @@ class SerialPage implements Page {
 
     const infoEl = this.$root.find('.detail__info')[0];
 
-    switch (this.focusArea) {
+    switch (this.fsm.state) {
       case 'bookmarks': {
         this.$root.find('[data-action="bookmark"]').addClass('focused');
         if (infoEl) infoEl.scrollTop = 0;
@@ -266,9 +397,9 @@ class SerialPage implements Page {
     const $preview = this.$root.find('.detail__ep-preview');
     let thumb = '';
 
-    if (this.focusArea === 'episodes') {
+    if (this.fsm.state === 'episodes') {
       thumb = this.$root.find('.episode').eq(this.focusedEpisode).attr('data-thumb') || '';
-    } else if (this.focusArea === 'play' && this.item && this.item.seasons) {
+    } else if (this.fsm.state === 'play' && this.item && this.item.seasons) {
       const resume = this.findResumeEpisode();
       if (resume) {
         const ep = this.item.seasons[resume.seasonIdx].episodes[resume.episodeIdx];
@@ -288,115 +419,21 @@ class SerialPage implements Page {
     this.$root.find('.episodes__season-tab').removeClass('active').eq(idx).addClass('active');
     this.$root.find('.episodes__list').html(this.buildEpisodes(this.seasons[idx]));
     this.focusedEpisode = 0;
-    this.updateFocus();
   }
 
   // --- keys ---
 
   private readonly handleKey = (e: JQuery.Event): void => {
-    if (e.keyCode === TvKey.Return || e.keyCode === TvKey.Backspace || e.keyCode === TvKey.Escape) {
-      if (this.focusArea === 'bookmarks') {
-        this.focusArea = 'play'; this.updateFocus();
-      } else {
-        router.goBack();
-      }
-      e.preventDefault();
-      return;
-    }
-
-    switch (this.focusArea) {
-      case 'bookmarks': this.handleBookmarksKey(e); break;
-      case 'watchlist': this.handleWatchlistKey(e); break;
-      case 'play': this.handlePlayKey(e); break;
-      case 'seasons': this.handleSeasonsKey(e); break;
-      case 'episodes': this.handleEpisodesKey(e); break;
-    }
+    const ev = toDetailEvent(e.keyCode!);
+    if (!ev) return;
+    this.fsm.send(ev);
+    e.preventDefault();
   };
 
-  private handleBookmarksKey(e: JQuery.Event): void {
-    switch (e.keyCode) {
-      case TvKey.Left: this.controls.prevFolder(); e.preventDefault(); break;
-      case TvKey.Right: this.controls.nextFolder(); e.preventDefault(); break;
-      case TvKey.Down: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter: this.controls.toggleBookmark(); e.preventDefault(); break;
-    }
-  }
-
-  private handleWatchlistKey(e: JQuery.Event): void {
-    switch (e.keyCode) {
-      case TvKey.Up: this.focusArea = 'bookmarks'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Down: this.focusArea = 'play'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Enter:
-        if (this.item) this.controls.toggleWatchlist(this.item.id);
-        e.preventDefault(); break;
-    }
-  }
-
-  private handlePlayKey(e: JQuery.Event): void {
-    switch (e.keyCode) {
-      case TvKey.Up: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Down:
-        if (this.seasons.length > 0) { this.focusArea = 'seasons'; this.updateFocus(); }
-        e.preventDefault(); break;
-      case TvKey.Enter:
-        this.playResume();
-        e.preventDefault(); break;
-    }
-  }
-
-  private handleSeasonsKey(e: JQuery.Event): void {
-    switch (e.keyCode) {
-      case TvKey.Left:
-        if (this.focusedSeasonTab > 0) { this.focusedSeasonTab--; this.switchSeason(this.focusedSeasonTab); }
-        e.preventDefault(); break;
-      case TvKey.Right:
-        if (this.focusedSeasonTab < this.seasons.length - 1) {
-          this.focusedSeasonTab++; this.switchSeason(this.focusedSeasonTab);
-        }
-        e.preventDefault(); break;
-      case TvKey.Up:
-        this.focusArea = 'play'; this.updateFocus(); e.preventDefault(); break;
-      case TvKey.Down: {
-        const s = this.seasons[this.selectedSeason];
-        if (s && s.episodes.length > 0) {
-          this.focusArea = 'episodes'; this.focusedEpisode = 0; this.updateFocus();
-        }
-        e.preventDefault(); break;
-      }
-      case TvKey.Enter:
-        this.switchSeason(this.focusedSeasonTab); e.preventDefault(); break;
-    }
-  }
-
-  private handleEpisodesKey(e: JQuery.Event): void {
-    const epCount = this.$root.find('.episode').length;
-    switch (e.keyCode) {
-      case TvKey.Down:
-        if (this.focusedEpisode < epCount - 1) { this.focusedEpisode++; this.updateFocus(); }
-        e.preventDefault(); break;
-      case TvKey.Up:
-        if (this.focusedEpisode > 0) { this.focusedEpisode--; this.updateFocus(); }
-        else { this.focusArea = 'seasons'; this.updateFocus(); }
-        e.preventDefault(); break;
-      case TvKey.Enter: {
-        const s = this.seasons[this.selectedSeason];
-        if (this.item && s) {
-          const ep = s.episodes[this.focusedEpisode];
-          if (ep) router.navigateSerialPlayer(this.item.id, s.number, ep.number);
-        }
-        e.preventDefault(); break;
-      }
-    }
-  }
-
-  private playResume(): void {
-    if (!this.item) return;
-    const resume = this.findResumeEpisode();
-    if (resume) {
-      router.navigateSerialPlayer(this.item.id, resume.season, resume.episode);
-    } else if (this.seasons.length > 0 && this.seasons[0].episodes.length > 0) {
-      router.navigateSerialPlayer(this.item.id, this.seasons[0].number, this.seasons[0].episodes[0].number);
-    }
+  private initFsm(initial: SerialFocus = 'play'): void {
+    if (this.fsm) this.fsm.stop();
+    this.fsm = new Fsm({ initial, states: serialMachine.states }, this as SerialFsmCtx);
+    this.fsm.setListener(() => this.updateFocus());
   }
 
   // --- Page ---
@@ -406,6 +443,7 @@ class SerialPage implements Page {
     this.watching = null;
     this.selectedSeason = 0;
     this.controls.reset();
+    this.initFsm();
     PageUtils.showSpinnerIn(this.$root);
 
     const targetEpisodeId = params.episodeId;
@@ -419,8 +457,8 @@ class SerialPage implements Page {
           const found = this.findEpisodeById(targetEpisodeId);
           if (found) {
             if (found.seasonIdx !== this.selectedSeason) this.switchSeason(found.seasonIdx);
-            this.focusArea = 'episodes';
             this.focusedEpisode = found.episodeIdx;
+            this.initFsm('episodes');
             this.updateFocus();
           }
         }
@@ -437,6 +475,7 @@ class SerialPage implements Page {
 
   unmount(): void {
     this.keys.unbind();
+    this.fsm.stop();
     PageUtils.clearPage(this.$root);
     this.item = null;
     this.watching = null;

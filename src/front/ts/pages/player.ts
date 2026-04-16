@@ -3,7 +3,7 @@ import { Page, RouteParams } from '../types/app';
 import { loadItemWithWatching } from '../api/items';
 import { Item, VideoFile, AudioTrack, Subtitle, WatchingInfoItem } from '../types/api';
 import { router } from '../router';
-import { TvKey } from '../utils/platform';
+import { TvKey, keyToEventType } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { pickHlsUrl, safePlay } from '../utils/hls-utils';
 
@@ -518,18 +518,14 @@ class PlayerController implements PlayerFsmCtx {
   }
 
   private keyToEvent(kc: number): PlayerEvent | null {
-    switch (kc) {
-      case TvKey.Up: return { type: 'KEY_UP' };
-      case TvKey.Down: return { type: 'KEY_DOWN' };
-      case TvKey.Left: case TvKey.Rw: return { type: 'KEY_LEFT' };
-      case TvKey.Right: case TvKey.Ff: return { type: 'KEY_RIGHT' };
-      case TvKey.Enter: return { type: 'KEY_ENTER' };
-      case TvKey.PlayPause: return { type: 'KEY_PLAY_PAUSE' };
-      case TvKey.Play: return { type: 'KEY_PLAY' };
-      case TvKey.Pause: return { type: 'KEY_PAUSE' };
-      case TvKey.Return: case TvKey.Backspace: case TvKey.Escape: case TvKey.Stop: return { type: 'KEY_BACK' };
-      default: return null;
-    }
+    if (kc === TvKey.Rw) return { type: 'KEY_LEFT' };
+    if (kc === TvKey.Ff) return { type: 'KEY_RIGHT' };
+    if (kc === TvKey.Stop) return { type: 'KEY_BACK' };
+    if (kc === TvKey.PlayPause) return { type: 'KEY_PLAY_PAUSE' };
+    if (kc === TvKey.Play) return { type: 'KEY_PLAY' };
+    if (kc === TvKey.Pause) return { type: 'KEY_PAUSE' };
+    const type = keyToEventType(kc) as PlayerEvent['type'] | null;
+    return type ? { type } : null;
   }
 
   private readonly handleKey = (e: JQuery.Event): void => {
