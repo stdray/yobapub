@@ -73,7 +73,7 @@ export interface PlayerFsmCtx {
   seekCancel(): void;
 }
 
-const UI_IDLE_MS = 15000;
+const UI_IDLE_MS = 8000;
 const SEEK_COMMIT_MS = 2000;
 
 export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
