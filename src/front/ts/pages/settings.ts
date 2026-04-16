@@ -152,7 +152,7 @@ const parseSettings = (raw: Record<string, DeviceSetting>): Partial<Record<Setti
 const buildQualitySetting = (): SettingItem => {
   let savedId = storage.getDefaultQuality();
   if (savedId === -1) {
-    savedId = QualityId.HD;
+    savedId = QualityId.Auto;
     storage.setDefaultQuality(savedId);
   }
   const opts: SettingOption[] = [];

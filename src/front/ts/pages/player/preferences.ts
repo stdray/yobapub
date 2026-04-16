@@ -5,7 +5,7 @@ import { storage, Storage, QualityId, TitlePrefs } from '../../utils/storage';
 const pickDefaultQualityIndex = (files: VideoFile[]): number => {
   let savedId = storage.getDefaultQuality();
   if (savedId === -1) {
-    savedId = QualityId.HD;
+    savedId = QualityId.Auto;
     storage.setDefaultQuality(savedId);
   }
   if (savedId === QualityId.Auto || files.length === 0) return 0;

@@ -27,7 +27,7 @@
     var forced = null, setting = null;
     try { forced = localStorage.getItem('kp_legacy_hls_forced'); } catch (e) {}
     try { setting = localStorage.getItem('kp_legacy_hls'); } catch (e) {}
-    var legacy = forced === '1' || setting === null || setting === '1';
+    var legacy = forced === '1' || setting === '1';
     var src = legacy ? 'vendor/hls-legacy.min.js' : 'vendor/hls-modern.min.js';
     document.write('<script src="' + src + '"><\/script>');
   })();

@@ -316,7 +316,7 @@ export class Storage {
 
   isLegacyHls = (): boolean => {
     const val = localStorage.getItem(KEYS.LEGACY_HLS);
-    return val === null || val === '1';
+    return val === '1';
   };
 
   setLegacyHls = (enabled: boolean): void => {
