@@ -49,19 +49,58 @@
 
 ## Фаза 2 — HlsAdapter и рефакторинг player
 
-- [ ] **Собрать реальный список различий 0.14 vs 1.5+**
-  по фактически используемому в коде API: `Events.*`, `Config`, `levels[]`,
-  `currentLevel`, `startLoad(-1)`, `stopLoad()`, `recoverMediaError()`,
-  `destroy()`, ABR-поведение, имена событий
+- [x] **Собрать реальный список различий 0.14 vs 1.5+**
+  Проверено по фактическому использованию в `hls-engine.ts`, `tv-player.ts`,
+  `hls-utils.ts`, `overlay.ts`. Итог: API совпадает ~на 99%.
+  - События (`MEDIA_ATTACHED`, `MANIFEST_LOADING/LOADED/PARSED`, `LEVEL_*`,
+    `FRAG_LOADING/LOADED/BUFFERED`, `ERROR`) — одинаковые имена и payload.
+  - Инстанс-методы (`loadSource`, `attachMedia`, `destroy`, `startLoad`,
+    `stopLoad`, `recoverMediaError`, `trigger`, `on`) — те же сигнатуры.
+    `startLoad(pos, skipSeekToStartPos?)` в 1.5+ имеет доп. параметр,
+    обратно совместим.
+  - Статика (`Hls.version`, `Hls.isSupported`, `Hls.Events`, `Hls.ErrorTypes`,
+    `Hls.ErrorDetails`) — идентично.
+  - Config-ключи, которые мы реально ставим (`maxBufferLength`, `maxMaxBufferLength`,
+    `maxBufferHole`, `highBufferWatchdogPeriod`, `nudgeMaxRetry`, `abrEwma*`,
+    `fragLoadingMaxRetry`, `manifestLoadingMaxRetry`, `levelLoadingMaxRetry`,
+    `autoStartLoad`) — все живы в 1.5+.
+  - `levels[]` поля (`bitrate`, `height`, `width`, `videoCodec`, `audioCodec`,
+    `name`) — совместимы.
+  - **Реальные отличия только в `ErrorData`**:
+    - 0.14: `{type, details, fatal, frag?, reason?, response?: {code, text}}`
+    - 1.5+: убраны `reason` и `response.code`, HTTP-статус теперь в
+      `context.response.status`; добавлены `error: Error`, `errorAction`, `level`.
+  - `hls.trigger(BUFFER_FLUSHING, {startOffset, endOffset})` работает и там, и там.
+  - `patch-hls.js` для modern не нужен — публичных событий хватает,
+    плюс 1.5+ использует worker агрессивнее и стринговые патчи по минифицированному
+    бандлу всё равно сломаются.
 
-- [ ] **Выбрать стратегию адаптера по размеру дифа**
-  - Если различий немного — базовый класс `HlsAdapter` с общим кодом и двумя
-    подклассами `HlsAdapterLegacy` / `HlsAdapterModern`
-  - Если различия большие — общий интерфейс `HlsAdapter` и две независимые
-    реализации без общего кода
+- [x] **Стратегия адаптера: абстрактный базовый класс**
+  Общего кода намного больше, чем различий — оборачивать `ErrorData` через
+  один виртуальный метод проще, чем дублировать конфиг-сборку, подписки и
+  делегирование `levels[]`.
+  ```
+  abstract class HlsAdapter {
+    protected hls: Hls;
+    // общее: конструктор, loadSource/attachMedia/destroy, startLoad/stopLoad,
+    // recoverMediaError, подписки на Events.*, проброс levels[], trigger(BUFFER_FLUSHING)
+    protected abstract normalizeError(raw: unknown): HlsError;
+    // + при необходимости abstract buildConfig() — если дефолты разойдутся
+  }
+  class HlsAdapterLegacy extends HlsAdapter { normalizeError(raw) { /* reason, response.code */ } }
+  class HlsAdapterModern extends HlsAdapter { normalizeError(raw) { /* context.response.status */ } }
+  ```
+  `HlsError` — свой узкий тип (`type`, `details`, `fatal`, `httpStatus?`, `fragUrl?`,
+  `message`), ровно то, что реально читают `hls-error.ts` и `hls-engine.ts`,
+  а не полный upstream `ErrorData`.
 
+- [ ] **Реализовать `HlsError`** — узкий тип ошибки плеера (см. выше)
+- [ ] **Реализовать базовый `HlsAdapter`** — общий код без `normalizeError`
 - [ ] **Реализовать `HlsAdapterLegacy`** (обёртка над существующим кодом)
+  - `normalizeError`: читать `data.reason`, `data.response?.code`
 - [ ] **Реализовать `HlsAdapterModern`**
+  - `normalizeError`: читать `data.context?.response?.status`, игнорировать
+    `errorAction`/`error` (или пробрасывать `data.error.message` в `HlsError.message`)
 - [ ] **Перевести на адаптер**:
   - [ ] `player.ts`
   - [ ] `player/hls.ts`
