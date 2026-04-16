@@ -6,15 +6,17 @@ import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
 import { buildBaseHlsConfig, logPlaybackStart, getOptionalRewrittenHlsUrl, showHlsError } from '../utils/hls-utils';
 import { ProxyCategory } from '../utils/storage';
-import Hls from 'hls.js';
+import { HlsAdapter, HlsError, createHlsAdapter } from './player/hls-adapter';
 
 const plog = new Logger('tv-player');
+
+const ERROR_TYPE_MEDIA = 'mediaError';
 
 class TvPlayerPage implements Page {
   private readonly $root = $('#page-tv-player');
   private readonly keys = new PageKeys();
 
-  private hls: Hls | null = null;
+  private adapter: HlsAdapter | null = null;
   private video: HTMLVideoElement | null = null;
   private overlayTimer: number | null = null;
 
@@ -105,8 +107,8 @@ class TvPlayerPage implements Page {
     plog.debug('startPlayback called', { streamUrl: streamUrl.substring(0, 80), videoExists: !!this.video });
     if (!this.video) { plog.error('video element not found'); return; }
 
-    plog.debug('HLS check', { hlsExists: !!Hls, hlsSupported: Hls && Hls.isSupported() });
-    if (Hls && Hls.isSupported()) {
+    plog.debug('HLS check', { supported: HlsAdapter.isSupported() });
+    if (HlsAdapter.isSupported()) {
       this.startHlsPlayback(this.video, streamUrl);
     } else if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
       plog.info('Using native HLS playback');
@@ -117,52 +119,16 @@ class TvPlayerPage implements Page {
   }
 
   private startHlsPlayback(videoEl: HTMLVideoElement, streamUrl: string): void {
-    plog.info('Using HLS.js');
-    const h = new Hls(buildBaseHlsConfig());
-    this.hls = h;
+    plog.info('Using HLS.js version={v}', { v: HlsAdapter.runtimeVersion });
+    const adapter = createHlsAdapter(buildBaseHlsConfig(), plog);
+    this.adapter = adapter;
 
     logPlaybackStart(plog, streamUrl);
 
-    streamUrl = getOptionalRewrittenHlsUrl(streamUrl, 0, ProxyCategory.Tv);
+    const rewrittenUrl = getOptionalRewrittenHlsUrl(streamUrl, 0, ProxyCategory.Tv);
 
-    this.bindHlsDebugEvents(h);
-    this.bindHlsManifestParsed(h, videoEl);
-    this.bindHlsError(h);
-
-    h.loadSource(streamUrl);
-    h.attachMedia(videoEl);
-    plog.debug('HLS attached to video element');
-  }
-
-  private bindHlsDebugEvents(h: Hls): void {
-    h.on(Hls.Events.MANIFEST_LOADING, (_e, data) => {
-      plog.debug('HLS MANIFEST_LOADING', { url: data?.url ? data.url.substring(0, 120) : null });
-    });
-    h.on(Hls.Events.MANIFEST_LOADED, (_e, data) => {
-      plog.debug('HLS MANIFEST_LOADED', { levels: data?.levels ? data.levels.length : 0 });
-    });
-    h.on(Hls.Events.LEVEL_LOADING, (_e, data) => {
-      plog.debug('HLS LEVEL_LOADING', { level: data?.level, url: data?.url ? data.url.substring(0, 120) : null });
-    });
-    h.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
-      plog.debug('HLS LEVEL_LOADED', {
-        level: data?.levelId,
-        frags: data?.details?.fragments ? data.details.fragments.length : 0,
-      });
-    });
-    h.on(Hls.Events.FRAG_LOADING, (_e, data) => {
-      plog.debug('HLS FRAG_LOADING', {
-        sn: data?.frag?.sn,
-        url: data?.frag?.url ? data.frag.url.substring(0, 120) : null,
-      });
-    });
-    h.on(Hls.Events.FRAG_LOADED, (_e, data) => {
-      plog.debug('HLS FRAG_LOADED', { sn: data?.frag?.sn });
-    });
-  }
-
-  private bindHlsManifestParsed(h: Hls, videoEl: HTMLVideoElement): void {
-    h.on(Hls.Events.MANIFEST_PARSED, () => {
+    this.bindHlsDebugEvents(adapter);
+    adapter.onManifestParsed(() => {
       plog.debug('HLS MANIFEST_PARSED');
       videoEl.play().catch((err: unknown) => {
         plog.warn('autoplay blocked, trying muted', { error: String(err) });
@@ -172,59 +138,67 @@ class TvPlayerPage implements Page {
         });
       });
     });
+    this.bindHlsError(adapter);
+
+    adapter.loadSource(rewrittenUrl);
+    adapter.attachMedia(videoEl);
+    plog.debug('HLS attached to video element');
   }
 
-  private bindHlsError(h: Hls): void {
-    h.on(Hls.Events.ERROR, (_event, data) => {
-      const info = this.collectErrorInfo(data);
-      plog.error('HLS error', info);
-
-      if (data && data.fatal) {
-        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          plog.warn('Media error, attempting recovery');
-          try { h.recoverMediaError(); } catch (e) { plog.error('Recovery failed', { error: String(e) }); }
-        } else {
-          this.stopPlayback();
-          const nd = data.networkDetails as XMLHttpRequest | undefined;
-          showHlsError(plog, this.$root, {
-            type: data.type,
-            details: data.details,
-            fatal: data.fatal,
-            httpStatus: nd ? nd.status : null,
-            url: (data.frag && data.frag.url) || data.url || null,
-            message: (data as { reason?: string }).reason || data.details,
-          }, 'tv-player');
-          this.keys.unbind();
-          this.keys.bind((e: JQuery.Event) => {
-            const kc = e.keyCode;
-            if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
-              router.goBack();
-              e.preventDefault();
-            }
-          });
-        }
-      }
+  private bindHlsDebugEvents(adapter: HlsAdapter): void {
+    adapter.onManifestLoaded((m) => {
+      plog.debug('HLS MANIFEST_LOADED', { levels: m.levelCount });
+    });
+    adapter.onLevelLoading((l) => {
+      plog.debug('HLS LEVEL_LOADING', { level: l.level, url: l.url ? l.url.substring(0, 120) : null });
+    });
+    adapter.onLevelLoaded((l) => {
+      plog.debug('HLS LEVEL_LOADED', { level: l.levelId, loadMs: l.loadMs });
+    });
+    adapter.onFragLoading((frag) => {
+      plog.debug('HLS FRAG_LOADING', { sn: frag.sn, url: frag.url ? frag.url.substring(0, 120) : null });
+    });
+    adapter.onFragLoaded((p) => {
+      plog.debug('HLS FRAG_LOADED', { sn: p.frag.sn });
     });
   }
 
-  private collectErrorInfo(data: Hls.errorData): Record<string, unknown> {
-    const info: Record<string, unknown> = { fatal: data?.fatal, type: data?.type };
-    if (data?.details) info.details = String(data.details).substring(0, 100);
-    if (data?.url) info.url = String(data.url).substring(0, 200);
-    if (data?.networkDetails) {
-      const nd = data.networkDetails as XMLHttpRequest;
-      info.httpStatus = nd.status;
-      info.httpStatusText = nd.statusText;
-    }
-    return info;
+  private bindHlsError(adapter: HlsAdapter): void {
+    adapter.onError((err: HlsError) => {
+      plog.error('HLS error', {
+        fatal: err.fatal, type: err.type,
+        details: err.details.substring(0, 100),
+        httpStatus: err.httpStatus,
+        url: err.url ? err.url.substring(0, 200) : null,
+      });
+
+      if (!err.fatal) return;
+
+      if (err.type === ERROR_TYPE_MEDIA) {
+        plog.warn('Media error, attempting recovery');
+        try { adapter.recoverMediaError(); } catch (e) { plog.error('Recovery failed', { error: String(e) }); }
+        return;
+      }
+
+      this.stopPlayback();
+      showHlsError(plog, this.$root, err, 'tv-player');
+      this.keys.unbind();
+      this.keys.bind((e: JQuery.Event) => {
+        const kc = e.keyCode;
+        if (kc === TvKey.Return || kc === TvKey.Backspace || kc === TvKey.Escape || kc === TvKey.Stop) {
+          router.goBack();
+          e.preventDefault();
+        }
+      });
+    });
   }
 
   private stopPlayback(): void {
     plog.debug('stopPlayback called');
-    if (this.hls) {
+    if (this.adapter) {
       plog.debug('destroying HLS instance');
-      this.hls.destroy();
-      this.hls = null;
+      this.adapter.destroy();
+      this.adapter = null;
     }
     if (this.video) {
       plog.debug('clearing video element');
