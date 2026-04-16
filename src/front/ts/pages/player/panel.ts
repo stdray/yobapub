@@ -10,6 +10,7 @@ export const enum Section {
   Subs = 3,
   Quality = 4,
   SubSize = 5,
+  MarkWatched = 6,
 }
 
 interface PanelButtonDef {
@@ -27,7 +28,8 @@ export const PANEL_BUTTONS: ReadonlyArray<PanelButtonDef> = [
   { section: Section.Audio,   label: 'Аудио',         instant: false },
   { section: Section.Subs,    label: 'Субтитры',      instant: false },
   { section: Section.Quality, label: 'Качество',      instant: false },
-  { section: Section.SubSize, label: 'Размер сабов',  instant: false },
+  { section: Section.SubSize,     label: 'Размер сабов',  instant: false },
+  { section: Section.MarkWatched, label: '✔',     instant: true  },
 ];
 
 const SECTION_COUNT = PANEL_BUTTONS.length;
@@ -57,6 +59,7 @@ export interface PanelData {
   readonly subSizeEnabled: boolean;
   readonly prevEpisodeEnabled: boolean;
   readonly nextEpisodeEnabled: boolean;
+  readonly watched: boolean;
 }
 
 interface PanelCallbacks {
@@ -66,6 +69,7 @@ interface PanelCallbacks {
   readonly onApplySubSize: (size: number) => void;
   readonly onPrevEpisode: () => void;
   readonly onNextEpisode: () => void;
+  readonly onMarkWatched: () => void;
   readonly onSavePrefs: () => void;
   readonly getData: () => PanelData;
 }
@@ -229,8 +233,9 @@ export class Panel {
       case Section.NextEp:  return d.nextEpisodeEnabled;
       case Section.Audio:   return d.audioEnabled;
       case Section.Subs:    return d.subsEnabled;
-      case Section.Quality: return d.qualityEnabled;
-      case Section.SubSize: return d.subSizeEnabled;
+      case Section.Quality:     return d.qualityEnabled;
+      case Section.SubSize:     return d.subSizeEnabled;
+      case Section.MarkWatched: return !d.watched;
     }
   }
 
@@ -246,6 +251,7 @@ export class Panel {
     const s = this.currentSection();
     if (s === Section.PrevEp) this.cbs.onPrevEpisode();
     else if (s === Section.NextEp) this.cbs.onNextEpisode();
+    else if (s === Section.MarkWatched) this.cbs.onMarkWatched();
   }
 
   private getItems(section: Section): ReadonlyArray<LabeledItem> {

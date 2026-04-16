@@ -35,7 +35,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
 
   videoEl.addEventListener('ended', () => {
     log.info('video ended currentTime={currentTime}', { currentTime: getV() ? getV()!.currentTime : -1 });
-    if (!watchTracker.markedWatched) watchTracker.sendToggleWatched();
+    watchTracker.markWatched();
     if (!trackNavigator.navigate(1)) onBack();
   });
   videoEl.addEventListener('waiting', () => {

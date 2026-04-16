@@ -156,6 +156,7 @@ class PlayerController implements PlayerFsmCtx {
     onApplySubSize: (size) => { storage.setSubSize(size); applySubSize(); },
     onPrevEpisode: () => { this.trackNavigator.navigate(-1); },
     onNextEpisode: () => { this.trackNavigator.navigate(1); },
+    onMarkWatched: () => { this.watchTracker.markWatched(); },
     onSavePrefs: () => { this.doSavePrefs(); },
     getData: () => this.getPanelData(),
   });
@@ -276,6 +277,7 @@ class PlayerController implements PlayerFsmCtx {
       subSizeEnabled: subsActive,
       prevEpisodeEnabled: this.trackNavigator.canNavigate(-1),
       nextEpisodeEnabled: this.trackNavigator.canNavigate(1),
+      watched: this.watchTracker.markedWatched,
     };
   }
 
