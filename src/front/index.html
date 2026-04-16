@@ -44,7 +44,7 @@
       if (typeof Hls === 'undefined' || typeof Hls.isSupported !== 'function') {
         localStorage.setItem('kp_legacy_hls', '1');
         localStorage.setItem('kp_legacy_hls_forced', '1');
-        location.replace(location.href.split('?')[0] + '?t=' + Date.now());
+        location.reload();
       }
     } catch (e) {}
   })();

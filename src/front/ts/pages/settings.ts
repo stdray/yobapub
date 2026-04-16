@@ -168,7 +168,8 @@ const buildVersionSetting = (): SettingItem => {
 };
 
 const buildReloadSetting = (): SettingItem => {
-  return { key: '_reloadApp', label: 'Перезагрузить приложение', type: 'action', value: null };
+  const label = platform.isLegacyTizen() ? 'Закрыть приложение' : 'Перезагрузить приложение';
+  return { key: '_reloadApp', label, type: 'action', value: null };
 };
 
 const buildLegacyHlsSetting = (): SettingItem => {
@@ -308,7 +309,11 @@ class SettingsPage extends SidebarPage {
         if (!item || item.type === 'readonly') { e.preventDefault(); break; }
         if (item.type === 'action') {
           if (item.key === '_reloadApp') {
-            showConfirmDialog('Перезагрузить приложение?', () => { location.replace(location.href.split('?')[0] + '?t=' + Date.now()); });
+            if (platform.isLegacyTizen()) {
+              showConfirmDialog('Закрыть приложение?', () => { platform.exitApp(); });
+            } else {
+              showConfirmDialog('Перезагрузить приложение?', () => { location.reload(); });
+            }
           }
           e.preventDefault(); break;
         }
@@ -419,10 +424,17 @@ class SettingsPage extends SidebarPage {
       storage.setLegacyHls(newVal);
       item.value = newVal;
       this.closeOptions();
-      showConfirmDialog(
-        'Настройка применится после перезапуска приложения. Перезапустить сейчас?',
-        () => { location.replace(location.href.split('?')[0] + '?t=' + Date.now()); }
-      );
+      if (platform.isLegacyTizen()) {
+        showConfirmDialog(
+          'Настройка применится после перезапуска. Закрыть приложение?',
+          () => { platform.exitApp(); }
+        );
+      } else {
+        showConfirmDialog(
+          'Настройка применится после перезапуска приложения. Перезапустить сейчас?',
+          () => { location.reload(); }
+        );
+      }
       return;
     }
 
