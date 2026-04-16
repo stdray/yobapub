@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [master]
-    tags: ['v*']
+    tags: ['apps']
   pull_request:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
 
   # ─── Docker publish + deploy (master & tags) ───
   publish:
-    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -93,9 +93,9 @@ jobs:
               "$IMAGE"
             run_sudo docker system prune -a -f
 
-  # ─── Release: APK + Tizen + GitHub Release (tags only) ───
+  # ─── Release: APK + Tizen + GitHub Release (push apps tag) ───
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/tags/apps'
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -145,7 +145,7 @@ jobs:
           sudo mv src/apk/app/build/outputs/apk/release/app-release.apk \
              "yobapub-androidtv-$SEMVER.apk"
 
-      # ── Tizen (cert generated on the fly) ──
+      # ── Tizen ──
       - name: Package Tizen widget
         run: |
           docker run --rm \
@@ -162,7 +162,7 @@ jobs:
       # ── GitHub Release ──
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: v${{ env.SEMVER }}
           name: "v${{ env.SEMVER }}"
           generate_release_notes: true
           files: |
