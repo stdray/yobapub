@@ -95,12 +95,16 @@
   `player/error-view.ts`, `player/video-bindings.ts`, `utils/hls-utils.ts`
   (коммит `de4dc84`). `tv-player.ts` — отдельно (остался прямой `Hls`).
 
-- [ ] **Типы**
-  - [ ] `@types/hls.js@0.13` оставляем для legacy-имплементации
-  - [ ] Для modern сначала пробуем выдернуть минимально необходимое подмножество
-    из встроенных типов `hls.js@1.5+/dist/hls.js.d.ts`
-  - [ ] Если это тянет много внутренних типов — пишем свой минимальный
-    `HlsLike`-интерфейс (~30–50 членов). `unknown` + type guards на границе адаптера
+- [x] **Типы**
+  - Оставили `@types/hls.js@0.13` как базовый тайпинг — он покрывает и legacy,
+    и то подмножество API modern, которое мы реально используем.
+  - Ambient-файл `ts/types/hls.d.ts` мёрджит `interface Hls` с глобальным
+    `declare class Hls` из `@types/hls.js`, чтобы дотипизировать
+    `trigger(BUFFER_FLUSHING, …)` без `as unknown`.
+  - На границе адаптера payload'ы событий принимаются как `unknown` и сужаются
+    per-field внутри `onXxx`-методов и `normalizeError`. Это честно отражает
+    рантайм-расхождения (modern добавляет поля вроде `error`, `errorAction`,
+    `context.response.status`) и не тянет внутренние типы hls.js@1.5+ в проект.
 
 - [x] **Start seek без костылей на modern**
   - Вся legacy-логика (`pendingStartSeek` / `firstFragSnapped` / ручной
@@ -112,13 +116,6 @@
   - Проверить на Этапе 2 Фазы 4, что A/V sync на Tizen 3.0+/Android TV при
     старте с ненулевой позиции действительно в порядке. Если всплывёт —
     завести отдельную задачу, не тащить legacy-обходы в modern по умолчанию.
-
-- [ ] **`patch-hls.js`**
-  - [ ] Старый патч оставляем только для legacy-бандла
-  - [ ] На modern **сначала не патчим**: включить подробное логирование публичных
-    событий hls.js (`Events.ERROR`, `FRAG_LOADED`, `BUFFER_*`, seek-related)
-    в `HlsAdapterModern`
-  - [ ] Если встроенной диагностики не хватает — отдельный `patch-hls-modern.js`
 
 ## Фаза 3 — HEVC/4K
 
