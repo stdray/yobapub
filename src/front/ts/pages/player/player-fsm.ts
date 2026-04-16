@@ -171,9 +171,10 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
     sidePanelOpen: {
       entry: (c) => c.openSidePanel(),
       exit:  (c) => c.closeSidePanel(),
+      after: { ms: UI_IDLE_MS, target: 'idle', action: (c) => c.markButtonsClosed() },
       on: {
-        KEY_UP:   { action: (c) => c.sideListPrev() },
-        KEY_DOWN: { action: (c) => c.sideListNext() },
+        KEY_UP:   { action: (c) => c.sideListPrev(), reenterAfter: true },
+        KEY_DOWN: { action: (c) => c.sideListNext(), reenterAfter: true },
         KEY_ENTER: {
           target: 'buttonsFocus',
           action: (c) => c.applySideSelection(),

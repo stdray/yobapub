@@ -56,13 +56,6 @@ interface MediaContext {
   duration: number;
 }
 
-const isHevcFile = (f: VideoFile): boolean => /hevc|hvc1|hev1/i.test(f.codec || '');
-
-const filterFilesByCodec = (files: VideoFile[]): VideoFile[] => {
-  if (!storage.getDeviceSettingBool('supportHevc')) return files.filter((f) => !isHevcFile(f));
-  return files.filter(isHevcFile);
-};
-
 // --- Defaults ---
 
 const defaultMedia = (): MediaContext => ({
@@ -339,7 +332,7 @@ class PlayerController implements PlayerFsmCtx {
 
     this.mediaService.loadLinks(found.mid, (files, subs) => {
       this.medlog.info('loadMediaLinks cb files={files} subs={subs}', { files: files.length, subs: subs.length });
-      this.media.files = filterFilesByCodec(files.slice().sort((a, b) => b.w - a.w));
+      this.media.files = files.slice().sort((a, b) => b.w - a.w);
       this.media.subs = subs.filter((s) => s.url && !s.embed);
       const q = restoreQualityIndex(this.media.files, prefs);
       const a = restoreAudioIndex(this.media.audios, prefs);

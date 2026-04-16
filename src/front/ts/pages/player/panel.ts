@@ -143,8 +143,9 @@ export const getQualityItems = (
   const items: LabeledItem[] = [];
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
+    const codec = f.codec ? ' ' + f.codec.toUpperCase() : '';
     items.push({
-      label: f.quality + ' (' + f.w + 'x' + f.h + ')',
+      label: f.quality + ' (' + f.w + 'x' + f.h + ')' + codec,
       selected: i === selectedQuality,
     });
   }
