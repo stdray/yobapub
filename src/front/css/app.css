@@ -616,6 +616,12 @@ html, body {
   height: 100%;
 }
 
+.player video::-webkit-media-controls-overlay-play-button,
+.player video::-webkit-media-controls-start-playback-button,
+.player video::-webkit-media-controls {
+  display: none !important;
+}
+
 .player--hide-video video {
   visibility: hidden;
 }
