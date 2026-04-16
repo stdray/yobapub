@@ -44,19 +44,9 @@
       if (typeof Hls === 'undefined' || typeof Hls.isSupported !== 'function') {
         localStorage.setItem('kp_legacy_hls', '1');
         localStorage.setItem('kp_legacy_hls_forced', '1');
-        location.reload();
+        location.href = location.href;
       }
     } catch (e) {}
-  })();
-  </script>
-  <meta name="viewport" content="width=1920, initial-scale=1.0">
-  <script>
-  // Tizen 2.3 WebKit may drop the viewport meta on location.reload() due to
-  // document.write parser interaction. Re-apply it from JS as a safety net.
-  (function(){
-    var vp=document.querySelector('meta[name="viewport"]');
-    if(!vp){vp=document.createElement('meta');vp.name='viewport';document.head.appendChild(vp);}
-    vp.setAttribute('content','width=1920, initial-scale=1.0');
   })();
   </script>
 </head>
