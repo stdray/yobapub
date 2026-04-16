@@ -616,6 +616,14 @@ html, body {
   height: 100%;
 }
 
+.player--hide-video video {
+  visibility: hidden;
+}
+
+.player--hide-video video.player__video--visible {
+  visibility: visible;
+}
+
 .player__spinner {
   position: absolute;
   top: 50%;

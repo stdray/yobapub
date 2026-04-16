@@ -2,7 +2,6 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=1920, initial-scale=1.0">
   <title>YobaPub</title>
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -49,6 +48,9 @@
     } catch (e) {}
   })();
   </script>
+  <!-- viewport after scripts: Tizen 2.3 WebKit drops viewport when
+       document.write runs during location.reload() -->
+  <meta name="viewport" content="width=1920, initial-scale=1.0">
 </head>
 <body>
   <div id="app">

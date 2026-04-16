@@ -28,8 +28,9 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
   // separate compositor layer. Hide the video element until the first `playing`
   // event so the user sees black instead. On Tizen this breaks remote-control
   // media keys (Play/Pause/FF/RW), so only apply it on Android.
-  if (platform.isAndroidWebView()) {
-    videoEl.style.visibility = 'hidden';
+  const playerEl = videoEl.parentElement;
+  if (platform.isAndroidWebView() && playerEl) {
+    playerEl.classList.add('player--hide-video');
   }
 
   videoEl.addEventListener('ended', () => {
@@ -67,7 +68,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
       br: formatBuffered(v),
     });
     overlay.hideSpinner();
-    videoEl.style.visibility = 'visible';
+    videoEl.classList.add('player__video--visible');
   });
   videoEl.addEventListener('seeked', () => {
     const v = getV();
