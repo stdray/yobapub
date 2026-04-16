@@ -624,10 +624,12 @@ html, body {
 
 .player--hide-video video {
   visibility: hidden;
+  opacity: 0;
 }
 
 .player--hide-video video.player__video--visible {
   visibility: visible;
+  opacity: 1;
 }
 
 .player__spinner {
