@@ -92,6 +92,7 @@ const KEYS = {
   START_PAGE: 'kp_start_page',
   DEVICE_ID: 'kp_device_id',
   LEGACY_HLS: 'kp_legacy_hls',
+  LEGACY_HLS_FORCED: 'kp_legacy_hls_forced',
   DEVICE_SETTINGS: 'kp_device_settings'
 } as const;
 
@@ -321,6 +322,9 @@ export class Storage {
   setLegacyHls = (enabled: boolean): void => {
     localStorage.setItem(KEYS.LEGACY_HLS, enabled ? '1' : '0');
   };
+
+  isLegacyHlsForced = (): boolean =>
+    localStorage.getItem(KEYS.LEGACY_HLS_FORCED) === '1';
 
   // --- Cached device settings (from /v1/device/{id}/settings) ---
   // Flat { key: effectiveValue } map derived from the server response so any

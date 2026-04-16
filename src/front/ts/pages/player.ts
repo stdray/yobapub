@@ -95,6 +95,7 @@ class PlayerController implements PlayerFsmCtx {
     getPlaybackStarted: () => this.playbackStarted,
     onReady: () => this.onSourceReady(),
     onFatalError: (err: HlsError) => { this.reportFatal(); this.errorView.showHlsFatalError(err); },
+    onHevcNotSupported: () => this.showToast('Устройство не тянет HEVC, выключите в настройках'),
     log: this.hlslog,
   });
   private readonly errorView = new PlayerErrorView({
@@ -415,7 +416,7 @@ class PlayerController implements PlayerFsmCtx {
     if (!this.videoEl) return;
     const audioIndex = this.media.audios.length > 0 ? this.media.audios[this.state.audio].index : 1;
     const target = this.media.files[this.state.quality];
-    this.engine.load(this.videoEl, originalUrl, {
+    const ok = this.engine.load(this.videoEl, originalUrl, {
       startPosition: this.state.position > 0 ? this.state.position : 0,
       quality: this.state.quality,
       audio: this.state.audio,
@@ -423,6 +424,10 @@ class PlayerController implements PlayerFsmCtx {
       audioIndex,
       qualityTarget: target ? { w: target.w, h: target.h } : null,
     });
+    if (!ok) {
+      this.reportFatal();
+      this.errorView.showMessage('Устройство не поддерживает воспроизведение видео');
+    }
   }
 
   private onSourceReady(): void {
@@ -466,6 +471,13 @@ class PlayerController implements PlayerFsmCtx {
 
     applySubSize();
     this.playSource(url);
+  }
+
+  private showToast(text: string): void {
+    const TOAST_MS = 7000;
+    const $t = $('<div class="player__toast">' + text + '</div>');
+    this.$root.append($t);
+    window.setTimeout(() => $t.remove(), TOAST_MS);
   }
 
   private destroyPlayer(): void {

@@ -7,6 +7,7 @@ import { Logger } from '../utils/log';
 import { buildBaseHlsConfig, logPlaybackStart, getOptionalRewrittenHlsUrl, showHlsError } from '../utils/hls-utils';
 import { ProxyCategory } from '../utils/storage';
 import { HlsAdapter, HlsError, createHlsAdapter } from './player/hls-adapter';
+import { tplErrorScreen } from './player/template';
 
 const plog = new Logger('tv-player');
 
@@ -115,6 +116,11 @@ class TvPlayerPage implements Page {
       this.video.src = streamUrl;
     } else {
       plog.error('HLS not supported and native playback not available');
+      this.$root.html(tplErrorScreen({
+        prefix: 'tv-player',
+        msg: 'Устройство не поддерживает воспроизведение видео',
+        debugLines: [navigator.userAgent],
+      }));
     }
   }
 

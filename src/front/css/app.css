@@ -800,6 +800,21 @@ html, body {
   line-height: 1.4;
 }
 
+.player__toast {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  -webkit-transform: translateX(-50%);
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 32px;
+  padding: 16px 40px;
+  border-radius: 8px;
+  z-index: 100;
+  white-space: nowrap;
+}
+
 /* Action buttons above progress bar */
 .player__actions {
   display: flex;

@@ -249,7 +249,7 @@ class SettingsPage extends SidebarPage {
           const ordered: SettingItem[] = [];
           ordered.push(buildVersionSetting());
           ordered.push(buildReloadSetting());
-          ordered.push(buildLegacyHlsSetting());
+          if (!storage.isLegacyHlsForced()) ordered.push(buildLegacyHlsSetting());
           if (parsed.serverLocation) ordered.push(parsed.serverLocation);
           const proxy = buildProxySetting(vip);
           if (proxy) ordered.push(proxy);

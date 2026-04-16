@@ -21,18 +21,34 @@
   </script>
   <script src="vendor/jquery.min.js"></script>
   <script>
-  // HLS bundle loader: picks legacy (0.14.x) or modern (1.5+) based only on
-  // the "kp_legacy_hls" localStorage flag (default = legacy). Platform
-  // autodetect / force-overrides are intentionally deferred until after the
-  // initial data collection pass — see doc/hls-upgrade-tasks.md, Фаза 5.
-  // Synchronous document.write keeps the script in the parser stream so the
-  // bundle finishes loading before webpack-injected app.js runs.
+  // HLS bundle loader: picks legacy (0.14.x) or modern (1.5+).
+  // Forced-legacy platforms (kp_legacy_hls_forced) always get legacy.
+  // Synchronous document.write keeps the bundle in the parser stream so it
+  // finishes loading before webpack-injected app.js runs.
   (function () {
-    var setting = null;
+    var forced = null, setting = null;
+    try { forced = localStorage.getItem('kp_legacy_hls_forced'); } catch (e) {}
     try { setting = localStorage.getItem('kp_legacy_hls'); } catch (e) {}
-    var legacy = setting === null || setting === '1';
+    var legacy = forced === '1' || setting === null || setting === '1';
     var src = legacy ? 'vendor/hls-legacy.min.js' : 'vendor/hls-modern.min.js';
     document.write('<script src="' + src + '"><\/script>');
+  })();
+  </script>
+  <script>
+  // Verify modern hls.js loaded. If the bundle failed to parse (old WebKit
+  // without Promise/Map/Symbol), window.Hls won't exist. Fall back to legacy
+  // permanently and reload.
+  (function () {
+    try {
+      if (localStorage.getItem('kp_legacy_hls_forced') === '1') return;
+      if (localStorage.getItem('kp_legacy_hls') === null ||
+          localStorage.getItem('kp_legacy_hls') === '1') return;
+      if (typeof Hls === 'undefined' || typeof Hls.isSupported !== 'function') {
+        localStorage.setItem('kp_legacy_hls', '1');
+        localStorage.setItem('kp_legacy_hls_forced', '1');
+        location.reload();
+      }
+    } catch (e) {}
   })();
   </script>
   <div id="app">

@@ -20,6 +20,7 @@ interface HlsEngineDeps {
   readonly getPlaybackStarted: () => boolean;
   readonly onReady: () => void;
   readonly onFatalError: (err: HlsError) => void;
+  readonly onHevcNotSupported?: () => void;
   readonly log: Logger;
 }
 
@@ -40,12 +41,16 @@ export const formatBuffered = (v: HTMLVideoElement | null): string => {
   return parts.join(',');
 };
 
+const HEVC_STALL_THRESHOLD = 5;
+
 export class HlsEngine {
   private adapter: HlsAdapter | null = null;
   private hlsUrl_ = '';
   private appendErrorCount = 0;
   private hadBufferFullError = false;
   private stallCount = 0;
+  private hevcStallCount = 0;
+  private hevcToastShown = false;
 
   constructor(private readonly deps: HlsEngineDeps) {}
 
@@ -73,25 +78,32 @@ export class HlsEngine {
     this.stallCount = 0;
   }
 
-  load(videoEl: HTMLVideoElement, originalUrl: string, ctx: HlsLoadContext): void {
+  load(videoEl: HTMLVideoElement, originalUrl: string, ctx: HlsLoadContext): boolean {
     this.hlsUrl_ = originalUrl;
     if (this.adapter) { this.adapter.destroy(); this.adapter = null; }
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     this.stallCount = 0;
+    this.hevcStallCount = 0;
+    this.hevcToastShown = false;
 
     const log = this.deps.log;
-
-    const cfg = this.buildConfig();
-    logPlaybackStart(log, originalUrl, {
-      startPosition: cfg.startPosition || 0,
-      quality: ctx.quality, audio: ctx.audio, sub: ctx.sub,
-    });
 
     log.info('[hls] version={v} mode={mode} isSupported={s}', {
       v: HlsAdapter.runtimeVersion,
       mode: isModernHls() ? 'modern' : 'legacy',
       s: HlsAdapter.isSupported(),
+    });
+
+    if (!HlsAdapter.isSupported()) {
+      log.error('[hls] MSE not supported on this device');
+      return false;
+    }
+
+    const cfg = this.buildConfig();
+    logPlaybackStart(log, originalUrl, {
+      startPosition: cfg.startPosition || 0,
+      quality: ctx.quality, audio: ctx.audio, sub: ctx.sub,
     });
 
     const rewrittenUrl = getRewrittenHlsUrl(originalUrl, ctx.audioIndex, ProxyCategory.Media);
@@ -100,6 +112,7 @@ export class HlsEngine {
     this.wireEvents(adapter, videoEl, ctx);
     adapter.loadSource(rewrittenUrl);
     adapter.attachMedia(videoEl);
+    return true;
   }
 
   onVideoSeeking(): void {
@@ -208,6 +221,22 @@ export class HlsEngine {
     }
     this.deps.log.warn('nudgePastBufferGap ct={ct} no suitable range found, buffered={br}', { ct, br: formatBuffered(v) });
     return false;
+  }
+
+  private checkHevcStalls(adapter: HlsAdapter, log: Logger): void {
+    if (this.hevcToastShown || !this.deps.onHevcNotSupported) return;
+    if (!storage.getDeviceSettingBool('supportHevc')) return;
+    const lvl = adapter.currentLevel;
+    if (lvl < 0) return;
+    const levels = adapter.levels;
+    if (lvl >= levels.length) return;
+    if (!/^hvc1|^hev1/i.test(levels[lvl].videoCodec || '')) return;
+    this.hevcStallCount++;
+    if (this.hevcStallCount >= HEVC_STALL_THRESHOLD) {
+      this.hevcToastShown = true;
+      log.warn('hevc stall threshold reached, notifying user hevcStallCount={sc}', { sc: this.hevcStallCount });
+      this.deps.onHevcNotSupported();
+    }
   }
 
   private wireEvents(adapter: HlsAdapter, videoEl: HTMLVideoElement, ctx: HlsLoadContext): void {
@@ -345,6 +374,7 @@ export class HlsEngine {
         started: diag.started, ct: diag.ct, rs: diag.rs, paused: diag.paused, br: diag.br,
         sc: this.stallCount,
       });
+      this.checkHevcStalls(adapter, log);
       if (this.nudgePastBufferGap()) return;
       // Do NOT use recoverMediaError() for stalls — on Tizen 2.3/3.0 it resets
       // currentTime to 0 and leaves playback dead. Instead, force hls.js to
