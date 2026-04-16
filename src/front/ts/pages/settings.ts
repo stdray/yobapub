@@ -4,13 +4,12 @@ import { deviceApi } from '../api/device';
 import { DeviceSetting, DeviceSettingsResponse } from '../types/api';
 import { TvKey, platform } from '../utils/platform';
 import { storage, Storage, QualityId, ProxyCategory, proxyCategoryLabel } from '../utils/storage';
-import { PageUtils } from '../utils/page';
+import { PageUtils, showConfirmDialog } from '../utils/page';
 import { formatAppVersion } from '../utils/format';
 import { sidebar } from '../sidebar';
 import { SidebarPage } from './sidebar-page';
 import { Logger } from '../utils/log';
 import { arrayFind } from '../utils/array';
-import { showConfirmDialog } from '../utils/confirm-dialog';
 
 const slog = new Logger('settings-diag');
 

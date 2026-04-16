@@ -3,7 +3,7 @@ import '../css/app.css';
 import { apiClient } from './api/client';
 import { router } from './router';
 import { platform } from './utils/platform';
-import { showExitDialog } from './utils/exit-dialog';
+import { showConfirmDialog } from './utils/page';
 import { storage } from './utils/storage';
 import { loginPage } from './pages/login';
 import { watchingPage } from './pages/watching';
@@ -152,4 +152,4 @@ const closeApp = (): void => {
   }
 };
 
-router.setExitHandler(() => showExitDialog(closeApp));
+router.setExitHandler(() => showConfirmDialog('Закрыть приложение?', closeApp));
