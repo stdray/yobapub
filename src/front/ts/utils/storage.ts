@@ -326,9 +326,6 @@ export class Storage {
   isLegacyHlsForced = (): boolean =>
     localStorage.getItem(KEYS.LEGACY_HLS_FORCED) === '1';
 
-  getWidgetUrl = (): string | null =>
-    localStorage.getItem('_widgetUrl');
-
   // --- Cached device settings (from /v1/device/{id}/settings) ---
   // Flat { key: effectiveValue } map derived from the server response so any
   // non-UI code (player, media layer) can read individual flags synchronously
