@@ -4,7 +4,8 @@ import { PageKeys } from '../../utils/page';
 import { Logger } from '../../utils/log';
 import { showHlsError } from '../../utils/hls-utils';
 import { tplErrorScreen } from './template';
-import { HlsEngine, HlsFatalErrorData } from './hls-engine';
+import { HlsEngine } from './hls-engine';
+import { HlsError } from './hls-adapter';
 
 interface PlayerErrorViewDeps {
   readonly $root: JQuery;
@@ -44,10 +45,10 @@ export class PlayerErrorView {
       code, msg, detail: detail || null, domain,
       url: url.substring(0, 120), ua: navigator.userAgent,
       hw: devInfo.hardware, sw: devInfo.software,
-      hlsLevel: this.deps.engine.instance ? this.deps.engine.instance.currentLevel : null,
+      hlsLevel: this.deps.engine.getCurrentLevelIndex(),
       hlsRes: curLevel ? curLevel.width + 'x' + curLevel.height : null,
-      vc: curLevel ? curLevel.videoCodec || null : null,
-      ac: curLevel ? curLevel.audioCodec || null : null,
+      vc: curLevel ? curLevel.videoCodec : null,
+      ac: curLevel ? curLevel.audioCodec : null,
     });
     this.deps.onDestroy();
     const debugLines: string[] = [];
@@ -62,9 +63,9 @@ export class PlayerErrorView {
     this.deps.$root.html(tplErrorScreen({ prefix: 'player', msg: text, debugLines: [] }));
   }
 
-  showHlsFatalError(data: HlsFatalErrorData): void {
+  showHlsFatalError(err: HlsError): void {
     this.deps.onDestroy();
-    showHlsError(this.deps.log, this.deps.$root, data, 'player');
+    showHlsError(this.deps.log, this.deps.$root, err, 'player');
     this.bindBackKeys();
   }
 

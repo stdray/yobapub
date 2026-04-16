@@ -2,7 +2,7 @@ import { Lazy } from '../../utils/lazy';
 import { VideoFile, AudioTrack, Subtitle } from '../../types/api';
 import { buildSubLabel } from './panel';
 import { Logger } from '../../utils/log';
-import Hls from 'hls.js';
+import { HlsAdapter, HlsLevelInfo } from './hls-adapter';
 
 export type HudIcon = 'pause' | 'rw' | 'ff';
 
@@ -21,7 +21,7 @@ interface OverlayDeps {
   readonly selectedQuality: () => number;
   readonly selectedAudio: () => number;
   readonly selectedSub: () => number;
-  readonly hlsInstance: () => Hls | null;
+  readonly getCurrentLevel: () => HlsLevelInfo | null;
   readonly videoEl: () => HTMLVideoElement | null;
   readonly log?: Logger;
 }
@@ -176,7 +176,7 @@ export class OverlayView {
     // selected hls.js level (videoCodec from the manifest), not from API
     // metadata on the file — the API describes hls4 multi-variant files as
     // HEVC even when pinQualityLevel ends up matching an avc1 variant first.
-    const line2: string[] = ['HLS ' + (Hls.version || '?')];
+    const line2: string[] = ['HLS ' + HlsAdapter.runtimeVersion];
     const files = this.deps.files();
     const sq = this.deps.selectedQuality();
     if (files.length > 0 && sq < files.length) {
@@ -184,10 +184,7 @@ export class OverlayView {
       const ql = f.quality || (f.h + 'p');
       line2.push(ql + ' ' + f.w + '×' + f.h);
     }
-    const hls = this.deps.hlsInstance();
-    const level = hls && hls.levels && hls.currentLevel !== undefined && hls.currentLevel >= 0
-      ? hls.levels[hls.currentLevel]
-      : undefined;
+    const level = this.deps.getCurrentLevel();
     if (level) {
       const vc = level.videoCodec;
       if (vc) {

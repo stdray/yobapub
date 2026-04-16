@@ -14,7 +14,8 @@ import {
 } from './player/media';
 import { applySubSize, SubtitleLoader } from './player/subtitles';
 import { storage } from '../utils/storage';
-import { HlsEngine, HlsFatalErrorData } from './player/hls-engine';
+import { HlsEngine } from './player/hls-engine';
+import { HlsError } from './player/hls-adapter';
 import { TrackNavigator } from './player/track-navigator';
 import { PlayerErrorView } from './player/error-view';
 import { ProgressBar } from './player/progress';
@@ -93,7 +94,7 @@ class PlayerController implements PlayerFsmCtx {
     getVideoEl: () => this.videoEl,
     getPlaybackStarted: () => this.playbackStarted,
     onReady: () => this.onSourceReady(),
-    onFatalError: (data: HlsFatalErrorData) => { this.reportFatal(); this.errorView.showHlsFatalError(data); },
+    onFatalError: (err: HlsError) => { this.reportFatal(); this.errorView.showHlsFatalError(err); },
     log: this.hlslog,
   });
   private readonly errorView = new PlayerErrorView({
@@ -134,7 +135,7 @@ class PlayerController implements PlayerFsmCtx {
     selectedQuality: () => this.state.quality,
     selectedAudio: () => this.state.audio,
     selectedSub: () => this.state.sub,
-    hlsInstance: () => this.engine.instance,
+    getCurrentLevel: () => this.engine.getCurrentLevel(),
     videoEl: () => this.videoEl,
     log: this.olog,
   });

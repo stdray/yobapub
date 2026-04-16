@@ -185,7 +185,15 @@ class TvPlayerPage implements Page {
           try { h.recoverMediaError(); } catch (e) { plog.error('Recovery failed', { error: String(e) }); }
         } else {
           this.stopPlayback();
-          showHlsError(plog, this.$root, data, 'tv-player');
+          const nd = data.networkDetails as XMLHttpRequest | undefined;
+          showHlsError(plog, this.$root, {
+            type: data.type,
+            details: data.details,
+            fatal: data.fatal,
+            httpStatus: nd ? nd.status : null,
+            url: (data.frag && data.frag.url) || data.url || null,
+            message: (data as { reason?: string }).reason || data.details,
+          }, 'tv-player');
           this.keys.unbind();
           this.keys.bind((e: JQuery.Event) => {
             const kc = e.keyCode;

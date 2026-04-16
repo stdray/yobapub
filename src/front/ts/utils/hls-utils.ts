@@ -6,6 +6,7 @@ import { extractHostname } from './url';
 import { formatAppVersion } from './format';
 import { VideoFile } from '../types/api';
 import { tplErrorScreen } from '../pages/player/template';
+import { HlsError } from '../pages/player/hls-adapter';
 
 // ── Config / setup ────────────────────────────────────────────────
 
@@ -97,16 +98,6 @@ export const getOptionalRewrittenHlsUrl = (url: string, audioIndex: number, cat:
 
 // ── Error display ─────────────────────────────────────────────────
 
-interface HlsErrorData {
-  fatal: boolean;
-  type: string;
-  details: string;
-  response?: { code: number };
-  frag?: { url?: string };
-  url?: string;
-  context?: { url?: string };
-}
-
 const getErrorMessage = (type: string, details: string): string => {
   if (type === 'networkError') {
     if (details.indexOf('TimeOut') >= 0) return 'Таймаут загрузки видео';
@@ -116,23 +107,19 @@ const getErrorMessage = (type: string, details: string): string => {
   return 'Ошибка воспроизведения';
 };
 
-const getFailedUrl = (data: HlsErrorData): string =>
-  data.frag?.url || data.url || data.context?.url || '';
-
-const formatHlsErrorDebug = (data: HlsErrorData): string =>
-  'type=' + data.type + ' details=' + data.details +
-  (data.response ? ' status=' + data.response.code : '');
+const formatHlsErrorDebug = (err: HlsError): string =>
+  'type=' + err.type + ' details=' + err.details +
+  (err.httpStatus !== null ? ' status=' + err.httpStatus : '');
 
 export const showHlsError = (
   log: Logger,
   $root: JQuery,
-  data: HlsErrorData,
+  err: HlsError,
   prefix: 'player' | 'tv-player',
 ): void => {
-  const failedUrl = getFailedUrl(data);
-  const domain = extractHostname(failedUrl);
-  const message = getErrorMessage(data.type, data.details);
-  const debug = formatHlsErrorDebug(data);
+  const domain = extractHostname(err.url || '');
+  const message = getErrorMessage(err.type, err.details);
+  const debug = formatHlsErrorDebug(err);
 
   const devInfo = platform.getDeviceInfo();
   log.error('playbackError {message} {domain} {debug}', {

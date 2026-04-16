@@ -79,9 +79,9 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
       ct: v ? v.currentTime : null,
       rs: v ? v.readyState : null,
       br: formatBuffered(v),
-      hlsLevel: engine.instance ? engine.instance.currentLevel : null,
-      vc: curLevel ? curLevel.videoCodec || null : null,
-      ac: curLevel ? curLevel.audioCodec || null : null,
+      hlsLevel: engine.getCurrentLevelIndex(),
+      vc: curLevel ? curLevel.videoCodec : null,
+      ac: curLevel ? curLevel.audioCodec : null,
       hlsBitrate: curLevel ? curLevel.bitrate : null,
     });
     if (engine.tryRecoverVideoError()) return;
