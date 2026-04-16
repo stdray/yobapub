@@ -48,9 +48,16 @@
     } catch (e) {}
   })();
   </script>
-  <!-- viewport after scripts: Tizen 2.3 WebKit drops viewport when
-       document.write runs during location.reload() -->
   <meta name="viewport" content="width=1920, initial-scale=1.0">
+  <script>
+  // Tizen 2.3 WebKit may drop the viewport meta on location.reload() due to
+  // document.write parser interaction. Re-apply it from JS as a safety net.
+  (function(){
+    var vp=document.querySelector('meta[name="viewport"]');
+    if(!vp){vp=document.createElement('meta');vp.name='viewport';document.head.appendChild(vp);}
+    vp.setAttribute('content','width=1920, initial-scale=1.0');
+  })();
+  </script>
 </head>
 <body>
   <div id="app">
