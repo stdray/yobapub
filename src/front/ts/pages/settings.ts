@@ -308,7 +308,7 @@ class SettingsPage extends SidebarPage {
         if (!item || item.type === 'readonly') { e.preventDefault(); break; }
         if (item.type === 'action') {
           if (item.key === '_reloadApp') {
-            showConfirmDialog('Перезагрузить приложение?', () => { location.replace(location.href.split('?')[0] + '?t=' + Date.now()); });
+            showConfirmDialog('Перезагрузить приложение?', () => { location.replace(storage.getWidgetUrl() || location.href); });
           }
           e.preventDefault(); break;
         }
@@ -421,7 +421,7 @@ class SettingsPage extends SidebarPage {
       this.closeOptions();
       showConfirmDialog(
         'Настройка применится после перезапуска приложения. Перезапустить сейчас?',
-        () => { location.replace(location.href.split('?')[0] + '?t=' + Date.now()); }
+        () => { location.replace(storage.getWidgetUrl() || location.href); }
       );
       return;
     }

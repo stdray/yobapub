@@ -30,5 +30,6 @@
   // webOS media keys come through without registration, but color keys may
   // need webOSDev.LGUDID / palmInitFramework — add here when webOS support lands.
 
+  try { localStorage.setItem('_widgetUrl', location.href); } catch (e) {}
   document.location.replace(APP_URL);
 })();
