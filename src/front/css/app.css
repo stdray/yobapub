@@ -614,15 +614,6 @@ html, body {
 .player video {
   width: 100%;
   height: 100%;
-  /* Hide until the first `playing` event. On Android WebView the native
-     Chromium overlay play button ignores `::-webkit-media-controls-*` hiding,
-     so we just keep the element invisible while it shows. `.player` is black,
-     so the user sees black instead of the giant blurred play triangle. */
-  visibility: hidden;
-}
-
-.player video.player__video--visible {
-  visibility: visible;
 }
 
 .player__spinner {

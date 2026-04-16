@@ -1,4 +1,5 @@
 import { Logger } from '../../utils/log';
+import { platform } from '../../utils/platform';
 import { HlsEngine, formatBuffered } from './hls-engine';
 import { OverlayView } from './overlay';
 import { WatchProgressTracker } from './watch-tracker';
@@ -21,6 +22,15 @@ export interface VideoBindingsDeps {
 export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDeps): void => {
   const { log, engine, overlay, watchTracker, trackNavigator, errorView, sourceUrl, onBack } = deps;
   const getV = deps.getVideoEl;
+
+  // On Android WebView the native Chromium overlay play button (giant blurred
+  // triangle) ignores ::-webkit-media-controls-* hiding — it renders in a
+  // separate compositor layer. Hide the video element until the first `playing`
+  // event so the user sees black instead. On Tizen this breaks remote-control
+  // media keys (Play/Pause/FF/RW), so only apply it on Android.
+  if (platform.isAndroidWebView()) {
+    videoEl.style.visibility = 'hidden';
+  }
 
   videoEl.addEventListener('ended', () => {
     log.info('video ended currentTime={currentTime}', { currentTime: getV() ? getV()!.currentTime : -1 });
@@ -57,7 +67,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
       br: formatBuffered(v),
     });
     overlay.hideSpinner();
-    videoEl.classList.add('player__video--visible');
+    videoEl.style.visibility = 'visible';
   });
   videoEl.addEventListener('seeked', () => {
     const v = getV();
