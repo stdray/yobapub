@@ -88,7 +88,7 @@ class MoviePage implements Page {
       countries: item.countries.map((c) => c.title).join(', '),
       genres: item.genres.map((g) => g.title).join(', '),
       duration: item.duration ? formatDuration(item.duration.average) : '',
-      quality: item.quality,
+      quality: !storage.getDeviceSettingBool('support4k') && item.quality >= 2160 ? 1080 : item.quality,
       ratings: renderRatings(item),
       buttons,
       plot: item.plot || '',
