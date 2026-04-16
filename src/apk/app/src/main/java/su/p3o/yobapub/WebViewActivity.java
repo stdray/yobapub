@@ -116,24 +116,47 @@ public class WebViewActivity extends Activity {
         if (hasFocus) enterImmersive();
     }
 
+    private void injectKey(int jsKeyCode) {
+        webView.evaluateJavascript(
+            "(function(){" +
+            "  var el = document.activeElement || document.body;" +
+            "  var e = new KeyboardEvent('keydown',{bubbles:true,cancelable:true,keyCode:" + jsKeyCode + ",which:" + jsKeyCode + "});" +
+            "  el.dispatchEvent(e);" +
+            "})()", null);
+    }
+
+    private static int mapMediaKey(int androidKeyCode) {
+        switch (androidKeyCode) {
+            case KeyEvent.KEYCODE_MEDIA_PLAY:         return 415;
+            case KeyEvent.KEYCODE_MEDIA_PAUSE:        return 19;
+            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:   return 10252;
+            case KeyEvent.KEYCODE_MEDIA_STOP:         return 413;
+            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD: return 417;
+            case KeyEvent.KEYCODE_MEDIA_REWIND:       return 412;
+            case KeyEvent.KEYCODE_MEDIA_NEXT:         return 10233;
+            case KeyEvent.KEYCODE_MEDIA_PREVIOUS:     return 10232;
+            default: return 0;
+        }
+    }
+
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event);
+        int keyCode = event.getKeyCode();
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (customView != null) {
                 chromeClient.onHideCustomView();
                 return true;
             }
-            // Inject keydown(keyCode=8) into WebView so JS page handlers can intercept it first.
-            // JS must call NativeApp.exit() when it wants to exit the app.
-            webView.evaluateJavascript(
-                "(function(){" +
-                "  var el = document.activeElement || document.body;" +
-                "  var e = new KeyboardEvent('keydown',{bubbles:true,cancelable:true,keyCode:8,which:8});" +
-                "  el.dispatchEvent(e);" +
-                "})()", null);
+            injectKey(8);
             return true;
         }
-        return super.onKeyDown(keyCode, event);
+        int jsKey = mapMediaKey(keyCode);
+        if (jsKey != 0) {
+            injectKey(jsKey);
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     @Override
