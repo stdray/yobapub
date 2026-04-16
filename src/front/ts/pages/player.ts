@@ -5,7 +5,7 @@ import { Item, VideoFile, AudioTrack, Subtitle, WatchingInfoItem } from '../type
 import { router } from '../router';
 import { TvKey } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
-import { pickHlsUrl } from '../utils/hls-utils';
+import { pickHlsUrl, safePlay } from '../utils/hls-utils';
 
 import { tplPlayer } from './player/template';
 import {
@@ -206,7 +206,7 @@ class PlayerController implements PlayerFsmCtx {
   }
   play(): void {
     if (!this.videoEl || !this.playbackStarted || !this.videoEl.paused) return;
-    this.videoEl.play().catch(() => { /* interrupted by load/pause */ });
+    safePlay(this.videoEl);
     this.state.paused = false;
     this.syncPlayIcon();
   }
@@ -443,7 +443,7 @@ class PlayerController implements PlayerFsmCtx {
     this.plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', {
       pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime,
     });
-    if (!this.state.paused) this.videoEl.play().catch(() => { /* interrupted by load/pause */ });
+    if (!this.state.paused) safePlay(this.videoEl);
     this.playbackStarted = true;
     if (this.state.sub >= 0 && this.videoEl) {
       this.subtitleLoader.load(this.videoEl, this.$root, this.media.subs, this.state.sub);

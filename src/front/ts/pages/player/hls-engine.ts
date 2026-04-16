@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/log';
 import { extractHostname } from '../../utils/url';
-import { buildBaseHlsConfig, HlsConfig, logPlaybackStart, getRewrittenHlsUrl } from '../../utils/hls-utils';
+import { buildBaseHlsConfig, HlsConfig, logPlaybackStart, getRewrittenHlsUrl, safePlay } from '../../utils/hls-utils';
 import { ProxyCategory, storage } from '../../utils/storage';
 import {
   HlsAdapter, HlsError, HlsFragInfo, HlsLevelInfo, createHlsAdapter, isModernHls,
@@ -142,7 +142,7 @@ export class HlsEngine {
     });
     this.adapter.stopLoad();
     this.adapter.startLoad(v.currentTime);
-    if (v.paused) v.play().catch(() => { /* interrupted by load/pause */ });
+    if (v.paused) safePlay(v);
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     return true;
@@ -362,7 +362,7 @@ export class HlsEngine {
         log.warn('hls RECOVER via bufferAppendingError stopLoad+startLoad ct={ct} br={br}', diag);
         adapter.stopLoad();
         adapter.startLoad(v.currentTime);
-        if (v.paused) v.play().catch(() => { /* interrupted by load/pause */ });
+        if (v.paused) safePlay(v);
         this.appendErrorCount = 0;
         this.hadBufferFullError = false;
       }

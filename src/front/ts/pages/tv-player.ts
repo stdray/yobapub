@@ -4,7 +4,7 @@ import { router } from '../router';
 import { TvKey, platform } from '../utils/platform';
 import { PageKeys, PageUtils } from '../utils/page';
 import { Logger } from '../utils/log';
-import { buildBaseHlsConfig, logPlaybackStart, getOptionalRewrittenHlsUrl, showHlsError } from '../utils/hls-utils';
+import { buildBaseHlsConfig, logPlaybackStart, getOptionalRewrittenHlsUrl, showHlsError, safePlay } from '../utils/hls-utils';
 import { ProxyCategory } from '../utils/storage';
 import { HlsAdapter, HlsError, createHlsAdapter } from './player/hls-adapter';
 import { tplErrorScreen } from './player/template';
@@ -136,13 +136,17 @@ class TvPlayerPage implements Page {
     this.bindHlsDebugEvents(adapter);
     adapter.onManifestParsed(() => {
       plog.debug('HLS MANIFEST_PARSED');
-      videoEl.play().catch((err: unknown) => {
-        plog.warn('autoplay blocked, trying muted', { error: String(err) });
-        videoEl.muted = true;
-        videoEl.play().catch((err2: unknown) => {
-          plog.error('muted play also failed', { error: String(err2) });
+      const p = videoEl.play();
+      if (p && p.catch) {
+        p.catch((err: unknown) => {
+          plog.warn('autoplay blocked, trying muted', { error: String(err) });
+          videoEl.muted = true;
+          const p2 = videoEl.play();
+          if (p2 && p2.catch) p2.catch((err2: unknown) => {
+            plog.error('muted play also failed', { error: String(err2) });
+          });
         });
-      });
+      }
     });
     this.bindHlsError(adapter);
 
@@ -223,9 +227,7 @@ class TvPlayerPage implements Page {
         if (this.video) {
           if (this.video.paused) {
             plog.debug('play pressed');
-            this.video.play().catch((err) => {
-              plog.error('play() failed', { error: String(err) });
-            });
+            safePlay(this.video);
           } else {
             plog.debug('pause pressed');
             this.video.pause();

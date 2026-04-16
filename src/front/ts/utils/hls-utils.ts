@@ -10,6 +10,12 @@ import { HlsError } from '../pages/player/hls-adapter';
 
 // ── Config / setup ────────────────────────────────────────────────
 
+// Chromium 28 (Tizen 2.3) HTMLMediaElement.play() returns undefined, not a Promise.
+export const safePlay = (v: HTMLMediaElement): void => {
+  const p = v.play();
+  if (p && p.catch) p.catch(() => { /* interrupted by load/pause */ });
+};
+
 export type HlsConfig = Partial<Hls.Config>;
 
 interface HlsBufferLimits {
