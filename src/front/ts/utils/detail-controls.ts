@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import { BookmarkFolder } from '../types/api';
-import { toggleWatchlist } from '../api/watching';
+import { toggleWatchlist, toggleWatched } from '../api/watching';
 import { getBookmarkFolders, getItemFolders, toggleBookmarkItem, createBookmarkFolder } from '../api/bookmarks';
 import { NumberSet } from './number-set';
 
@@ -140,6 +140,24 @@ export class DetailControls {
   readonly toggleWatchlist = (itemId: number): void => {
     toggleWatchlist(itemId).done((resp) => {
       this.$root.find('.detail__watchlist-text').text(resp.watching ? 'Смотрю' : 'Не смотрю');
+    });
+  };
+
+  // --- Watched ---
+
+  private watched = false;
+
+  readonly initWatched = (isWatched: boolean): void => {
+    this.watched = isWatched;
+  };
+
+  readonly watchedTpl = (isWatched: boolean): string =>
+    '<span class="detail__rating focusable" data-action="watched"><span class="detail__watched-text">' + (isWatched ? 'Просмотрен' : 'Не просмотрен') + '</span></span>';
+
+  readonly toggleWatchedStatus = (itemId: number, video: number): void => {
+    toggleWatched(itemId, video).done(() => {
+      this.watched = !this.watched;
+      this.$root.find('.detail__watched-text').text(this.watched ? 'Просмотрен' : 'Не просмотрен');
     });
   };
 

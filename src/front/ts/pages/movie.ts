@@ -25,7 +25,7 @@ const tplDetailCompiled = doT.template(`
       <div class="detail__meta">{{=it.genres}}</div>
       <div class="detail__ratings">{{=it.bookmarksTpl}}</div>
       {{?it.duration}}<div class="detail__meta">{{=it.duration}} &bull; {{=it.quality}}p</div>{{?}}
-      <div class="detail__ratings">{{=it.ratings}}{{=it.watchlistTpl}}</div>
+      <div class="detail__ratings">{{=it.ratings}}{{=it.watchedTpl}}</div>
       <div class="detail__actions">{{=it.buttons}}</div>
       <div class="detail__plot">{{=it.plot}}</div>
       {{?it.personnel}}<div class="detail__personnel">{{=it.personnel}}</div>{{?}}
@@ -46,7 +46,7 @@ interface DetailData {
   readonly buttons: string;
   readonly plot: string;
   readonly bookmarksTpl: string;
-  readonly watchlistTpl: string;
+  readonly watchedTpl: string;
   readonly personnel: string;
 }
 
@@ -54,7 +54,7 @@ const tplDetail = (data: DetailData): string => tplDetailCompiled(data);
 
 // --- page ---
 
-type FocusArea = 'bookmarks' | 'watchlist' | 'play';
+type FocusArea = 'bookmarks' | 'watched' | 'play';
 
 class MoviePage implements Page {
   private readonly $root = $('#page-movie');
@@ -71,11 +71,10 @@ class MoviePage implements Page {
     const item = this.item!;
     const title = item.title.split(' / ');
 
-    let resumeTime = 0;
-    if (this.watching && this.watching.videos && this.watching.videos.length > 0) {
-      const v = this.watching.videos[0];
-      if (v.status === 0 && v.time > 0 && v.time < v.duration - 10) resumeTime = v.time;
-    }
+    const video = this.watching && this.watching.videos && this.watching.videos.length > 0 ? this.watching.videos[0] : null;
+    const resumeTime = video && video.status === 0 && video.time > 0 && video.time < video.duration - 10 ? video.time : 0;
+    const isWatched = video !== null && video.status === 1;
+    this.controls.initWatched(isWatched);
 
     const buttons = '<div class="btn" data-action="play">' +
       (resumeTime > 0 ? 'Продолжить с ' + formatDuration(resumeTime) : 'Смотреть') + '</div>';
@@ -93,7 +92,7 @@ class MoviePage implements Page {
       buttons,
       plot: item.plot || '',
       bookmarksTpl: this.controls.bookmarksTpl(),
-      watchlistTpl: this.controls.watchlistTpl(item.in_watchlist),
+      watchedTpl: this.controls.watchedTpl(isWatched),
       personnel: renderPersonnel(item),
     }));
 
@@ -110,8 +109,8 @@ class MoviePage implements Page {
 
     if (this.focusArea === 'bookmarks') {
       this.$root.find('[data-action="bookmark"]').addClass('focused');
-    } else if (this.focusArea === 'watchlist') {
-      this.$root.find('[data-action="watchlist"]').addClass('focused');
+    } else if (this.focusArea === 'watched') {
+      this.$root.find('[data-action="watched"]').addClass('focused');
     } else {
       this.$root.find('.btn').eq(0).addClass('focused');
     }
@@ -132,7 +131,7 @@ class MoviePage implements Page {
 
     switch (this.focusArea) {
       case 'bookmarks': this.handleBookmarksKey(e); break;
-      case 'watchlist': this.handleWatchlistKey(e); break;
+      case 'watched': this.handleWatchedKey(e); break;
       case 'play': this.handlePlayKey(e); break;
     }
   };
@@ -141,24 +140,24 @@ class MoviePage implements Page {
     switch (e.keyCode) {
       case TvKey.Left: this.controls.prevFolder(); e.preventDefault(); break;
       case TvKey.Right: this.controls.nextFolder(); e.preventDefault(); break;
-      case TvKey.Down: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
+      case TvKey.Down: this.focusArea = 'watched'; this.updateFocus(); e.preventDefault(); break;
       case TvKey.Enter: this.controls.toggleBookmark(); e.preventDefault(); break;
     }
   }
 
-  private handleWatchlistKey(e: JQuery.Event): void {
+  private handleWatchedKey(e: JQuery.Event): void {
     switch (e.keyCode) {
       case TvKey.Up: this.focusArea = 'bookmarks'; this.updateFocus(); e.preventDefault(); break;
       case TvKey.Down: this.focusArea = 'play'; this.updateFocus(); e.preventDefault(); break;
       case TvKey.Enter:
-        if (this.item) this.controls.toggleWatchlist(this.item.id);
+        if (this.item) this.controls.toggleWatchedStatus(this.item.id, 1);
         e.preventDefault(); break;
     }
   }
 
   private handlePlayKey(e: JQuery.Event): void {
     switch (e.keyCode) {
-      case TvKey.Up: this.focusArea = 'watchlist'; this.updateFocus(); e.preventDefault(); break;
+      case TvKey.Up: this.focusArea = 'watched'; this.updateFocus(); e.preventDefault(); break;
       case TvKey.Enter:
         if (this.item) router.navigateMoviePlayer(this.item.id);
         e.preventDefault(); break;

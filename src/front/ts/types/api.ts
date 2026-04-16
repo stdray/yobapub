@@ -256,8 +256,8 @@ export interface BookmarkToggleResponse {
 }
 
 export interface WatchlistToggleResponse {
-  status: number;
-  watching: boolean;
+  readonly status: number;
+  readonly watching: boolean;
 }
 
 export interface TvChannel {
