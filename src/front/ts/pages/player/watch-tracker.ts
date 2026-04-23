@@ -64,6 +64,10 @@ export class WatchProgressTracker {
     const v = this.deps.getVideoEl();
     const ctx = this.deps.getContext();
     const log = this.deps.log;
+    if (this.marked) {
+      log.info("sendMarkTime skip (already marked watched)", {});
+      return;
+    }
     if (!v || !ctx) {
       log.warn("sendMarkTime skip hasVideo={hv} hasItem={hi}", {
         hv: !!v,
