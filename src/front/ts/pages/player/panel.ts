@@ -296,7 +296,18 @@ export class Panel {
     if (pos < SECTION_COUNT) { this.btnPos = pos; this.renderButtons(); }
   }
 
-  refreshButtons(): void { this.renderButtons(); }
+  refreshButtons(): void {
+    if (this.btnsFocused && !this.isSectionEnabled(this.currentSection())) {
+      let pos = this.btnPos - 1;
+      while (pos >= 0 && !this.isSectionEnabled(PANEL_BUTTONS[pos].section)) pos--;
+      if (pos < 0) {
+        pos = this.btnPos + 1;
+        while (pos < SECTION_COUNT && !this.isSectionEnabled(PANEL_BUTTONS[pos].section)) pos++;
+      }
+      if (pos >= 0 && pos < SECTION_COUNT) this.btnPos = pos;
+    }
+    this.renderButtons();
+  }
 
   private renderButtons(): void {
     const $btns = this.$actionBtns.get();

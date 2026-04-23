@@ -114,21 +114,55 @@ export class WatchProgressTracker {
     );
   }
 
-  markWatched(): void {
+  markWatched(onFail?: () => void): void {
     if (this.marked) return;
     this.marked = true;
     this.deps.log.info("markWatched", {});
-    this.sendToggleWatched();
+    this.sendToggleWatched(() => {
+      this.marked = false;
+      if (onFail) onFail();
+    });
   }
 
-  sendToggleWatched(): void {
+  sendToggleWatched(onFail?: () => void): void {
     const ctx = this.deps.getContext();
-    if (!ctx) return;
-    if (ctx.season !== undefined && ctx.episode !== undefined) {
-      toggleWatched(ctx.itemId, ctx.episode, ctx.season);
-    } else if (ctx.video !== undefined) {
-      toggleWatched(ctx.itemId, ctx.video);
+    const log = this.deps.log;
+    if (!ctx) {
+      log.warn("sendToggleWatched skip no ctx", {});
+      if (onFail) onFail();
+      return;
     }
+    let promise: JQueryDeferred<void>;
+    if (ctx.season !== undefined && ctx.episode !== undefined) {
+      log.info("sendToggleWatched serial id={id} season={s} episode={e}", {
+        id: ctx.itemId, s: ctx.season, e: ctx.episode,
+      });
+      promise = toggleWatched(ctx.itemId, ctx.episode, ctx.season);
+    } else if (ctx.video !== undefined) {
+      log.info("sendToggleWatched movie id={id} video={v}", {
+        id: ctx.itemId, v: ctx.video,
+      });
+      promise = toggleWatched(ctx.itemId, ctx.video);
+    } else {
+      log.warn("sendToggleWatched skip no season/episode/video", {});
+      if (onFail) onFail();
+      return;
+    }
+    promise.then(
+      (res: unknown) =>
+        log.info("toggleWatched resp id={id} body={b}", {
+          id: ctx.itemId,
+          b: JSON.stringify(res).substring(0, 300),
+        }),
+      (xhr: JQueryXHR) => {
+        log.error("toggleWatched failed status={s} text={txt} resp={r}", {
+          s: xhr ? xhr.status : -1,
+          txt: xhr ? String(xhr.statusText || "") : "",
+          r: xhr ? String(xhr.responseText || "").substring(0, 200) : "",
+        });
+        if (onFail) onFail();
+      },
+    );
   }
 
   private tick(): void {

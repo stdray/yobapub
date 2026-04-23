@@ -149,7 +149,10 @@ class PlayerController implements PlayerFsmCtx {
     onApplySubSize: (size) => { storage.setSubSize(size); applySubSize(); },
     onPrevEpisode: () => { this.trackNavigator.navigate(-1); },
     onNextEpisode: () => { this.trackNavigator.navigate(1); },
-    onMarkWatched: () => { this.watchTracker.markWatched(); },
+    onMarkWatched: () => {
+      this.watchTracker.markWatched(() => this.panel.refreshButtons());
+      this.panel.refreshButtons();
+    },
     onSavePrefs: () => { this.doSavePrefs(); },
     getData: () => this.getPanelData(),
   });
