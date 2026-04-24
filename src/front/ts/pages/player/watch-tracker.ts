@@ -210,8 +210,7 @@ export class WatchProgressTracker {
         ? SERIAL_END_THRESHOLD_SEC
         : MOVIE_END_THRESHOLD_SEC;
     if (dur - time <= threshold) {
-      this.marked = true;
-      this.sendToggleWatched();
+      this.markWatched();
     }
   }
 
