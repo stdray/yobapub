@@ -1,4 +1,6 @@
-import { markTime, toggleWatched } from "../../api/watching";
+import { getWatchingInfo, markTime, toggleWatched } from "../../api/watching";
+import { WatchingInfoItem, WatchingInfoResponse } from "../../types/api";
+import { arrayFind } from "../../utils/array";
 import { Logger } from "../../utils/log";
 
 interface WatchContext {
@@ -122,10 +124,62 @@ export class WatchProgressTracker {
     if (this.marked) return;
     this.marked = true;
     this.deps.log.info("markWatched", {});
-    this.sendToggleWatched(() => {
+    this.ensureWatched(true, () => {
       this.marked = false;
       if (onFail) onFail();
     });
+  }
+
+  private ensureWatched(target: boolean, onFail?: () => void): void {
+    const ctx = this.deps.getContext();
+    const log = this.deps.log;
+    if (!ctx) {
+      log.warn("ensureWatched skip no ctx", {});
+      if (onFail) onFail();
+      return;
+    }
+    log.info("ensureWatched id={id} target={t}", {
+      id: ctx.itemId, t: target ? 1 : 0,
+    });
+    getWatchingInfo(ctx.itemId).then(
+      (resp: WatchingInfoResponse) => {
+        const info = resp && resp.item;
+        const currentWatched = !!info && this.isWatchedInInfo(info, ctx);
+        log.info("ensureWatched current={c} target={t}", {
+          c: currentWatched ? 1 : 0, t: target ? 1 : 0,
+        });
+        if (currentWatched === target) {
+          log.info("ensureWatched skip toggle (already at target)", {});
+          return;
+        }
+        this.sendToggleWatched(onFail);
+      },
+      (xhr: JQueryXHR) => {
+        log.error("ensureWatched: getWatchingInfo failed status={s} text={txt}", {
+          s: xhr ? xhr.status : -1,
+          txt: xhr ? String(xhr.statusText || "") : "",
+        });
+        this.sendToggleWatched(onFail);
+      },
+    );
+  }
+
+  private isWatchedInInfo(info: WatchingInfoItem, ctx: WatchContext): boolean {
+    if (ctx.season !== undefined && ctx.episode !== undefined) {
+      if (!info.seasons) return false;
+      const season = ctx.season;
+      const episode = ctx.episode;
+      const s = arrayFind(info.seasons, (ss) => ss.number === season);
+      if (!s) return false;
+      const ep = arrayFind(s.episodes, (e) => e.number === episode);
+      return !!ep && ep.status === 1;
+    }
+    if (ctx.video !== undefined) {
+      if (!info.videos) return false;
+      const idx = ctx.video - 1;
+      return idx >= 0 && idx < info.videos.length && info.videos[idx].status === 1;
+    }
+    return false;
   }
 
   sendToggleWatched(onFail?: () => void): void {
@@ -195,7 +249,7 @@ export class WatchProgressTracker {
         this.deps.log.info("resetting watched status after {sec}s of playback", {
           sec: WAS_WATCHED_TICKS * TICK_MS / 1000,
         });
-        this.sendToggleWatched();
+        this.ensureWatched(false);
       }
     }
 
