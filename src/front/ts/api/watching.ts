@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { WatchingMoviesResponse, WatchingSerialsResponse, WatchingInfoResponse, WatchlistToggleResponse } from '../types/api';
+import { WatchingMoviesResponse, WatchingSerialsResponse, WatchingInfoResponse, WatchlistToggleResponse, ToggleWatchedResponse } from '../types/api';
 
 export const getWatchingMovies = (): JQueryDeferred<WatchingMoviesResponse> =>
   apiClient.apiGetWithRefresh('/v1/watching/movies');
@@ -16,7 +16,7 @@ export const markTime = (id: number, video: number, time: number, season?: numbe
   return apiClient.apiGetWithRefresh('/v1/watching/marktime', params);
 };
 
-export const toggleWatched = (id: number, video: number, season?: number): JQueryDeferred<void> => {
+export const toggleWatched = (id: number, video: number, season?: number): JQueryDeferred<ToggleWatchedResponse> => {
   const params: { id: number; video: number; season?: number } = { id, video };
   if (season !== undefined) params.season = season;
   return apiClient.apiGetWithRefresh('/v1/watching/toggle', params);

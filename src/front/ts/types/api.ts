@@ -228,6 +228,12 @@ export interface WatchingInfoResponse {
   item: WatchingInfoItem;
 }
 
+export interface ToggleWatchedResponse {
+  status: number;
+  watched: number;
+  watching: { status: number };
+}
+
 export interface BookmarkFolder {
   id: number;
   title: string;

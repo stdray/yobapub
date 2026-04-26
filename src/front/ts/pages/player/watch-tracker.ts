@@ -1,6 +1,5 @@
-import { getWatchingInfo, markTime, toggleWatched } from "../../api/watching";
-import { WatchingInfoItem, WatchingInfoResponse } from "../../types/api";
-import { arrayFind } from "../../utils/array";
+import { markTime, toggleWatched } from "../../api/watching";
+import { ToggleWatchedResponse } from "../../types/api";
 import { Logger } from "../../utils/log";
 
 interface WatchContext {
@@ -124,65 +123,17 @@ export class WatchProgressTracker {
     if (this.marked) return;
     this.marked = true;
     this.deps.log.info("markWatched", {});
-    this.ensureWatched(true, () => {
+    this.sendToggleWatched(true, () => {
       this.marked = false;
       if (onFail) onFail();
     });
   }
 
-  private ensureWatched(target: boolean, onFail?: () => void): void {
-    const ctx = this.deps.getContext();
-    const log = this.deps.log;
-    if (!ctx) {
-      log.warn("ensureWatched skip no ctx", {});
-      if (onFail) onFail();
-      return;
-    }
-    log.info("ensureWatched id={id} target={t}", {
-      id: ctx.itemId, t: target ? 1 : 0,
-    });
-    getWatchingInfo(ctx.itemId).then(
-      (resp: WatchingInfoResponse) => {
-        const info = resp && resp.item;
-        const currentWatched = !!info && this.isWatchedInInfo(info, ctx);
-        log.info("ensureWatched current={c} target={t}", {
-          c: currentWatched ? 1 : 0, t: target ? 1 : 0,
-        });
-        if (currentWatched === target) {
-          log.info("ensureWatched skip toggle (already at target)", {});
-          return;
-        }
-        this.sendToggleWatched(onFail);
-      },
-      (xhr: JQueryXHR) => {
-        log.error("ensureWatched: getWatchingInfo failed status={s} text={txt}", {
-          s: xhr ? xhr.status : -1,
-          txt: xhr ? String(xhr.statusText || "") : "",
-        });
-        this.sendToggleWatched(onFail);
-      },
-    );
+  sendToggleWatched(target: boolean, onFail?: () => void): void {
+    this.toggleAttempt(target, 0, onFail);
   }
 
-  private isWatchedInInfo(info: WatchingInfoItem, ctx: WatchContext): boolean {
-    if (ctx.season !== undefined && ctx.episode !== undefined) {
-      if (!info.seasons) return false;
-      const season = ctx.season;
-      const episode = ctx.episode;
-      const s = arrayFind(info.seasons, (ss) => ss.number === season);
-      if (!s) return false;
-      const ep = arrayFind(s.episodes, (e) => e.number === episode);
-      return !!ep && ep.status === 1;
-    }
-    if (ctx.video !== undefined) {
-      if (!info.videos) return false;
-      const idx = ctx.video - 1;
-      return idx >= 0 && idx < info.videos.length && info.videos[idx].status === 1;
-    }
-    return false;
-  }
-
-  sendToggleWatched(onFail?: () => void): void {
+  private toggleAttempt(target: boolean, attempt: number, onFail?: () => void): void {
     const ctx = this.deps.getContext();
     const log = this.deps.log;
     if (!ctx) {
@@ -190,15 +141,15 @@ export class WatchProgressTracker {
       if (onFail) onFail();
       return;
     }
-    let promise: JQueryDeferred<void>;
+    let promise: JQueryDeferred<ToggleWatchedResponse>;
     if (ctx.season !== undefined && ctx.episode !== undefined) {
-      log.info("sendToggleWatched serial id={id} season={s} episode={e}", {
-        id: ctx.itemId, s: ctx.season, e: ctx.episode,
+      log.info("sendToggleWatched serial id={id} season={s} episode={e} target={t} attempt={a}", {
+        id: ctx.itemId, s: ctx.season, e: ctx.episode, t: target ? 1 : 0, a: attempt,
       });
       promise = toggleWatched(ctx.itemId, ctx.episode, ctx.season);
     } else if (ctx.video !== undefined) {
-      log.info("sendToggleWatched movie id={id} video={v}", {
-        id: ctx.itemId, v: ctx.video,
+      log.info("sendToggleWatched movie id={id} video={v} target={t} attempt={a}", {
+        id: ctx.itemId, v: ctx.video, t: target ? 1 : 0, a: attempt,
       });
       promise = toggleWatched(ctx.itemId, ctx.video);
     } else {
@@ -207,11 +158,20 @@ export class WatchProgressTracker {
       return;
     }
     promise.then(
-      (res: unknown) =>
-        log.info("toggleWatched resp id={id} body={b}", {
-          id: ctx.itemId,
-          b: JSON.stringify(res).substring(0, 300),
-        }),
+      (res: ToggleWatchedResponse) => {
+        const watchedNow = !!res && res.watched === 1;
+        log.info("toggleWatched resp id={id} watched={w} target={t} attempt={a}", {
+          id: ctx.itemId, w: watchedNow ? 1 : 0, t: target ? 1 : 0, a: attempt,
+        });
+        if (watchedNow === target) return;
+        if (attempt >= 1) {
+          log.error("toggleWatched stuck at wrong state after retry, giving up", {});
+          if (onFail) onFail();
+          return;
+        }
+        log.warn("toggleWatched flipped wrong way, re-toggling", {});
+        this.toggleAttempt(target, attempt + 1, onFail);
+      },
       (xhr: JQueryXHR) => {
         log.error("toggleWatched failed status={s} text={txt} resp={r}", {
           s: xhr ? xhr.status : -1,
@@ -249,7 +209,7 @@ export class WatchProgressTracker {
         this.deps.log.info("resetting watched status after {sec}s of playback", {
           sec: WAS_WATCHED_TICKS * TICK_MS / 1000,
         });
-        this.ensureWatched(false);
+        this.sendToggleWatched(false);
       }
     }
 
