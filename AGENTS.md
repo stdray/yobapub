@@ -77,6 +77,7 @@ English, imperative, capitalized, no period, ≤72 chars. No Conventional Commit
 
 - **Decision log** (`doc/decision-log.md`): record non-trivial technical decisions, rollbacks, experiments. Newest on top. Prevents going in circles.
 - **Debugging**: don't guess twice — if a hypothesis fails, collect data before the next one. Add logging with context, use diagnostic patches, instrument `node_modules` if needed, reproduce in a desktop browser when possible.
+- **Logs from device** (`tmp/`): when the user provides a log URL (e.g. `https://yobapub.3po.su/s/logs/.../tsv`), ALWAYS download to `tmp/<id>.tsv` first (`curl -sL <url> -o tmp/<id>.tsv`), then analyze the file with `Read`/`Grep`. Don't rely on `WebFetch` — it summarizes and drops critical lines. `tmp/` is gitignored.
 
 ## Backend Proxy
 

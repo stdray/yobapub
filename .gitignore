@@ -65,6 +65,7 @@ err/
 .claude
 .factory/
 *.tsv
+tmp/
 
 # Local keys/certs documentation (not for repo)
 docs/local-keys.md
