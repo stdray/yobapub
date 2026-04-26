@@ -402,17 +402,27 @@ export class HlsEngine {
       message: err.message,
     });
     // Unrecoverable MEDIA_ERROR details — manifest-level codec mismatches cannot be
-    // fixed by recoverMediaError(), which only handles decoder/buffer issues at runtime.
+    // fixed at runtime. Everything else (e.g. fatal bufferStalledError) we recover
+    // with stopLoad+startLoad(ct), same path as the non-fatal stall watchdog.
+    // Do NOT call recoverMediaError() on Tizen 2.3/3.0 + hls.js 0.14 — it resets
+    // currentTime to 0 and leaves the player wedged.
     if (err.type === ERROR_TYPE_MEDIA && UNRECOVERABLE_MEDIA_ERRORS.indexOf(err.details) < 0) {
       const vf = this.deps.getVideoEl();
+      const ct = vf ? vf.currentTime : -1;
       log.warn('hls RECOVER fatal MEDIA_ERROR started={started} ct={ct} rs={rs} br={br}', {
         started: this.deps.getPlaybackStarted(),
-        ct: vf ? vf.currentTime : -1,
-        rs: vf ? vf.readyState : -1,
-        br: formatBuffered(vf),
+        ct, rs: vf ? vf.readyState : -1, br: formatBuffered(vf),
       });
-      adapter.recoverMediaError();
-      return;
+      if (vf && ct > 0) {
+        adapter.stopLoad();
+        adapter.startLoad(ct);
+        if (vf.paused) safePlay(vf);
+        this.stallCount = 0;
+        this.hadBufferFullError = false;
+        this.appendErrorCount = 0;
+        return;
+      }
+      log.warn('hls RECOVER fatal MEDIA_ERROR: no usable ct, escalating to fatal', {});
     }
     this.deps.onFatalError(err);
   }

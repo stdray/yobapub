@@ -13,6 +13,23 @@
 
 ---
 
+## 2026-04-26 08:15 — fatal `bufferStalledError`: `stopLoad+startLoad` вместо `recoverMediaError`
+
+**Решение:** в `hls-engine.ts:handleFatalError` для recoverable fatal `MEDIA_ERROR` (всё, что не в `UNRECOVERABLE_MEDIA_ERRORS`) убран `adapter.recoverMediaError()`. Заменён на `stopLoad()` + `startLoad(ct)` + `safePlay()` если на паузе, плюс ресет `stallCount` / `hadBufferFullError` / `appendErrorCount`. Если `ct ≤ 0` или нет видео — fallback на `onFatalError(err)` (показ экрана ошибки), чтобы не терять диагностику.
+
+**Причина:** лог `cq-bu7uYgkaE0MIHto3Q2A` (Tizen 2.3, legacy hls.js 0.14, 720p, серия id=86218 S4E16). В `20:48:55Z` пришёл `hls fatal mediaError bufferStalledError ct=1880.319 rs=4 br=1834.8-1880.4,1880.4-1922.8` (playhead на стыке двух буферных диапазонов, типичный stall). Наш fatal-handler позвал `adapter.recoverMediaError()` — `currentTime` улетел в 0, hls.js перестал грузить фрагменты. 90 секунд тишины, 3 stale tick'а, `markTimer` сам себя выключил. Юзер пробовал паузу/play — без эффекта. Восстановил вручную через seek (`pos=2054.84`).
+
+Это та же грабля, что чинили 2026-04-14 12:37 для НЕ-fatal `bufferStalledError`. Тогда ветку fatal оставили нетронутой (по невнимательности — fatal `bufferStalledError` редкий, в логах не попадался). Симптом полностью совпадает: `recoverMediaError()` на Tizen 2.3/3.0 + hls.js 0.14 сбрасывает `currentTime` в 0 и оставляет плеер мёртвым. Переиспользуем тот же recovery-путь, что для не-fatal версии — он уже подтверждён на устройстве.
+
+**Данные:**
+- лог https://yobapub.3po.su/s/logs/cq-bu7uYgkaE0MIHto3Q2A/tsv (сохранён в `tmp/`)
+- правка в `src/front/ts/pages/player/hls-engine.ts` (метод `handleFatalError`)
+- связано: 2026-04-14 12:37 (тот же fix для не-fatal ветки), 2026-04-14 11:23 (stall watchdog паттерн)
+
+**Результат:** ждём проверки на реальном устройстве. Юзер также жалуется на пропадания звука и рассыпание картинки в той же сессии — по логу не видно (вытеснены KEY_RIGHT-нажатиями), требует отдельной диагностики с более длинным логом. Записано в `doc/open-incidents.md`.
+
+---
+
 ## 2026-04-15 21:46 — HEVC 1080p на Tizen 3.0 через hls.js 1.6.16 — стабильно, без stall'ов
 
 **Решение:** подтверждено на реальном устройстве, что modern hls.js (1.6.16) чинит главную проблему 0.14 на Tizen 3.0 — частые `bufferStalledError` при HEVC 1080p. Tizen 3.0 становится кандидатом на default=modern.
