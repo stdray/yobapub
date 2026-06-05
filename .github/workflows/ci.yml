@@ -73,16 +73,14 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USERNAME }}
-          password: ${{ secrets.DEPLOY_PASSWORD }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             IMAGE="ghcr.io/${{ github.repository }}:latest"
             CONTAINER_NAME="yobapub-proxy"
-            PASSWORD="${{ secrets.DEPLOY_PASSWORD }}"
-            run_sudo() { printf '%s\n' "$PASSWORD" | sudo -S -p '' "$@"; }
-            run_sudo docker pull "$IMAGE"
-            run_sudo docker stop "$CONTAINER_NAME" || true
-            run_sudo docker rm "$CONTAINER_NAME" || true
-            run_sudo docker run -d \
+            docker pull "$IMAGE"
+            docker stop "$CONTAINER_NAME" || true
+            docker rm "$CONTAINER_NAME" || true
+            docker run -d \
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
               -p 127.0.0.1:8080:8080 \
@@ -91,7 +89,7 @@ jobs:
               -e Admin__Username="${{ secrets.ADMIN_USERNAME }}" \
               -e Admin__Password="${{ secrets.ADMIN_PASSWORD }}" \
               "$IMAGE"
-            run_sudo docker system prune -a -f
+            docker system prune -a -f
 
   # ─── Release: APK + Tizen + GitHub Release (push apps tag) ───
   release:
