@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-06-11 — CSS transform на `<video>` игнорируется Tizen 2.3; попытка №2 — display width в tkhd (патч hls.js)
+
+**Решение:** в `scripts/patch-hls.js` добавлен патч `mp4-generator:tkhd-display-width`: в `MP4.tkhd` пишется презентационная ширина `Math.round(track.width * pixelRatio[0] / pixelRatio[1])` вместо coded (для нашего потока 1280 вместо 960). Заодно патчер переведён с глобального маркера `__ctLog` на пер-патчевую идемпотентность (иначе новый патч локально не применялся бы при уже пропатченных ct-сайтах). AspectFixer и CSS-ветка оставлены: на платформах, где transform работает, они чинят; телеметрия `aspect {mode}` — главный сигнал верификации.
+
+**Причина:** проверка на устройстве (Tizen 2.3, серия Льюис S8E2, mid=527767): в логе `aspect stretch … transform=scale(1.3037, 0.9778)` — детект и применение трансформа отработали, но поля остались. Вывод: Tizen 2.3 рендерит видео в hardware plane и игнорирует CSS-transform на `<video>`. Следующий рычаг — контейнер: по ISO BMFF `tkhd.width/height` — презентационные размеры (с учётом SAR), hls.js 0.14 пишет туда coded. Chromium-пайплайны tkhd игнорируют (берут coded × pasp) — для них патч нейтрален; платформенный пайплайн Самсунга, который игнорирует и pasp, и CSS, с высокой вероятностью масштабирует по tkhd. avc1/stsd не трогаем (там по спеке coded). Аудио-трек не затронут (`pixelRatio` undefined → старое поведение).
+
+**Данные:** лог сессии TraceId=c355 (22:29Z, DeviceId cfee9f11…): `app ver=2.1.1-17`, `[hls] version=0.14.17 mode=legacy`, `BUFFER_CODECS video 960x704 initSegment=729B`, `aspect stretch believed=1.3636 display=1.8182`. Патч проверен в собранном бандле (`pixelRatio?Math.round` в `dist/release/vendor/hls-legacy.min.js`).
+
+**Результат:** ждём проверки на устройстве. Сигналы в логе после выката: если tkhd сработал — `believed` станет ≈1.8182 и `aspect none`; если нет — снова `aspect stretch` при полях на экране, тогда CSS/контейнерные пути исчерпаны (останется думать про канвас/AVPlay/транскод — всё дорого).
+
+---
+
 ## 2026-06-11 — анаморфные потоки: авто-коррекция аспекта через pasp/SAR + CSS scale
 
 **Решение:** новый модуль `pages/player/aspect.ts` (`AspectFixer` + `parsePaspBox`). KinoPub отдаёт часть тайтлов анаморфно (пример: `RESOLUTION=960x704`, H.264 SAR 4:3, DAR 20:11 — проверено ffprobe по живому сегменту). hls.js парсит SAR из SPS и пишет его в init-сегмент fMP4 как `pasp`-бокс; Tizen 3.0 его уважает (полный экран), пайплайн Tizen 2.3 игнорирует (квадратные пиксели → чёрные поля по бокам, картинка ~4:3). Фикс: `HlsAdapter.onBufferCodecs` отдаёт coded-размеры + init-сегмент → `parsePaspBox` достаёт SAR сканом fourcc с проверкой размера бокса → `AspectFixer` сравнивает аспект, в который верит платформа (`videoWidth/videoHeight`), с целевым (coded × SAR). Если платформа отрендерила по coded-аспекту — инлайн `transform: scale(sx, sy)` (`-webkit-` + unprefixed), пересчёт contain-бокса. Если аспекты совпадают (SAR учтён) или не совпадают ни с чем (аномалия) — трансформ снимается, всё логируется (`aspect {mode} ...` в канал `player`). Пересчёт на `loadedmetadata`/`resize`, сброс в `destroyPlayer`.
