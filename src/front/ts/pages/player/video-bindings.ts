@@ -5,10 +5,12 @@ import { OverlayView } from './overlay';
 import { WatchProgressTracker } from './watch-tracker';
 import { TrackNavigator } from './track-navigator';
 import { PlayerErrorView } from './error-view';
+import { AspectFixer } from './aspect';
 
 export interface VideoBindingsDeps {
   readonly getVideoEl: () => HTMLVideoElement | null;
   readonly engine: HlsEngine;
+  readonly aspect: AspectFixer;
   readonly overlay: OverlayView;
   readonly watchTracker: WatchProgressTracker;
   readonly trackNavigator: TrackNavigator;
@@ -20,7 +22,7 @@ export interface VideoBindingsDeps {
 }
 
 export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDeps): void => {
-  const { log, engine, overlay, watchTracker, trackNavigator, errorView, sourceUrl, onBack } = deps;
+  const { log, engine, aspect, overlay, watchTracker, trackNavigator, errorView, sourceUrl, onBack } = deps;
   const getV = deps.getVideoEl;
 
   // On Android WebView the native Chromium overlay play button (giant blurred
@@ -32,6 +34,11 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
   if (platform.isAndroidWebView() && playerEl) {
     playerEl.classList.add('player--hide-video');
   }
+
+  // Anamorphic correction: videoWidth becomes known on loadedmetadata and
+  // changes on quality switches ('resize' fires when intrinsic dims change).
+  videoEl.addEventListener('loadedmetadata', () => { aspect.onVideoResize(); });
+  videoEl.addEventListener('resize', () => { aspect.onVideoResize(); });
 
   videoEl.addEventListener('ended', () => {
     log.info('video ended currentTime={currentTime}', { currentTime: getV() ? getV()!.currentTime : -1 });

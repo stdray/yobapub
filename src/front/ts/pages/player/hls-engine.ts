@@ -3,7 +3,7 @@ import { extractHostname } from '../../utils/url';
 import { buildBaseHlsConfig, HlsConfig, logPlaybackStart, getRewrittenHlsUrl, safePlay } from '../../utils/hls-utils';
 import { ProxyCategory, storage } from '../../utils/storage';
 import {
-  HlsAdapter, HlsError, HlsFragInfo, HlsLevelInfo, createHlsAdapter, isModernHls,
+  HlsAdapter, HlsError, HlsFragInfo, HlsLevelInfo, HlsVideoTrack, createHlsAdapter, isModernHls,
 } from './hls-adapter';
 
 interface HlsLoadContext {
@@ -21,6 +21,7 @@ interface HlsEngineDeps {
   readonly onReady: () => void;
   readonly onFatalError: (err: HlsError) => void;
   readonly onHevcNotSupported?: () => void;
+  readonly onVideoTrack?: (t: HlsVideoTrack) => void;
   readonly log: Logger;
 }
 
@@ -304,6 +305,13 @@ export class HlsEngine {
       log.info('hls LEVEL_LOADED level={level} load={load}ms', {
         level: l.levelId, load: l.loadMs,
       });
+    });
+
+    adapter.onBufferCodecs((t) => {
+      log.info('hls BUFFER_CODECS video {w}x{h} initSegment={len}B', {
+        w: t.width, h: t.height, len: t.initSegment ? t.initSegment.length : 0,
+      });
+      if (this.deps.onVideoTrack) this.deps.onVideoTrack(t);
     });
 
     adapter.onManifestParsed(() => {

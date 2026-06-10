@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-06-11 — анаморфные потоки: авто-коррекция аспекта через pasp/SAR + CSS scale
+
+**Решение:** новый модуль `pages/player/aspect.ts` (`AspectFixer` + `parsePaspBox`). KinoPub отдаёт часть тайтлов анаморфно (пример: `RESOLUTION=960x704`, H.264 SAR 4:3, DAR 20:11 — проверено ffprobe по живому сегменту). hls.js парсит SAR из SPS и пишет его в init-сегмент fMP4 как `pasp`-бокс; Tizen 3.0 его уважает (полный экран), пайплайн Tizen 2.3 игнорирует (квадратные пиксели → чёрные поля по бокам, картинка ~4:3). Фикс: `HlsAdapter.onBufferCodecs` отдаёт coded-размеры + init-сегмент → `parsePaspBox` достаёт SAR сканом fourcc с проверкой размера бокса → `AspectFixer` сравнивает аспект, в который верит платформа (`videoWidth/videoHeight`), с целевым (coded × SAR). Если платформа отрендерила по coded-аспекту — инлайн `transform: scale(sx, sy)` (`-webkit-` + unprefixed), пересчёт contain-бокса. Если аспекты совпадают (SAR учтён) или не совпадают ни с чем (аномалия) — трансформ снимается, всё логируется (`aspect {mode} ...` в канал `player`). Пересчёт на `loadedmetadata`/`resize`, сброс в `destroyPlayer`.
+
+**Причина:** жалоба юзера: на Tizen 3.0 видео во весь экран, на Tizen 2.3 — чёрные поля по бокам. `width:100% !important` не помогло бы — элемент и так на весь экран, поля это letterboxing внутри элемента; contain-fit всегда сохраняет аспект, в который верит платформа, так что единственный CSS-рычаг — неравномерный scale. Авто-детект через SAR безопасен: честный 4:3-контент (SAR 1:1) не трогается, на платформах с поддержкой pasp факторы ≈1 → no-op, и кнопка в UI не нужна.
+
+**Данные:** манифест `…/527767.m3u8` (поток из жалобы), ffprobe seg-1: `960x704 SAR 4:3 DAR 20:11`; для 1080p-экрана вычисляется `scale(1.3037, 0.9778)` (полная ширина + корректный тонкий letterbox сверху/снизу). Правки: `aspect.ts` (новый), `hls-adapter.ts` (`onBufferCodecs`, `HlsVideoTrack`), `hls-engine.ts` (`onVideoTrack` dep + лог BUFFER_CODECS), `video-bindings.ts`, `player.ts`. `npm run release` зелёный.
+
+**Результат:** ждём проверки на устройстве Tizen 2.3. Риски: (1) CSS-transform на `<video>` может не примениться, если платформа рендерит видео в hardware plane — по логу `aspect stretch …` будет видно, что мы хоть посчитали правильно; (2) нативные сабы (`::cue`) растянутся вместе с видео ~на 30% по горизонтали — косметика; (3) tv-player не трогали.
+
+---
+
 ## 2026-06-10 22:45 — перекат логов и конфига на PetBox, снос admin-стека прокси
 
 **Решение:** весь встроенный обвес прокси (LiteDB-логи, share-ссылки `/s/logs`, playback errors, VIP-стор, admin UI с cookie-auth, DataProtection, RetentionService) удалён. Вместо него — PetBox (https://petbox.3po.su, проект `yobapub`): лог `clients` (телеметрия ТВ, релей через bounded channel + CLEF-батчи в `PetBox/ClientLogForwarder.cs`), лог `backend` (self-логи прокси через `Seq.Extensions.Logging`, serverUrl `.../api/ingest/yobapub/backend/compat/seq` — Seq-клиент дописывает `api/events/raw`; роут реализован в petbox в тот же день, коммит `acbe44e`, auth `X-Seq-ApiKey` = обычный ключ). VIP-логины — конфиг-биндинг `vip/logins`; уровень клиентского логгирования — биндинг `client-log/level`, per-device override той же path с тегом `device:{id}` (precedence: больше тегов — выше приоритет, проверено по `ResolvePipeline.cs` и живым запросом). Клиент получил minLevel-фильтр в `log.ts` (гейт только на отправку, console не режется), уровень тянется при старте с `GET /api/log-config?deviceId=` и кэшируется в `kp_log_level`. Playback errors идут в тот же лог `clients` (`Level=Error`, `Category=playback-error`).
