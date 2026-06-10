@@ -20,7 +20,7 @@ import { historyPage } from './pages/history';
 import { deviceApi } from './api/device';
 import { CLIENT_ID, CLIENT_SECRET } from './config';
 import { sidebar } from './sidebar';
-import { Logger } from './utils/log';
+import { Logger, syncMinLogLevel } from './utils/log';
 
 const initLog = new Logger('init-diag');
 const crashLog = new Logger('crash');
@@ -70,6 +70,8 @@ objectFitImages();
 apiClient.configure(CLIENT_ID, CLIENT_SECRET);
 
 platform.registerTizenKeys();
+
+syncMinLogLevel();
 
 router.registerPage('login', loginPage);
 router.registerPage('watching', watchingPage);

@@ -1,37 +1,60 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Options;
+using PetBox.Client.Config;
 using YobaPub.Proxy;
+using YobaPub.Proxy.PetBox;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var proxyConfig = builder.Configuration.GetSection("Proxy").Get<ProxyConfig>() ?? new ProxyConfig();
+var petBox = builder.Configuration.GetSection("PetBox").Get<PetBoxOptions>() ?? new PetBoxOptions();
+var petBoxEnabled = petBox.ApiKey.Length > 0;
+
+if (petBoxEnabled)
+{
+    // Workspace config (vip/logins, default client-log/level) — polled with ETags.
+    builder.Configuration.AddPetBoxConfig(o =>
+    {
+        o.BaseUrl = petBox.BaseUrl;
+        o.ApiKey = petBox.ApiKey;
+        o.RefreshInterval = TimeSpan.FromSeconds(petBox.ConfigRefreshSeconds);
+        o.Optional = true; // the proxy must come up even when PetBox is down
+        o.WithTag("project", petBox.ProjectKey);
+    });
+
+    // Proxy self-logs → PetBox `backend` log. The Seq client appends api/events/raw
+    // to the server URL, landing on PetBox's named-log Seq-compat ingest route
+    // (/api/ingest/{p}/{log}/compat/seq, auth via X-Seq-ApiKey = regular API key).
+    builder.Logging.AddSeq(
+        $"{petBox.BaseUrl}/api/ingest/{petBox.ProjectKey}/{petBox.BackendLogName}/compat/seq",
+        apiKey: petBox.ApiKey);
+}
 
 builder.Services.AddSingleton(proxyConfig);
-builder.Services.AddOptions<AdminOptions>().BindConfiguration("Admin");
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(
-        builder.Configuration["DataProtection:KeysPath"] ?? "/keys/dataprotection"));
-builder.Services.AddSingleton<LogStore>();
-builder.Services.AddSingleton<LogShareStore>();
-builder.Services.AddSingleton<PlaybackErrorStore>();
-builder.Services.AddSingleton<MainDb>();
-builder.Services.AddSingleton<VipLoginStore>();
-builder.Services.AddSingleton<DebugSettingsStore>();
-builder.Services.AddSingleton<UserSettingsStore>();
-builder.Services.AddHostedService<RetentionService>();
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(opt =>
-    {
-        opt.LoginPath = "/admin/login";
-        opt.ExpireTimeSpan = TimeSpan.FromDays(30);
-        opt.Cookie.Name = "YobaPub.Auth";
-        opt.Cookie.HttpOnly = true;
-        opt.Cookie.SameSite = SameSiteMode.Lax;
-        opt.SlidingExpiration = true;
-    });
-builder.Services.AddControllersWithViews()
-    .AddJsonOptions(o => o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
+builder.Services.AddOptions<PetBoxOptions>().BindConfiguration("PetBox");
+
+// PetBox conf binding paths contain slashes ("client-log/level"), which IConfiguration
+// keeps as single key segments — bind manually instead of GetSection.
+builder.Services.AddOptions<PetBoxConfValues>().Configure<IConfiguration>((values, cfg) =>
+{
+    values.ClientLogLevel = cfg[petBox.ClientLevelConfKey];
+    values.VipLogins = cfg[petBox.VipLoginsConfKey];
+});
+builder.Services.AddSingleton<IOptionsChangeTokenSource<PetBoxConfValues>>(
+    new ConfigurationChangeTokenSource<PetBoxConfValues>(builder.Configuration));
+
+builder.Services.AddSingleton<DeviceLogLevelService>();
+builder.Services.AddSingleton<VipService>();
+builder.Services.AddSingleton<ClientLogRelay>();
+if (petBoxEnabled)
+    builder.Services.AddHostedService<ClientLogForwarder>();
+
+builder.Services.AddHttpClient(PetBoxHttp.ClientName, client =>
+{
+    client.BaseAddress = new Uri(petBox.BaseUrl);
+    client.DefaultRequestHeaders.TryAddWithoutValidation("X-Api-Key", petBox.ApiKey);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 builder.Services.AddHttpClient("proxy")
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
     {
@@ -48,11 +71,6 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
 });
 
 var app = builder.Build();
-
-app.Services.GetRequiredService<ILoggerFactory>()
-    .AddProvider(new LiteDbLoggerProvider(
-        app.Services.GetRequiredService<LogStore>(),
-        app.Services.GetRequiredService<DebugSettingsStore>()));
 
 app.UseForwardedHeaders();
 app.UseMiddleware<UniversalProxyMiddleware>();
@@ -73,9 +91,6 @@ app.UseStaticFiles(new StaticFileOptions
         }
     }
 });
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
 app.MapFallbackToFile("index.html");
 
 app.MapGet("/api/about", () =>
@@ -89,59 +104,71 @@ app.MapGet("/api/about", () =>
 
 app.MapGet("/api/proxy-config", (ProxyConfig cfg) => Results.Json(new { cfg.ProxyAll, cfg.Upstream }));
 
-app.MapGet("/api/vip-check", (string login, VipLoginStore vipStore) =>
-    Results.Json(new { vip = vipStore.Contains(login) }));
+app.MapGet("/api/vip-check", (string login, VipService vip) =>
+    Results.Json(new { vip = vip.Contains(login) }));
 
-app.MapPost("/api/log", async (HttpContext ctx, LogStore store, DebugSettingsStore debugSettings) =>
+// Effective log level for a device — fetched by the TV client at startup; the same
+// value backstops the relay filter below. Managed via PetBox config bindings:
+// client-log/level (project default) and client-log/level + tag device:{id} (override).
+app.MapGet("/api/log-config", async (string deviceId, DeviceLogLevelService levels, CancellationToken ct) =>
+    Results.Json(new { level = await levels.GetLevelAsync(deviceId, ct) }));
+
+app.MapPost("/api/log", async (HttpContext ctx, ClientLogRelay relay, DeviceLogLevelService levels) =>
 {
-    if (!debugSettings.IsEnabled) return Results.Ok();
     try
     {
         using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
         var root = doc.RootElement;
-        var entry = new LogEntry
-        {
-            ServerTs = DateTimeOffset.UtcNow,
-            ClientTs = root.TryGetProperty("clientTs", out var ts) && ts.TryGetInt64(out var tsVal) ? tsVal : 0,
-            Level = root.TryGetProperty("level", out var level) ? level.GetString() ?? "" : "",
-            Category = root.TryGetProperty("category", out var cat) ? cat.GetString() ?? "" : "",
-            Message = root.TryGetProperty("message", out var msg) ? msg.GetString() ?? "" : "",
-            DeviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
-            ClientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
-            TraceId = root.TryGetProperty("traceId", out var trace) ? trace.GetString() ?? "" : "",
-            Props = root.TryGetProperty("props", out var props) ? props.GetRawText() : "{}"
-        };
-        store.Add(entry);
+        var entry = new ClientLogEvent(
+            ServerTs: DateTimeOffset.UtcNow,
+            ClientTs: root.TryGetProperty("clientTs", out var ts) && ts.TryGetInt64(out var tsVal) ? tsVal : 0,
+            Level: root.TryGetProperty("level", out var level) ? level.GetString() ?? "" : "",
+            Category: root.TryGetProperty("category", out var cat) ? cat.GetString() ?? "" : "",
+            Message: root.TryGetProperty("message", out var msg) ? msg.GetString() ?? "" : "",
+            DeviceId: root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
+            ClientIp: ctx.Connection.RemoteIpAddress?.ToString() ?? "",
+            TraceId: root.TryGetProperty("traceId", out var trace) ? trace.GetString() ?? "" : "",
+            Props: root.TryGetProperty("props", out var props) ? props.Clone() : null);
+
+        var threshold = await levels.GetLevelAsync(entry.DeviceId, ctx.RequestAborted);
+        if (LogLevels.IsEnabled(entry.Level, threshold))
+            relay.Enqueue(entry);
     }
     catch { /* ignore malformed requests */ }
     return Results.Ok();
 });
 
-app.MapPost("/api/playback-error", async (HttpContext ctx, PlaybackErrorStore store, DebugSettingsStore debugSettings) =>
+app.MapPost("/api/playback-error", async (HttpContext ctx, ClientLogRelay relay, DeviceLogLevelService levels) =>
 {
-    if (!debugSettings.IsEnabled) return Results.Ok();
     try
     {
         using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
         var root = doc.RootElement;
         var url = root.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
-        var domain = "";
-        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            domain = uri.Host;
-
+        var domain = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : "";
         if (string.IsNullOrEmpty(domain)) return Results.Ok();
 
-        var entry = new PlaybackErrorEntry
-        {
-            ServerTs = DateTimeOffset.UtcNow,
-            Domain = domain,
-            DeviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "",
-            UserAgent = root.TryGetProperty("userAgent", out var ua) ? ua.GetString() ?? "" : "",
-            ErrorDetails = root.TryGetProperty("errorDetails", out var details) ? details.GetString() ?? "" : "",
-            Url = url.Length > 500 ? url[..500] : url,
-            ClientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? ""
-        };
-        store.Add(entry);
+        var deviceId = root.TryGetProperty("deviceId", out var dev) ? dev.GetString() ?? "" : "";
+        var entry = new ClientLogEvent(
+            ServerTs: DateTimeOffset.UtcNow,
+            ClientTs: 0,
+            Level: "Error",
+            Category: "playback-error",
+            Message: $"Playback error on {domain}",
+            DeviceId: deviceId,
+            ClientIp: ctx.Connection.RemoteIpAddress?.ToString() ?? "",
+            TraceId: "",
+            Props: JsonSerializer.SerializeToElement(new
+            {
+                url = url.Length > 500 ? url[..500] : url,
+                domain,
+                userAgent = root.TryGetProperty("userAgent", out var ua) ? ua.GetString() ?? "" : "",
+                errorDetails = root.TryGetProperty("errorDetails", out var details) ? details.GetString() ?? "" : ""
+            }));
+
+        var threshold = await levels.GetLevelAsync(deviceId, ctx.RequestAborted);
+        if (LogLevels.IsEnabled(entry.Level, threshold))
+            relay.Enqueue(entry);
     }
     catch { /* ignore malformed requests */ }
     return Results.Ok();

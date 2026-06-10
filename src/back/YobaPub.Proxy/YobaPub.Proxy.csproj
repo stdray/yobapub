@@ -7,7 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LiteDB" Version="5.0.21" />
+    <PackageReference Include="PetBox.Client.Config" Version="0.1.0-ci.324" />
+    <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

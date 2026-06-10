@@ -93,7 +93,8 @@ const KEYS = {
   DEVICE_ID: 'kp_device_id',
   LEGACY_HLS: 'kp_legacy_hls',
   LEGACY_HLS_FORCED: 'kp_legacy_hls_forced',
-  DEVICE_SETTINGS: 'kp_device_settings'
+  DEVICE_SETTINGS: 'kp_device_settings',
+  LOG_LEVEL: 'kp_log_level'
 } as const;
 
 // Old per-flag keys — read once during migration, then removed.
@@ -325,6 +326,14 @@ export class Storage {
 
   isLegacyHlsForced = (): boolean =>
     localStorage.getItem(KEYS.LEGACY_HLS_FORCED) === '1';
+
+  // --- Log level (server-driven, cached for instant apply on next launch) ---
+
+  getLogLevel = (): string | null => localStorage.getItem(KEYS.LOG_LEVEL);
+
+  setLogLevel = (level: string): void => {
+    localStorage.setItem(KEYS.LOG_LEVEL, level);
+  };
 
   // --- Cached device settings (from /v1/device/{id}/settings) ---
   // Flat { key: effectiveValue } map derived from the server response so any

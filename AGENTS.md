@@ -77,8 +77,9 @@ English, imperative, capitalized, no period, ≤72 chars. No Conventional Commit
 
 - **Decision log** (`doc/decision-log.md`): record non-trivial technical decisions, rollbacks, experiments. Newest on top. Prevents going in circles.
 - **Debugging**: don't guess twice — if a hypothesis fails, collect data before the next one. Add logging with context, use diagnostic patches, instrument `node_modules` if needed, reproduce in a desktop browser when possible.
-- **Logs from device** (`tmp/`): when the user provides a log URL (e.g. `https://yobapub.3po.su/s/logs/.../tsv`), ALWAYS download to `tmp/<id>.tsv` first (`curl -sL <url> -o tmp/<id>.tsv`), then analyze the file with `Read`/`Grep`. Don't rely on `WebFetch` — it summarizes and drops critical lines. `tmp/` is gitignored.
+- **Logs from device**: client logs live in PetBox (project `yobapub`, log `clients`; proxy self-logs in `backend`). Query via the petbox MCP `log_query` (KQL; filter by time window + `Message contains` — Properties columns like DeviceId may not be filterable, known gap) or the PetBox UI. For long excerpts, save to `tmp/` (gitignored) and analyze with `Read`/`Grep`.
+- **Log levels**: clients send only events ≥ their effective level; the proxy backstop-filters with the same value. Default — PetBox config binding `client-log/level` (tags `ws:stdray,project:yobapub`). To get verbose logs from ONE device, create a binding with the same path, value `Verbose`, and an extra tag `device:{deviceId}` (most specific tag-set wins); delete it after the session. The TV fetches its level at startup from `GET /api/log-config?deviceId=` and caches it in `kp_log_level`, so a level change applies on next app launch.
 
 ## Backend Proxy
 
-`src/back/YobaPub.Proxy/` — .NET reverse proxy with HLS manifest rewriting (`HlsRewriter.cs`). Config in `appsettings.json`.
+`src/back/YobaPub.Proxy/` — .NET reverse proxy with HLS manifest rewriting (`HlsRewriter.cs`). Config in `appsettings.json`. PetBox integration lives in `PetBox/`: client logs relayed to the `clients` log in CLEF batches, self-logs via `Seq.Extensions.Logging` to `backend`, VIP list and client log levels resolved from PetBox config (`vip/logins`, `client-log/level`). The PetBox API key comes from env `PetBox__ApiKey`; with an empty key all PetBox integrations are disabled (local dev).

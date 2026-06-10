@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-06-10 22:45 — перекат логов и конфига на PetBox, снос admin-стека прокси
+
+**Решение:** весь встроенный обвес прокси (LiteDB-логи, share-ссылки `/s/logs`, playback errors, VIP-стор, admin UI с cookie-auth, DataProtection, RetentionService) удалён. Вместо него — PetBox (https://petbox.3po.su, проект `yobapub`): лог `clients` (телеметрия ТВ, релей через bounded channel + CLEF-батчи в `PetBox/ClientLogForwarder.cs`), лог `backend` (self-логи прокси через `Seq.Extensions.Logging`, serverUrl `.../api/ingest/yobapub/backend/compat/seq` — Seq-клиент дописывает `api/events/raw`; роут реализован в petbox в тот же день, коммит `acbe44e`, auth `X-Seq-ApiKey` = обычный ключ). VIP-логины — конфиг-биндинг `vip/logins`; уровень клиентского логгирования — биндинг `client-log/level`, per-device override той же path с тегом `device:{id}` (precedence: больше тегов — выше приоритет, проверено по `ResolvePipeline.cs` и живым запросом). Клиент получил minLevel-фильтр в `log.ts` (гейт только на отправку, console не режется), уровень тянется при старте с `GET /api/log-config?deviceId=` и кэшируется в `kp_log_level`. Playback errors идут в тот же лог `clients` (`Level=Error`, `Category=playback-error`).
+
+**Причина:** плеерные логи (~84 call sites, без фильтрации) шумели; машина, где жил yobapub, умерла — все данные LiteDB утеряны, держать собственный лог-сервис в прокси больше незачем. Ветка `extract-yobalog` (standalone YobaLog) объявлена superseded — её роль выполняет petbox; из неё взят только инвентарь сноса. Dual-write не делали: мигрировать нечего, выкат биг-бэнг на чистую копию.
+
+**Данные:** план `recursive-booping-hearth.md`; petbox-ключ `yobapub-proxy` (scopes logs:ingest, config:read) — в env деплоя `PetBox__ApiKey`; биндинги id 52 (`client-log/level`=Information), 53 (`vip/logins`=[] — список заводится заново). NuGet: `PetBox.Client.Config` 0.1.0-ci.324, `Seq.Extensions.Logging` 8.0.0. Нюанс: слэш-ключи биндингов IConfiguration хранит одним сегментом — биндинг в `IOptionsMonitor<PetBoxConfValues>` сделан ручным `Configure<IConfiguration>` + `ConfigurationChangeTokenSource`.
+
+**Результат:** dotnet build чистый, тесты 16/16, tsc/eslint чистые. Smoke: CLEF-ингест в `clients` и `/v1/conf` (вкл. device-override) проверены живьём. Ждём: алиас-роут в petbox (до него self-логи в `backend` не доезжают — шиппер получает 404 и дропает), деплой на новую машину, проверка gap d13 (KQL по Properties) после первых реальных логов.
+
+---
+
 ## 2026-04-26 08:15 — fatal `bufferStalledError`: `stopLoad+startLoad` вместо `recoverMediaError`
 
 **Решение:** в `hls-engine.ts:handleFatalError` для recoverable fatal `MEDIA_ERROR` (всё, что не в `UNRECOVERABLE_MEDIA_ERRORS`) убран `adapter.recoverMediaError()`. Заменён на `stopLoad()` + `startLoad(ct)` + `safePlay()` если на паузе, плюс ресет `stallCount` / `hadBufferFullError` / `appendErrorCount`. Если `ct ≤ 0` или нет видео — fallback на `onFatalError(err)` (показ экрана ошибки), чтобы не терять диагностику.

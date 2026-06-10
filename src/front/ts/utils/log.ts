@@ -4,6 +4,51 @@ import { storage } from './storage';
 
 type Level = 'Verbose' | 'Debug' | 'Information' | 'Warning' | 'Error';
 
+// Backend send threshold. Managed remotely via PetBox config (binding
+// `client-log/level`, per-device override via tag device:{id}) and fetched from
+// the proxy at startup (syncMinLogLevel). Cached in localStorage so the next
+// launch applies it immediately. Console output is never filtered.
+const LEVEL_RANK: { readonly [level: string]: number | undefined } = {
+  Verbose: 0,
+  Debug: 1,
+  Information: 2,
+  Warning: 3,
+  Error: 4,
+  Off: 5,
+  None: 5,
+};
+const DEFAULT_LEVEL = 'Information';
+
+const rankOf = (level: string): number => {
+  const rank = LEVEL_RANK[level];
+  return rank === undefined ? (LEVEL_RANK[DEFAULT_LEVEL] as number) : rank;
+};
+
+let minRank = rankOf(storage.getLogLevel() || DEFAULT_LEVEL);
+
+export const setMinLogLevel = (level: string): void => {
+  minRank = rankOf(level);
+  storage.setLogLevel(level);
+};
+
+// Fire-and-forget fetch of this device's effective log level from the proxy
+// (which resolves it from PetBox config, down to a per-device override).
+export const syncMinLogLevel = (): void => {
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/log-config?deviceId=' + encodeURIComponent(storage.getDeviceId()), true);
+    xhr.onload = (): void => {
+      try {
+        if (xhr.status === 200) {
+          const res = JSON.parse(xhr.responseText) as { level?: unknown };
+          if (res && typeof res.level === 'string') setMinLogLevel(res.level);
+        }
+      } catch (_) { /* ignore malformed response */ }
+    };
+    xhr.send();
+  } catch (_) { /* fire-and-forget */ }
+};
+
 const PAGE_T0 = Date.now();
 
 const relTs = (): string =>
@@ -35,7 +80,7 @@ const sendToBackend = (level: Level, message: string, props: Record<string, unkn
 
 const emit = (level: Level, template: string, props: Record<string, unknown>, traceId?: string): void => {
   const message = renderTemplate(template, props);
-  sendToBackend(level, message, props, traceId);
+  if (rankOf(level) >= minRank) sendToBackend(level, message, props, traceId);
   const traceTag = traceId ? '[' + traceId + ']' : '';
   const console_msg = '[' + relTs() + '][' + level[0] + ']' + traceTag + ' ' + message;
   switch (level) {
