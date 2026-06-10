@@ -84,10 +84,7 @@ jobs:
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
               -p 127.0.0.1:8080:8080 \
-              -v /opt/yobapub/logs:/logs \
-              -v /opt/yobapub/keys:/keys/dataprotection \
-              -e Admin__Username="${{ secrets.ADMIN_USERNAME }}" \
-              -e Admin__Password="${{ secrets.ADMIN_PASSWORD }}" \
+              -e PetBox__ApiKey="${{ secrets.PETBOX_API_KEY }}" \
               "$IMAGE"
             docker system prune -a -f
 
