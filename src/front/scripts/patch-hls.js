@@ -25,6 +25,17 @@ var patches = [
     replace: 'MP4.tkhd = function tkhd(track) {\n    var id = track.id,\n        duration = track.duration * track.timescale,\n        width = track.pixelRatio ? Math.round(track.width * track.pixelRatio[0] / track.pixelRatio[1]) : track.width,\n        height = track.height,'
   },
   {
+    // tkhd alone moved videoWidth (WebKit natural size) but not the hardware
+    // video plane on Tizen 2.3 — the decoder config is built from the avc1
+    // (stsd) sample entry. Pre-apply the SAR into avc1 width and neutralize
+    // pasp to 1:1 so every container consumer sees the same square-pixel
+    // display-size story. The SPS inside avcC keeps the real coded dims for
+    // the decoder itself.
+    site: 'mp4-generator:avc1-display-width',
+    find: '    width = track.width,\n        height = track.height,\n        hSpacing = track.pixelRatio[0],\n        vSpacing = track.pixelRatio[1];',
+    replace: '    width = track.pixelRatio ? Math.round(track.width * track.pixelRatio[0] / track.pixelRatio[1]) : track.width,\n        height = track.height,\n        hSpacing = 1,\n        vSpacing = 1;'
+  },
+  {
     site: 'stream-controller:_seekToStartPos',
     find: 'logger["logger"].log("seek to target start position " + startPosition + " from current time " + currentTime + ". ready state " + media.readyState);\n      media.currentTime = startPosition;',
     replace: 'logger["logger"].log("seek to target start position " + startPosition + " from current time " + currentTime + ". ready state " + media.readyState);\n      if (typeof window !== \'undefined\' && window.__ctLog) window.__ctLog(\'stream-controller:_seekToStartPos\', startPosition, currentTime);\n      media.currentTime = startPosition;'
