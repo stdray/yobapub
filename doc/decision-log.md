@@ -21,7 +21,7 @@
 
 **Данные:** лог сессии TraceId=c355 (22:29Z, DeviceId cfee9f11…): `app ver=2.1.1-17`, `[hls] version=0.14.17 mode=legacy`, `BUFFER_CODECS video 960x704 initSegment=729B`, `aspect stretch believed=1.3636 display=1.8182`. Патч проверен в собранном бандле (`pixelRatio?Math.round` в `dist/release/vendor/hls-legacy.min.js`).
 
-**Результат:** ждём проверки на устройстве. Сигналы в логе после выката: если tkhd сработал — `believed` станет ≈1.8182 и `aspect none`; если нет — снова `aspect stretch` при полях на экране, тогда CSS/контейнерные пути исчерпаны (останется думать про канвас/AVPlay/транскод — всё дорого).
+**Результат:** ПОДТВЕРЖДЕНО на устройстве (выкат `4fbd87a` / 2.1.1-18, сессия TraceId=8a4f 22:35Z): `aspect none video=1280x704 coded=960x704 sar=4:3 believed=1.8182 display=1.8182 transform=none` — пайплайн Tizen 2.3 взял презентационную ширину из tkhd, картинка во всю ширину, AspectFixer корректно ушёл в no-op (двойного растяжения нет). Инцидент закрыт, запись удалена из open-incidents.md. Итоговая иерархия рычагов для аспекта на Tizen 2.3: pasp — игнор, CSS transform на `<video>` — игнор (hardware plane), tkhd — РАБОТАЕТ.
 
 ---
 
