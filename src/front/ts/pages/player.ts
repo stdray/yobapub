@@ -27,7 +27,6 @@ import { SeekController } from './player/seek';
 import { WatchProgressTracker } from './player/watch-tracker';
 import { OverlayView } from './player/overlay';
 import { installCtLogShim } from './player/ct-debug';
-import { AspectFixer } from './player/aspect';
 import { bindVideoEvents, VideoBindingsDeps } from './player/video-bindings';
 import { Fsm } from '../utils/fsm';
 import { playerMachine, PlayerFsmCtx, PlayerState, PlayerEvent } from './player/player-fsm';
@@ -91,17 +90,12 @@ class PlayerController implements PlayerFsmCtx {
   private videoEl: HTMLVideoElement | null = null;
   private media = defaultMedia();
   private state = defaultPlayState();
-  private readonly aspect = new AspectFixer({
-    getVideoEl: () => this.videoEl,
-    log: this.plog,
-  });
   private readonly engine = new HlsEngine({
     getVideoEl: () => this.videoEl,
     getPlaybackStarted: () => this.playbackStarted,
     onReady: () => this.onSourceReady(),
     onFatalError: (err: HlsError) => { this.reportFatal(); this.errorView.showHlsFatalError(err); },
     onHevcNotSupported: () => this.showToast('Устройство не тянет HEVC, выключите в настройках'),
-    onVideoTrack: (t) => this.aspect.setHlsTrack(t),
     log: this.hlslog,
   });
   private readonly errorView = new PlayerErrorView({
@@ -470,7 +464,6 @@ class PlayerController implements PlayerFsmCtx {
     const bindingsDeps: VideoBindingsDeps = {
       getVideoEl: () => this.videoEl,
       engine: this.engine,
-      aspect: this.aspect,
       overlay: this.overlay,
       watchTracker: this.watchTracker,
       trackNavigator: this.trackNavigator,
@@ -501,7 +494,6 @@ class PlayerController implements PlayerFsmCtx {
     this.seek.reset();
     this.overlay.clearSeekLabel();
     this.engine.destroy();
-    this.aspect.reset();
     if (this.videoEl) {
       try { this.videoEl.pause(); } catch { /* ignore */ }
       this.videoEl.removeAttribute('src');

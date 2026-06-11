@@ -74,14 +74,6 @@ export interface HlsLevelInfo {
   readonly audioCodec: string | null;
 }
 
-// Video track as announced via BUFFER_CODECS: coded dimensions from the SPS
-// plus the raw fMP4 init segment (carries the `pasp` box with the SAR).
-export interface HlsVideoTrack {
-  readonly width: number;
-  readonly height: number;
-  readonly initSegment: Uint8Array | null;
-}
-
 // -------- Raw per-version error shapes (private — live inside subclasses) --------
 
 interface HlsErrorDataLegacy {
@@ -280,24 +272,6 @@ export abstract class HlsAdapter {
 
   onManifestParsed(cb: () => void): void {
     this.hls.on(Hls.Events.MANIFEST_PARSED, (): void => { cb(); });
-  }
-
-  onBufferCodecs(cb: (t: HlsVideoTrack) => void): void {
-    this.hls.on(Hls.Events.BUFFER_CODECS, (_e: string, d: unknown): void => {
-      const r = d as {
-        video?: {
-          initSegment?: Uint8Array;
-          metadata?: { width?: number; height?: number };
-        };
-      };
-      const v = r.video;
-      if (!v || !v.metadata || !v.metadata.width || !v.metadata.height) return;
-      cb({
-        width: v.metadata.width,
-        height: v.metadata.height,
-        initSegment: v.initSegment || null,
-      });
-    });
   }
 
   protected abstract normalizeError(raw: unknown): HlsError;
