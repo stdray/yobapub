@@ -13,6 +13,23 @@
 
 ---
 
+## 2026-06-16 13:00 — Сабы (рендер своим оверлеем), фокус панели, шум логов, рантайм-конфиг
+
+**Решение:**
+- **Сабы не отображались на Tizen 2.3** — `pages/player/subtitles.ts` сделан гибридным по `isModernHls()` (= тумблер «Старый телевизор», делящий версии hls.js): **modern** (Tizen 3.0+/Android TV/браузер) — прежний нативный `<track>`/`::cue` (рабочий путь не трогаем); **legacy** (Tizen 2.3, hardware plane не композит нативные cue) — парсим SRT сами и рисуем активную реплику в HTML-оверлее `.player__subs` по `timeupdate`/`seeked`. Добавлен `<div class="player__subs">` в шаблон, `SubtitleLoader.destroy()` снимает слушатели из `destroyPlayer`.
+- **Странный (скриптовый) шрифт сабов на Android** — стек `"Comic Sans MS",…,cursive` на Android падал в дженерик `cursive` (вычурный скрипт, нечитаемо). Заменён единый чейн для `video::cue` и `.player__subs`: `Roboto, "Breeze Sans", "Tizen Sans", "Noto Sans", Arial, sans-serif` — Android→Roboto, Tizen 3.0→Breeze Sans, Tizen 2.3→Tizen Sans, конец `sans-serif` гарантирует читаемый системный sans везде. `applySubSize` пишет размер/межстрочье в оба селектора.
+- **Фокус уезжал на «Пред. серия»** после выбора в сайд-листе — в `Panel` добавлен флаг `justClosedSide`: при возврате `sidePanelOpen → buttonsFocus` сохраняем текущий `btnPos` вместо пересчёта из close-памяти. Сбрасывается в `markButtonsClosed/markSeekClosed/reset`.
+- **Шум в логах** — диагностические `info` понижены до `debug` (Verbose, не уходит на бэкенд при уровне Information): `subs-diag` (весь subtitles.ts), `loadMediaLinks start/ok` + `raw api count` (media.ts), `loadMediaLinks cb` (player.ts), `hls LEVEL_LOADING` (hls-engine.ts).
+- **Рантайм-перечтение конфига** — оказалось, в коде уже корректно: `PetBox.Client.Config` поллит каждые `ConfigRefreshSeconds`=60с, дёргает `OnReload()`; `VipService` и `DeviceLogLevelService` читают через `IOptionsMonitor.CurrentValue` (правильный паттерн, не `IOptions<T>`). Поэтому добавлен только `ConfigChangeLogger` (лог факта применения смены конфига) для верификации; идею периодического `IConfigurationRoot.Reload()` отбросил как дублирующую встроенный поллинг (и бесполезную против server-side ETag-staleness — `Reload→Load` шлёт тот же `If-None-Match`).
+
+**Причина:** Tizen 2.3 рендерит видео в hardware plane → нативные сабы не композятся (тот же класс проблемы, что CSS-transform/pasp в аспект-инцидентах). Диагностика с устройства (`subs-diag`): куски грузились (`cues=408, mode=showing`), но были невидимы — значит проблема в рендере, не в загрузке. Фокус-баг: `focusButtons()` безусловно перетирал `btnPos`.
+
+**Данные:** правки в `subtitles.ts`, `panel.ts`, `template.ts`, `app.css`, `player.ts`, `media.ts`, `hls-engine.ts`, новый `PetBox/ConfigChangeLogger.cs`, `Program.cs`. `npm run typecheck/lint/csslint` зелёные, `dotnet build` + 16 тестов зелёные.
+
+**Результат:** ждём проверки на устройстве. Особо: на Tizen 3.0 — что нативные сабы не сломались (путь не менялся, но проверить); на Tizen 2.3 — что оверлей виден; на Android — что шрифт стал нормальным. По конфигу: следующий деплой/рестарт подхватит `vip/logins=stdray` (рестарт = чистый fetch); если рантайм-смена биндинга НЕ даёт лог `PetBox config reloaded` за ~60с — копать server-side ETag-инвалидацию resolve в petbox.
+
+---
+
 ## 2026-06-11 — чёрные поля на Tizen 2.3: принято как косметика, все аспект-патчи откачены
 
 **Решение:** инцидент закрыт решением юзера («на чёрные края забиваем»). Откачены все три попытки одним revert-коммитом: avc1/stsd display width + нейтрализация pasp (`156d741`), tkhd display width (`4fbd87a`), AspectFixer/CSS transform с модулем `aspect.ts` и обвязкой (`4e8e4a3`). Код плеера и `patch-hls.js` вернулись ровно к состоянию `fd2d7e1`. Записи в журналах сохранены как история.

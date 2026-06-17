@@ -176,6 +176,10 @@ export class Panel {
   private listSection: Section = Section.PrevEp;
   private btnsFocused = false;
   private sideOpen = false;
+  // Set when the side list closes back into the button row (within one panel
+  // session). Tells focusButtons() to keep the current btnPos — the button
+  // whose list we just used — instead of recomputing it from close-memory.
+  private justClosedSide = false;
 
   // 20-sec memory: if user reopens the panel within this window we return to
   // the same button rather than starting over from the first section.
@@ -200,6 +204,7 @@ export class Panel {
     this.listSection = Section.PrevEp;
     this.btnsFocused = false;
     this.sideOpen = false;
+    this.justClosedSide = false;
     this.lastBtnPos = 0;
     this.lastCloseAt = 0;
     this.lastMode = 'seek';
@@ -208,12 +213,14 @@ export class Panel {
   markSeekClosed(): void {
     this.lastMode = 'seek';
     this.lastCloseAt = Date.now();
+    this.justClosedSide = false;
   }
 
   markButtonsClosed(): void {
     this.lastMode = 'buttons';
     this.lastBtnPos = this.btnPos;
     this.lastCloseAt = Date.now();
+    this.justClosedSide = false;
   }
 
   wasLastModeButtons(): boolean {
@@ -269,6 +276,13 @@ export class Panel {
 
   focusButtons(): void {
     this.btnsFocused = true;
+    // Returning from the side list within the same panel session: keep the
+    // current button (the one whose list we just used), don't recompute.
+    if (this.justClosedSide) {
+      this.justClosedSide = false;
+      this.renderButtons();
+      return;
+    }
     const within = (Date.now() - this.lastCloseAt) < RESTORE_FOCUS_MS;
     this.btnPos = within ? this.lastBtnPos : 0;
     if (!this.isSectionEnabled(this.currentSection())) {
@@ -344,6 +358,7 @@ export class Panel {
 
   closeSideList(): void {
     this.sideOpen = false;
+    this.justClosedSide = true;
     const $sp = this.$sidePanel.get();
     $sp.removeClass('active');
     setTimeout(() => { $sp.addClass('hidden'); }, 200);

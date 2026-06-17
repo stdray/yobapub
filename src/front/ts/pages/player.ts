@@ -334,7 +334,7 @@ class PlayerController implements PlayerFsmCtx {
     const prefs = getTitlePrefs(this.media.item.id);
 
     this.mediaService.loadLinks(found.mid, (files, subs) => {
-      this.medlog.info('loadMediaLinks cb files={files} subs={subs}', { files: files.length, subs: subs.length });
+      this.medlog.debug('loadMediaLinks cb files={files} subs={subs}', { files: files.length, subs: subs.length });
       this.media.files = files.slice().sort((a, b) => b.w - a.w);
       this.media.subs = subs.filter((s) => s.url && !s.embed);
       const q = restoreQualityIndex(this.media.files, prefs);
@@ -494,6 +494,7 @@ class PlayerController implements PlayerFsmCtx {
     this.seek.reset();
     this.overlay.clearSeekLabel();
     this.engine.destroy();
+    this.subtitleLoader.destroy();
     if (this.videoEl) {
       try { this.videoEl.pause(); } catch { /* ignore */ }
       this.videoEl.removeAttribute('src');

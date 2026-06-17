@@ -68,13 +68,13 @@ export class MediaService {
   }
 
   loadLinks(mid: number, cb: (files: VideoFile[], subs: Subtitle[]) => void): void {
-    this.mediaLog.info('loadMediaLinks start mid={mid}', { mid });
+    this.mediaLog.debug('loadMediaLinks start mid={mid}', { mid });
     apiClient.apiGet('/v1/items/media-links', { mid: mid }).then(
       (res: MediaLinksResponse) => {
         const files: VideoFile[] = (res && res.files) || [];
         const subs: Subtitle[] = (res && res.subtitles) || [];
-        this.mediaLog.info('loadMediaLinks ok files={files} subs={subs}', { files: files.length, subs: subs.length });
-        this.subsDiagLog.info('raw api count={count} json={json}', {
+        this.mediaLog.debug('loadMediaLinks ok files={files} subs={subs}', { files: files.length, subs: subs.length });
+        this.subsDiagLog.debug('raw api count={count} json={json}', {
           count: subs.length,
           json: JSON.stringify(subs),
         });

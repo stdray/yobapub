@@ -295,7 +295,7 @@ export class HlsEngine {
     });
 
     adapter.onLevelLoading((l) => {
-      log.info('hls LEVEL_LOADING level={level} url={url}', {
+      log.debug('hls LEVEL_LOADING level={level} url={url}', {
         level: l.level, url: l.url ? l.url.substring(0, 200) : null,
       });
     });

@@ -47,7 +47,10 @@ builder.Services.AddSingleton<DeviceLogLevelService>();
 builder.Services.AddSingleton<VipService>();
 builder.Services.AddSingleton<ClientLogRelay>();
 if (petBoxEnabled)
+{
     builder.Services.AddHostedService<ClientLogForwarder>();
+    builder.Services.AddHostedService<ConfigChangeLogger>();
+}
 
 builder.Services.AddHttpClient(PetBoxHttp.ClientName, client =>
 {

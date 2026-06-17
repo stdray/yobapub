@@ -931,7 +931,16 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-video::cue {
+/* Subtitle styling. Modern platforms (Tizen 3.0+, Android TV, browser) render
+   native cues via `video::cue`; Tizen 2.3 paints video in a hardware plane that
+   ignores native cues, so legacy uses the `.player__subs` HTML overlay instead
+   (see player/subtitles.ts). Both share one readable sans-serif chain — each
+   platform lands on its own system sans, never the `cursive` generic (which on
+   Android is an ornate, unreadable script). Size/line-height come from
+   applySubSize. */
+video::cue,
+.player__subs {
+  font-family: Roboto, "Breeze Sans", "Tizen Sans", "Noto Sans", Arial, sans-serif;
   font-weight: bold;
   color: #fff;
   background: transparent;
@@ -940,6 +949,16 @@ video::cue {
     -2px  2px 0 #000, 2px  2px 0 #000,
      0   -2px 0 #000, 0    2px 0 #000,
     -2px  0   0 #000, 2px  0   0 #000;
+}
+
+.player__subs {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 100px;
+  z-index: 5;
+  text-align: center;
+  pointer-events: none;
 }
 
 /* Settings page */
