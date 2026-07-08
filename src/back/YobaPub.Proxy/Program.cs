@@ -19,6 +19,8 @@ if (petBoxEnabled)
         o.ApiKey = petBox.ApiKey;
         o.RefreshInterval = TimeSpan.FromSeconds(petBox.ConfigRefreshSeconds);
         o.Optional = true; // the proxy must come up even when PetBox is down
+        o.CacheDirectory = Path.Combine(builder.Environment.ContentRootPath, "config-cache");
+        o.Timeout = TimeSpan.FromSeconds(10);
         o.WithTag("project", petBox.ProjectKey);
     });
 
