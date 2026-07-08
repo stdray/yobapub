@@ -27,6 +27,7 @@ export type PlayerEvent =
   | { readonly type: 'KEY_PAUSE' }
   | { readonly type: 'SOURCE_READY' }
   | { readonly type: 'BUFFERING' }
+  | { readonly type: 'RECOVERED' }
   | { readonly type: 'FATAL_ERROR' };
 
 // Side-effects the machine can request. PlayerController implements this.
@@ -34,6 +35,9 @@ export interface PlayerFsmCtx {
   // --- spinner / bar / error ---
   showSpinner(): void;
   hideSpinner(): void;
+  // Invoked when the `loading` state is entered because of a mid-playback
+  // BUFFERING event — the hook that launches a controlled recovery.
+  onBufferingEntered(): void;
   showBar(): void;
   hideBar(): void;
   showError(): void;
@@ -81,10 +85,14 @@ export const playerMachine: FsmDef<PlayerState, PlayerFsmCtx, PlayerEvent> = {
   states: {
 
     loading: {
-      entry: (c) => c.showSpinner(),
+      // `loading` covers both initial source load (entered via __init__) and a
+      // mid-playback stall (entered via BUFFERING). Only the latter launches a
+      // controlled recovery; RECOVERED returns to steady-state playback.
+      entry: (c, e) => { c.showSpinner(); if (e.type === 'BUFFERING') c.onBufferingEntered(); },
       exit:  (c) => c.hideSpinner(),
       on: {
         SOURCE_READY: 'idle',
+        RECOVERED:    'idle',
         FATAL_ERROR:  'error',
         KEY_BACK:     { action: (c) => c.exit() },
       },

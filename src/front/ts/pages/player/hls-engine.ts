@@ -21,6 +21,9 @@ interface HlsEngineDeps {
   readonly onReady: () => void;
   readonly onFatalError: (err: HlsError) => void;
   readonly onHevcNotSupported?: () => void;
+  // True while a controlled recovery owns the flush+reload; the internal error
+  // watchdog stands down so the two paths don't double stopLoad+startLoad.
+  readonly isRecovering?: () => boolean;
   readonly log: Logger;
 }
 
@@ -131,6 +134,25 @@ export class HlsEngine {
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     this.stallCount = 0;
+  }
+
+  // Controlled recovery primitive: flush the whole SourceBuffer and re-append
+  // from `ct`. Resets the decoder (heals the Tizen 2.3 audio wedge). Uses
+  // stopLoad+startLoad — NEVER recoverMediaError() (resets ct to 0) and never an
+  // in-buffer nudge (A/V desync). The legacy startup dance is one-shot and
+  // already latched, so startLoad(ct) here does not re-run it.
+  controlledReload(ct: number): void {
+    const a = this.adapter;
+    if (!a) return;
+    this.deps.log.warn('controlledReload flush+reload ct={ct} br={br}', {
+      ct, br: formatBuffered(this.deps.getVideoEl()),
+    });
+    a.stopLoad();
+    a.flushBuffer(0, Number.POSITIVE_INFINITY);
+    a.startLoad(ct);
+    this.stallCount = 0;
+    this.hadBufferFullError = false;
+    this.appendErrorCount = 0;
   }
 
   tryRecoverVideoError(): boolean {
@@ -339,6 +361,13 @@ export class HlsEngine {
       message: err.message,
       url: err.url ? err.url.substring(0, 120) : null,
     });
+    // A controlled recovery already owns the flush+reload for this stall; the
+    // watchdog must not also stopLoad+startLoad (double-fire). Transient stall/
+    // append errors thrown while the buffer is empty mid-reload are expected.
+    if (this.deps.isRecovering && this.deps.isRecovering()) {
+      log.warn('hls non-fatal error ignored: controlled recovery in progress');
+      return;
+    }
     const v = this.deps.getVideoEl();
     const diag = {
       started: this.deps.getPlaybackStarted(),
