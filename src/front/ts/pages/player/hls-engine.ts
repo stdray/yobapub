@@ -54,6 +54,7 @@ export class HlsEngine {
   private stallCount = 0;
   private hevcStallCount = 0;
   private hevcToastShown = false;
+  private savedNudgeMaxRetry: number | null = null;
 
   constructor(private readonly deps: HlsEngineDeps) {}
 
@@ -79,6 +80,7 @@ export class HlsEngine {
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     this.stallCount = 0;
+    this.savedNudgeMaxRetry = null;
   }
 
   load(videoEl: HTMLVideoElement, originalUrl: string, ctx: HlsLoadContext): boolean {
@@ -89,6 +91,7 @@ export class HlsEngine {
     this.stallCount = 0;
     this.hevcStallCount = 0;
     this.hevcToastShown = false;
+    this.savedNudgeMaxRetry = null;
 
     const log = this.deps.log;
 
@@ -153,6 +156,24 @@ export class HlsEngine {
     this.stallCount = 0;
     this.hadBufferFullError = false;
     this.appendErrorCount = 0;
+  }
+
+  // Disable hls.js's own in-buffer stall-nudge for the duration of a controlled
+  // recovery (it would re-desync the audio we are re-appending), remembering the
+  // configured value so it can be restored exactly (never hardcode).
+  suppressNudge(): void {
+    if (!this.adapter || this.savedNudgeMaxRetry !== null) return;
+    this.savedNudgeMaxRetry = this.adapter.nudgeMaxRetry;
+    this.adapter.nudgeMaxRetry = 0;
+    this.deps.log.info('nudge suppressed (was {n})', { n: this.savedNudgeMaxRetry });
+  }
+
+  restoreNudge(): void {
+    if (!this.adapter || this.savedNudgeMaxRetry === null) return;
+    const n = this.savedNudgeMaxRetry;
+    this.savedNudgeMaxRetry = null;
+    this.adapter.nudgeMaxRetry = n;
+    this.deps.log.info('nudge restored to {n}', { n });
   }
 
   tryRecoverVideoError(): boolean {
@@ -436,6 +457,12 @@ export class HlsEngine {
     // Do NOT call recoverMediaError() on Tizen 2.3/3.0 + hls.js 0.14 — it resets
     // currentTime to 0 and leaves the player wedged.
     if (err.type === ERROR_TYPE_MEDIA && UNRECOVERABLE_MEDIA_ERRORS.indexOf(err.details) < 0) {
+      // A controlled recovery already owns the flush+reload — do not run our own
+      // stopLoad+startLoad in parallel. Let recovery's own timeout escalate if needed.
+      if (this.deps.isRecovering && this.deps.isRecovering()) {
+        log.warn('hls fatal MEDIA_ERROR ignored: controlled recovery in progress');
+        return;
+      }
       const vf = this.deps.getVideoEl();
       const ct = vf ? vf.currentTime : -1;
       log.warn('hls RECOVER fatal MEDIA_ERROR started={started} ct={ct} rs={rs} br={br}', {

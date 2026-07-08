@@ -187,9 +187,10 @@ class PlayerController implements PlayerFsmCtx {
 
   // Flags
   private playbackStarted = false;
-  private sourceSwapping = false;
+  private firstPlayingSeen = false;
   private lastSeekAt = 0;
   private pendingRecoveryReason: RecoveryReason = 'stall';
+  private recoveryEndPaused = false;
   private fsm: Fsm<PlayerState, PlayerFsmCtx, PlayerEvent> | null = null;
 
   constructor() {
@@ -273,18 +274,39 @@ class PlayerController implements PlayerFsmCtx {
     this.pendingRecoveryReason = 'stall';
     const started = this.recovery.start(reason);
     this.plog.info('controlled recovery requested reason={reason} started={started}', { reason, started });
+    // No video element to recover: the FSM is already in `loading` (spinner up)
+    // but nothing will send RECOVERED/SOURCE_READY — leave `loading` immediately
+    // so the spinner cannot get stuck forever.
+    if (!started && this.fsm) this.fsm.send({ type: 'RECOVERED' });
+  }
+
+  // Marks the first genuine `playing`. Until this is seen, every `waiting` is
+  // initial-load / source-swap rebuffer, NOT a decoder stall.
+  private onFirstPlaying(): void {
+    this.firstPlayingSeen = true;
+    this.onResumeLikely();
   }
 
   // `waiting` handler. Only a genuine mid-playback stall goes through the FSM
-  // (→ loading → controlled recovery). Initial load, seeks and quality/audio
-  // swaps keep their existing plain-spinner handling — do not disturb them.
+  // (→ loading → controlled recovery). Initial load, source swaps and seeks keep
+  // their existing plain-spinner handling — do not disturb them.
   private onWaiting(): void {
-    if (!this.playbackStarted) { this.overlay.showSpinner(); return; }
+    // `firstPlayingSeen` (not `playbackStarted`) is the initial-load gate:
+    // `playbackStarted` is set at MANIFEST_PARSED, before the first frame, so the
+    // startup rebuffer would otherwise be misclassified as a stall. Reset on every
+    // new source / quality-audio swap, so their startup rebuffer counts as load.
+    if (!this.firstPlayingSeen) { this.overlay.showSpinner(); return; }
     if (this.recovery.running) return;
     const seekSettling = this.seek.active || (Date.now() - this.lastSeekAt) < RECOVERY_SEEK_GUARD_MS;
-    if (this.sourceSwapping || seekSettling) { this.overlay.showSpinner(); return; }
+    if (seekSettling) { this.overlay.showSpinner(); return; }
     this.plog.info('waiting -> BUFFERING (stall) ct={ct}', { ct: this.videoEl ? this.videoEl.currentTime : -1 });
-    if (this.fsm) this.fsm.send({ type: 'BUFFERING' });
+    this.recoveryEndPaused = false;
+    if (this.fsm) {
+      this.fsm.send({ type: 'BUFFERING' });
+      // States without a BUFFERING handler (sidePanelOpen/error) drop the event;
+      // guarantee the spinner as a fallback so the user still sees feedback.
+      if (this.fsm.state !== 'loading') this.overlay.showSpinner();
+    }
   }
 
   // canplay/playing/seeked. The FSM owns the spinner while a controlled recovery
@@ -296,7 +318,14 @@ class PlayerController implements PlayerFsmCtx {
   }
 
   private onRecoveryStable(): void {
-    this.state.paused = false;
+    // Recovery always resumes playback to prove stability; honor a pre-existing
+    // pause (manual re-sync pressed while paused) by re-pausing afterwards.
+    if (this.recoveryEndPaused) {
+      if (this.videoEl) this.videoEl.pause();
+      this.state.paused = true;
+    } else {
+      this.state.paused = false;
+    }
     this.syncPlayIcon();
     if (this.fsm) this.fsm.send({ type: 'RECOVERED' });
   }
@@ -311,6 +340,7 @@ class PlayerController implements PlayerFsmCtx {
   private requestManualResync(): void {
     if (!this.playbackStarted || this.recovery.running || !this.fsm) return;
     this.pendingRecoveryReason = 'manual';
+    this.recoveryEndPaused = this.state.paused;
     this.fsm.send({ type: 'BUFFERING' });
     if (this.fsm.state !== 'loading') {
       // BUFFERING not accepted in the current UI state (e.g. side panel open).
@@ -461,7 +491,6 @@ class PlayerController implements PlayerFsmCtx {
       if (this.media.files.length === 0 || !this.videoEl) return;
       const hlsUrl = pickHlsUrl(this.media.files[this.state.quality]);
       if (!hlsUrl) return;
-      this.sourceSwapping = true;
       this.overlay.showSpinner();
       this.playSource(hlsUrl);
       return;
@@ -494,6 +523,9 @@ class PlayerController implements PlayerFsmCtx {
 
   private playSource(originalUrl: string): void {
     if (!this.videoEl) return;
+    // New source (initial load, track switch, or quality/audio swap): until the
+    // first real `playing`, treat every `waiting` as startup rebuffer, not a stall.
+    this.firstPlayingSeen = false;
     this.videoEl.classList.remove('player__video--visible');
     const audioIndex = this.media.audios.length > 0 ? this.media.audios[this.state.audio].index : 1;
     const target = this.media.files[this.state.quality];
@@ -518,7 +550,6 @@ class PlayerController implements PlayerFsmCtx {
     });
     if (!this.state.paused) safePlay(this.videoEl);
     this.playbackStarted = true;
-    this.sourceSwapping = false;
     if (this.state.sub >= 0 && this.videoEl) {
       this.subtitleLoader.load(this.videoEl, this.$root, this.media.subs, this.state.sub);
     }
@@ -549,6 +580,7 @@ class PlayerController implements PlayerFsmCtx {
       onFatalError: () => this.reportFatal(),
       onWaiting: () => this.onWaiting(),
       onResumeLikely: () => this.onResumeLikely(),
+      onPlaying: () => this.onFirstPlaying(),
     };
     bindVideoEvents(this.videoEl, bindingsDeps);
 
@@ -589,9 +621,10 @@ class PlayerController implements PlayerFsmCtx {
     this.panel.reset();
     this.progressBar.resetElements();
     this.playbackStarted = false;
-    this.sourceSwapping = false;
+    this.firstPlayingSeen = false;
     this.lastSeekAt = 0;
     this.pendingRecoveryReason = 'stall';
+    this.recoveryEndPaused = false;
     this.watchTracker.setWasWatched(false);
   }
 

@@ -61,9 +61,11 @@ export class ControlledRecovery {
     this.ticks = 0;
     this.deps.log.warn('controlled recovery start reason={reason} ct={ct}', { reason, ct });
     // Tizen: play() on a stalled non-paused element is a no-op — pause() first to
-    // un-wedge it. Then flush + re-append from ct to reset the decoder, and resume
-    // so the video clock advances and the stability watcher can observe it.
+    // un-wedge it. Suppress hls.js's own stall-nudge (would re-desync audio), then
+    // flush + re-append from ct to reset the decoder, and resume so the video clock
+    // advances and the stability watcher can observe it.
     v.pause();
+    this.deps.engine.suppressNudge();
     this.deps.engine.controlledReload(ct);
     safePlay(v);
     v.addEventListener('timeupdate', this.onTick);
@@ -104,11 +106,14 @@ export class ControlledRecovery {
     }
   }
 
+  // Single exit point for every outcome (stable / timeout / cancel), so the
+  // nudge suppression is always lifted no matter how recovery ends.
   private teardown(): void {
     this.active = false;
     this.ticks = 0;
     if (this.timer !== null) { clearTimeout(this.timer); this.timer = null; }
     if (this.videoEl) this.videoEl.removeEventListener('timeupdate', this.onTick);
     this.videoEl = null;
+    this.deps.engine.restoreNudge();
   }
 }

@@ -18,9 +18,12 @@ export interface VideoBindingsDeps {
   // Spinner ownership lives in PlayerController (it knows the FSM state and
   // whether a controlled recovery is running). `waiting` asks it to decide
   // whether this is a genuine stall (→ FSM `loading` + recovery) or a transient
-  // seek/swap buffer (→ plain spinner); resume events ask it to hide.
+  // seek/swap buffer (→ plain spinner); resume events ask it to hide. `playing`
+  // is reported separately because it marks the first real frame — the boundary
+  // between "startup rebuffer" and a genuine mid-playback stall.
   readonly onWaiting: () => void;
   readonly onResumeLikely: () => void;
+  readonly onPlaying: () => void;
 }
 
 export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDeps): void => {
@@ -71,7 +74,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
       rs: v ? v.readyState : -1,
       br: formatBuffered(v),
     });
-    deps.onResumeLikely();
+    deps.onPlaying();
     videoEl.classList.add('player__video--visible');
   });
   videoEl.addEventListener('seeked', () => {
