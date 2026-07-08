@@ -1,7 +1,6 @@
 import { Logger } from '../../utils/log';
 import { platform } from '../../utils/platform';
 import { HlsEngine, formatBuffered } from './hls-engine';
-import { OverlayView } from './overlay';
 import { WatchProgressTracker } from './watch-tracker';
 import { TrackNavigator } from './track-navigator';
 import { PlayerErrorView } from './error-view';
@@ -9,7 +8,6 @@ import { PlayerErrorView } from './error-view';
 export interface VideoBindingsDeps {
   readonly getVideoEl: () => HTMLVideoElement | null;
   readonly engine: HlsEngine;
-  readonly overlay: OverlayView;
   readonly watchTracker: WatchProgressTracker;
   readonly trackNavigator: TrackNavigator;
   readonly errorView: PlayerErrorView;
@@ -17,10 +15,19 @@ export interface VideoBindingsDeps {
   readonly log: Logger;
   readonly onBack: () => void;
   readonly onFatalError: () => void;
+  // Spinner ownership lives in PlayerController (it knows the FSM state and
+  // whether a controlled recovery is running). `waiting` asks it to decide
+  // whether this is a genuine stall (→ FSM `loading` + recovery) or a transient
+  // seek/swap buffer (→ plain spinner); resume events ask it to hide. `playing`
+  // is reported separately because it marks the first real frame — the boundary
+  // between "startup rebuffer" and a genuine mid-playback stall.
+  readonly onWaiting: () => void;
+  readonly onResumeLikely: () => void;
+  readonly onPlaying: () => void;
 }
 
 export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDeps): void => {
-  const { log, engine, overlay, watchTracker, trackNavigator, errorView, sourceUrl, onBack } = deps;
+  const { log, engine, watchTracker, trackNavigator, errorView, sourceUrl, onBack } = deps;
   const getV = deps.getVideoEl;
 
   // On Android WebView the native Chromium overlay play button (giant blurred
@@ -40,7 +47,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
   });
   videoEl.addEventListener('waiting', () => {
     log.debug('video waiting currentTime={currentTime}', { currentTime: getV() ? getV()!.currentTime : -1 });
-    overlay.showSpinner();
+    deps.onWaiting();
   });
   videoEl.addEventListener('seeking', () => {
     const v = getV();
@@ -53,7 +60,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
   videoEl.addEventListener('canplay', () => {
     const v = getV();
     log.debug('video canplay currentTime={currentTime}', { currentTime: v ? v.currentTime : -1 });
-    overlay.hideSpinner();
+    deps.onResumeLikely();
     // Fresh playback (pos=0): some HLS streams have first-segment PTS != 0, leaving the
     // SourceBuffer starting at e.g. 10.0 while playhead sits at 0. Gap-controller won't
     // close gaps > maxBufferHole. Snap once to the buffered start so playback can begin.
@@ -67,7 +74,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
       rs: v ? v.readyState : -1,
       br: formatBuffered(v),
     });
-    overlay.hideSpinner();
+    deps.onPlaying();
     videoEl.classList.add('player__video--visible');
   });
   videoEl.addEventListener('seeked', () => {
@@ -77,7 +84,7 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
       rs: v ? v.readyState : -1,
       br: formatBuffered(v),
     });
-    overlay.hideSpinner();
+    deps.onResumeLikely();
   });
   videoEl.addEventListener('error', () => {
     const v = getV();
