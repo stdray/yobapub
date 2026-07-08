@@ -80,10 +80,12 @@ jobs:
             docker pull "$IMAGE"
             docker stop "$CONTAINER_NAME" || true
             docker rm "$CONTAINER_NAME" || true
+            docker volume create yobapub-config-cache 2>/dev/null || true
             docker run -d \
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
               -p 127.0.0.1:8080:8080 \
+              -v yobapub-config-cache:/app/config-cache \
               -e PetBox__ApiKey="${{ secrets.PETBOX_API_KEY }}" \
               "$IMAGE"
             docker system prune -a -f
