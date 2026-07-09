@@ -169,13 +169,6 @@ export abstract class HlsAdapter {
   stopLoad(): void { this.hls.stopLoad(); }
   recoverMediaError(): void { this.hls.recoverMediaError(); }
 
-  // Live nudge budget on the running instance. Used to disable hls.js's own
-  // in-buffer `currentTime += nudgeOffset` stall-nudge during a controlled
-  // recovery (the nudge would re-desync the audio we are re-appending), then
-  // restore the original value.
-  get nudgeMaxRetry(): number { return this.hls.config.nudgeMaxRetry; }
-  set nudgeMaxRetry(n: number) { this.hls.config.nudgeMaxRetry = n; }
-
   // levels
   get levels(): ReadonlyArray<HlsLevelInfo> {
     const raw = this.hls.levels || [];

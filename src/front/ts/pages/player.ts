@@ -15,8 +15,7 @@ import {
 import { applySubSize, SubtitleLoader } from './player/subtitles';
 import { storage } from '../utils/storage';
 import { HlsEngine } from './player/hls-engine';
-import { HlsError, isModernHls } from './player/hls-adapter';
-import { ControlledRecovery, RecoveryReason } from './player/recovery';
+import { HlsError } from './player/hls-adapter';
 import { TrackNavigator } from './player/track-navigator';
 import { PlayerErrorView } from './player/error-view';
 import { ProgressBar } from './player/progress';
@@ -68,10 +67,6 @@ const defaultPlayState = (): PlayState => ({
   quality: 0, audio: 0, sub: -1, position: 0, paused: false,
 });
 
-// After a user seek assigns currentTime, the native `waiting` that follows is
-// buffer refill, not a stall — do not launch a controlled recovery for it.
-const RECOVERY_SEEK_GUARD_MS = 3000;
-
 // --- PlayerController ---
 
 class PlayerController implements PlayerFsmCtx {
@@ -95,20 +90,12 @@ class PlayerController implements PlayerFsmCtx {
   private videoEl: HTMLVideoElement | null = null;
   private media = defaultMedia();
   private state = defaultPlayState();
-  private readonly engine: HlsEngine = new HlsEngine({
+  private readonly engine = new HlsEngine({
     getVideoEl: () => this.videoEl,
     getPlaybackStarted: () => this.playbackStarted,
     onReady: () => this.onSourceReady(),
     onFatalError: (err: HlsError) => { this.reportFatal(); this.errorView.showHlsFatalError(err); },
     onHevcNotSupported: () => this.showToast('Устройство не тянет HEVC, выключите в настройках'),
-    isRecovering: (): boolean => this.recovery.running,
-    log: this.hlslog,
-  });
-  private readonly recovery: ControlledRecovery = new ControlledRecovery({
-    getVideoEl: () => this.videoEl,
-    engine: this.engine,
-    onStable: () => this.onRecoveryStable(),
-    onTimeout: () => this.onRecoveryTimeout(),
     log: this.hlslog,
   });
   private readonly errorView = new PlayerErrorView({
@@ -187,10 +174,6 @@ class PlayerController implements PlayerFsmCtx {
 
   // Flags
   private playbackStarted = false;
-  private firstPlayingSeen = false;
-  private lastSeekAt = 0;
-  private pendingRecoveryReason: RecoveryReason = 'stall';
-  private recoveryEndPaused = false;
   private fsm: Fsm<PlayerState, PlayerFsmCtx, PlayerEvent> | null = null;
 
   constructor() {
@@ -263,92 +246,6 @@ class PlayerController implements PlayerFsmCtx {
 
   private reportFatal(): void {
     if (this.fsm) this.fsm.send({ type: 'FATAL_ERROR' });
-  }
-
-  // --- Controlled buffering recovery ---
-
-  // Called by the FSM `loading` entry when it was reached via a BUFFERING event
-  // (mid-playback stall or manual re-sync). The reason is stashed by the caller.
-  onBufferingEntered(): void {
-    const reason = this.pendingRecoveryReason;
-    this.pendingRecoveryReason = 'stall';
-    const started = this.recovery.start(reason);
-    this.plog.info('controlled recovery requested reason={reason} started={started}', { reason, started });
-    // No video element to recover: the FSM is already in `loading` (spinner up)
-    // but nothing will send RECOVERED/SOURCE_READY — leave `loading` immediately
-    // so the spinner cannot get stuck forever.
-    if (!started && this.fsm) this.fsm.send({ type: 'RECOVERED' });
-  }
-
-  // Marks the first genuine `playing`. Until this is seen, every `waiting` is
-  // initial-load / source-swap rebuffer, NOT a decoder stall.
-  private onFirstPlaying(): void {
-    this.firstPlayingSeen = true;
-    this.onResumeLikely();
-  }
-
-  // `waiting` handler. Only a genuine mid-playback stall goes through the FSM
-  // (→ loading → controlled recovery). Initial load, source swaps and seeks keep
-  // their existing plain-spinner handling — do not disturb them.
-  private onWaiting(): void {
-    // `firstPlayingSeen` (not `playbackStarted`) is the initial-load gate:
-    // `playbackStarted` is set at MANIFEST_PARSED, before the first frame, so the
-    // startup rebuffer would otherwise be misclassified as a stall. Reset on every
-    // new source / quality-audio swap, so their startup rebuffer counts as load.
-    if (!this.firstPlayingSeen) { this.overlay.showSpinner(); return; }
-    if (this.recovery.running) return;
-    const seekSettling = this.seek.active || (Date.now() - this.lastSeekAt) < RECOVERY_SEEK_GUARD_MS;
-    if (seekSettling) { this.overlay.showSpinner(); return; }
-    this.plog.info('waiting -> BUFFERING (stall) ct={ct}', { ct: this.videoEl ? this.videoEl.currentTime : -1 });
-    this.recoveryEndPaused = false;
-    if (this.fsm) {
-      this.fsm.send({ type: 'BUFFERING' });
-      // States without a BUFFERING handler (sidePanelOpen/error) drop the event;
-      // guarantee the spinner as a fallback so the user still sees feedback.
-      if (this.fsm.state !== 'loading') this.overlay.showSpinner();
-    }
-  }
-
-  // canplay/playing/seeked. The FSM owns the spinner while a controlled recovery
-  // runs (loading entry/exit) — do not let a premature resume event hide it.
-  private onResumeLikely(): void {
-    if (this.recovery.running) return;
-    if (this.fsm && this.fsm.state === 'loading') return;
-    this.overlay.hideSpinner();
-  }
-
-  private onRecoveryStable(): void {
-    // Recovery always resumes playback to prove stability; honor a pre-existing
-    // pause (manual re-sync pressed while paused) by re-pausing afterwards.
-    if (this.recoveryEndPaused) {
-      if (this.videoEl) this.videoEl.pause();
-      this.state.paused = true;
-    } else {
-      this.state.paused = false;
-    }
-    this.syncPlayIcon();
-    if (this.fsm) this.fsm.send({ type: 'RECOVERED' });
-  }
-
-  private onRecoveryTimeout(): void {
-    this.reportFatal();
-    this.errorView.showMessage('Не удалось восстановить воспроизведение');
-  }
-
-  // Manual re-sync remote key (legacy engine only). Heals the silent audio-decoder
-  // wedge (case #1) that emits no JS event and cannot be auto-detected.
-  private requestManualResync(): void {
-    if (!this.playbackStarted || this.recovery.running || !this.fsm) return;
-    this.pendingRecoveryReason = 'manual';
-    this.recoveryEndPaused = this.state.paused;
-    this.fsm.send({ type: 'BUFFERING' });
-    if (this.fsm.state !== 'loading') {
-      // BUFFERING not accepted in the current UI state (e.g. side panel open).
-      this.pendingRecoveryReason = 'stall';
-      this.keylog.info('manual re-sync ignored in state={st}', { st: this.fsm.state });
-      return;
-    }
-    this.showToast('Пересинхронизация звука…');
   }
 
   // --- Helpers ---
@@ -497,7 +394,6 @@ class PlayerController implements PlayerFsmCtx {
     }
 
     if (needSeek && this.videoEl) {
-      this.lastSeekAt = Date.now();
       this.videoEl.currentTime = next.position;
     }
 
@@ -523,9 +419,6 @@ class PlayerController implements PlayerFsmCtx {
 
   private playSource(originalUrl: string): void {
     if (!this.videoEl) return;
-    // New source (initial load, track switch, or quality/audio swap): until the
-    // first real `playing`, treat every `waiting` as startup rebuffer, not a stall.
-    this.firstPlayingSeen = false;
     this.videoEl.classList.remove('player__video--visible');
     const audioIndex = this.media.audios.length > 0 ? this.media.audios[this.state.audio].index : 1;
     const target = this.media.files[this.state.quality];
@@ -571,6 +464,7 @@ class PlayerController implements PlayerFsmCtx {
     const bindingsDeps: VideoBindingsDeps = {
       getVideoEl: () => this.videoEl,
       engine: this.engine,
+      overlay: this.overlay,
       watchTracker: this.watchTracker,
       trackNavigator: this.trackNavigator,
       errorView: this.errorView,
@@ -578,9 +472,6 @@ class PlayerController implements PlayerFsmCtx {
       log: this.hlslog,
       onBack: () => router.goBack(),
       onFatalError: () => this.reportFatal(),
-      onWaiting: () => this.onWaiting(),
-      onResumeLikely: () => this.onResumeLikely(),
-      onPlaying: () => this.onFirstPlaying(),
     };
     bindVideoEvents(this.videoEl, bindingsDeps);
 
@@ -596,7 +487,6 @@ class PlayerController implements PlayerFsmCtx {
   }
 
   private destroyPlayer(): void {
-    this.recovery.cancel();
     this.watchTracker.sendMarkTime();
     this.watchTracker.stop();
     this.overlay.dispose();
@@ -621,10 +511,6 @@ class PlayerController implements PlayerFsmCtx {
     this.panel.reset();
     this.progressBar.resetElements();
     this.playbackStarted = false;
-    this.firstPlayingSeen = false;
-    this.lastSeekAt = 0;
-    this.pendingRecoveryReason = 'stall';
-    this.recoveryEndPaused = false;
     this.watchTracker.setWasWatched(false);
   }
 
@@ -650,9 +536,6 @@ class PlayerController implements PlayerFsmCtx {
     const kc = this.getKeyCode(e);
     if (kc === TvKey.TrackNext) { this.trackNavigator.navigate(1); e.preventDefault(); return; }
     if (kc === TvKey.TrackPrev) { this.trackNavigator.navigate(-1); e.preventDefault(); return; }
-    // Manual re-sync (Blue) — legacy hls.js engine only. Heals the Tizen 2.3
-    // silent audio-decoder wedge, which emits no JS event and can't be auto-detected.
-    if (kc === TvKey.Blue && !isModernHls()) { this.requestManualResync(); e.preventDefault(); return; }
     const ev = this.keyToEvent(kc);
     if (!ev) return;
     this.keylog.info('key kc={kc} state={st} ev={ev}', {
