@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using YobaPub.Proxy.PetBox;
 
 namespace YobaPub.Proxy.Tests;
 
@@ -19,7 +21,7 @@ public class UniversalProxyMiddlewareTests
             Captured = request;
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(""),
+                Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json"),
             });
         }
     }
@@ -27,6 +29,16 @@ public class UniversalProxyMiddlewareTests
     private sealed class StubHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+    }
+
+    /// <summary>Pins the `proxy/upstreams` binding to a single host.</summary>
+    private sealed class ConfStub(string upstreams) : IOptionsMonitor<PetBoxConfValues>
+    {
+        public PetBoxConfValues CurrentValue { get; } = new() { Upstreams = upstreams };
+
+        public PetBoxConfValues Get(string? name) => CurrentValue;
+
+        public IDisposable? OnChange(Action<PetBoxConfValues, string?> listener) => null;
     }
 
     /// <summary>Runs the middleware over a request carrying <paramref name="inboundHeaders"/>.</summary>
@@ -37,7 +49,8 @@ public class UniversalProxyMiddlewareTests
         var middleware = new UniversalProxyMiddleware(
             _ => Task.CompletedTask,
             new StubHttpClientFactory(handler),
-            new ProxyConfig { Upstream = "https://api.example.com" },
+            new UpstreamSelector(
+                new ConfStub("https://api.example.com"), NullLogger<UpstreamSelector>.Instance),
             NullLogger<UniversalProxyMiddleware>.Instance);
 
         var context = new DefaultHttpContext();

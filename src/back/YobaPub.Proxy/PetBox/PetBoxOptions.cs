@@ -17,6 +17,10 @@ public class PetBoxOptions
     public string ClientLevelConfKey { get; init; } = "client-log/level";
     public string VipLoginsConfKey { get; init; } = "vip/logins";
 
+    // Ordered, comma-separated list of KinoPub API base URLs (PetBox list bindings are strings,
+    // not JSON arrays). Empty/absent → UpstreamSelector.DefaultHosts.
+    public string UpstreamsConfKey { get; init; } = "proxy/upstreams";
+
     public int DeviceLevelCacheTtlSeconds { get; init; } = 60;
     public int ConfigRefreshSeconds { get; init; } = 60;
     public string FallbackClientLogLevel { get; init; } = "Information";

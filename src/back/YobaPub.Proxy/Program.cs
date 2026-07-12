@@ -33,6 +33,7 @@ if (petBoxEnabled)
 }
 
 builder.Services.AddSingleton(proxyConfig);
+
 builder.Services.AddOptions<PetBoxOptions>().BindConfiguration("PetBox");
 
 // PetBox conf binding paths contain slashes ("client-log/level"), which IConfiguration
@@ -41,12 +42,14 @@ builder.Services.AddOptions<PetBoxConfValues>().Configure<IConfiguration>((value
 {
     values.ClientLogLevel = cfg[petBox.ClientLevelConfKey];
     values.VipLogins = cfg[petBox.VipLoginsConfKey];
+    values.Upstreams = cfg[petBox.UpstreamsConfKey];
 });
 builder.Services.AddSingleton<IOptionsChangeTokenSource<PetBoxConfValues>>(
     new ConfigurationChangeTokenSource<PetBoxConfValues>(builder.Configuration));
 
 builder.Services.AddSingleton<DeviceLogLevelService>();
 builder.Services.AddSingleton<VipService>();
+builder.Services.AddSingleton<UpstreamSelector>();
 builder.Services.AddSingleton<ClientLogRelay>();
 if (petBoxEnabled)
 {
@@ -107,7 +110,8 @@ app.MapGet("/api/about", () =>
     return Results.Content(json, "application/json");
 });
 
-app.MapGet("/api/proxy-config", (ProxyConfig cfg) => Results.Json(new { cfg.ProxyAll, cfg.Upstream }));
+app.MapGet("/api/proxy-config", (ProxyConfig cfg, UpstreamSelector upstreams) =>
+    Results.Json(new { cfg.ProxyAll, Upstreams = upstreams.Hosts, Upstream = upstreams.Current }));
 
 app.MapGet("/api/vip-check", (string login, VipService vip) =>
     Results.Json(new { vip = vip.Contains(login) }));

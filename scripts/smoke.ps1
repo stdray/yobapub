@@ -71,9 +71,11 @@ Step 'GET /api/about returns version json' {
     Assert ($null -ne $about.semVer -and "$($about.semVer)".Length -gt 0) "semVer missing: $($about | ConvertTo-Json -Compress)"
 }
 
-Step 'GET /api/proxy-config returns upstream' {
+Step 'GET /api/proxy-config returns the upstream list and the selected host' {
     $cfg = GetJson '/api/proxy-config'
     Assert ("$($cfg.upstream)".StartsWith('http')) "unexpected upstream: $($cfg.upstream)"
+    Assert ($cfg.upstreams.Count -ge 1) 'upstreams list is empty'
+    Assert ($cfg.upstreams -contains $cfg.upstream) "selected upstream is not in the list: $($cfg.upstream)"
     Assert ($cfg.proxyAll -is [bool]) 'proxyAll is not a boolean'
 }
 

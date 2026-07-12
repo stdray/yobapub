@@ -7,4 +7,7 @@ public class PetBoxConfValues
 {
     public string? ClientLogLevel { get; set; }
     public string? VipLogins { get; set; }
+
+    /// <summary>Comma-separated upstream base URLs, in priority order (`proxy/upstreams`).</summary>
+    public string? Upstreams { get; set; }
 }

@@ -2,6 +2,7 @@ namespace YobaPub.Proxy;
 
 public class ProxyConfig
 {
-    public string Upstream { get; set; } = "https://api.service-kp.com";
+    // The upstream host list is NOT here: it lives in the PetBox config binding `proxy/upstreams`
+    // and is resolved at runtime by UpstreamSelector.
     public bool ProxyAll { get; set; }
 }
