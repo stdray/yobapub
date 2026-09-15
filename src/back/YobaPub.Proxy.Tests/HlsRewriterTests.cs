@@ -258,24 +258,53 @@ public class HlsRewriterTests
     // ── plainHttp (Tizen 2.x ECC-cert workaround) ───────────────────────────
 
     [Fact]
-    public void PlainHttp_DowngradesAbsoluteAndUriAttributeSegments()
+    public void PlainHttp_MasterPlaylist_M3u8LinesRouteThroughRewrite()
     {
+        // master -> level: nested .m3u8 references must re-enter /hls/rewrite (with
+        // the ORIGINAL https url escaped inside) so the backend can fetch and rewrite
+        // the level playlist server-side, rather than being downgraded in place.
         const string manifest =
             "#EXTM3U\n" +
-            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"a\",NAME=\"rus\",URI=\"https://cdn.cdntogo.net/hls/TOKEN/index-a1.m3u8?loc=ru\"\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=4201905,AUDIO=\"audio1080\"\n" +
+            "https://cdn.cdntogo.net/hls/TOKEN/index-v1.m3u8?loc=ru\n" +
+            "#EXT-X-I-FRAME-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=525238,URI=\"https://cdn.cdntogo.net/hls/TOKEN/iframes-v1.m3u8?loc=ru\"";
+
+        var result = HlsRewriter.Rewrite(manifest,
+            "https://cdn.cdntogo.net/hls/TOKEN/137590.m3u8?loc=ru", audioIndex: 2, plainHttp: true);
+
+        var expectedStream = "/hls/rewrite?url=" +
+            Uri.EscapeDataString("https://cdn.cdntogo.net/hls/TOKEN/index-v1.m3u8?loc=ru") + "&audio=2&plain=true";
+        var expectedIframe = "URI=\"/hls/rewrite?url=" +
+            Uri.EscapeDataString("https://cdn.cdntogo.net/hls/TOKEN/iframes-v1.m3u8?loc=ru") + "&audio=2&plain=true\"";
+
+        Assert.Contains(expectedStream, result);
+        Assert.Contains(expectedIframe, result);
+        Assert.DoesNotContain("proxy=true", result);
+        Assert.DoesNotContain("https://", result);
+    }
+
+    [Fact]
+    public void PlainHttp_LevelPlaylist_SegmentLinesDowngradeToHttp()
+    {
+        // level playlist: the CDN's own absolute https:// segment urls (not seen by the
+        // make-relative-absolute step, since they're already absolute) must still be
+        // downgraded to http for the Tizen 2.x client to load them directly.
+        const string manifest =
+            "#EXTM3U\n" +
+            "#EXT-X-TARGETDURATION:10\n" +
+            "#EXT-X-VERSION:3\n" +
+            "#EXT-X-MEDIA-SEQUENCE:1\n" +
             "#EXTINF:10.010,\n" +
-            "https://cdn.cdntogo.net/hls/TOKEN/seg-1.ts\n" +
+            "https://cdn.cdntogo.net/hls/TOKEN/seg-1-v1-a1.ts\n" +
             "#EXTINF:10.010,\n" +
-            "seg-2.ts\n" +
+            "https://cdn.cdntogo.net/hls/TOKEN/seg-2-v1-a1.ts\n" +
             "#EXT-X-ENDLIST";
 
-        // seg-2.ts is relative to an https base and must be made absolute, then downgraded
         var result = HlsRewriter.Rewrite(manifest,
-            "https://cdn.cdntogo.net/hls/TOKEN/index-v1.m3u8?loc=ru", audioIndex: 1, plainHttp: true);
+            "https://cdn.cdntogo.net/hls/TOKEN/index-v1a1.m3u8?loc=ru", audioIndex: 1, plainHttp: true);
 
-        Assert.Contains("URI=\"http://cdn.cdntogo.net/hls/TOKEN/index-a1.m3u8?loc=ru\"", result);
-        Assert.Contains("http://cdn.cdntogo.net/hls/TOKEN/seg-1.ts", result);
-        Assert.Contains("http://cdn.cdntogo.net/hls/TOKEN/seg-2.ts", result);
+        Assert.Contains("http://cdn.cdntogo.net/hls/TOKEN/seg-1-v1-a1.ts", result);
+        Assert.Contains("http://cdn.cdntogo.net/hls/TOKEN/seg-2-v1-a1.ts", result);
         Assert.DoesNotContain("https://", result);
     }
 
