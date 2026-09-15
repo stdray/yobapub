@@ -254,4 +254,65 @@ public class HlsRewriterTests
         Assert.All(urlLines, l => Assert.Contains("://", l));
         Assert.DoesNotContain(urlLines, l => l.StartsWith("/hls/"));
     }
+
+    // ── plainHttp (Tizen 2.x ECC-cert workaround) ───────────────────────────
+
+    [Fact]
+    public void PlainHttp_DowngradesAbsoluteAndUriAttributeSegments()
+    {
+        const string manifest =
+            "#EXTM3U\n" +
+            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"a\",NAME=\"rus\",URI=\"https://cdn.cdntogo.net/hls/TOKEN/index-a1.m3u8?loc=ru\"\n" +
+            "#EXTINF:10.010,\n" +
+            "https://cdn.cdntogo.net/hls/TOKEN/seg-1.ts\n" +
+            "#EXTINF:10.010,\n" +
+            "seg-2.ts\n" +
+            "#EXT-X-ENDLIST";
+
+        // seg-2.ts is relative to an https base and must be made absolute, then downgraded
+        var result = HlsRewriter.Rewrite(manifest,
+            "https://cdn.cdntogo.net/hls/TOKEN/index-v1.m3u8?loc=ru", audioIndex: 1, plainHttp: true);
+
+        Assert.Contains("URI=\"http://cdn.cdntogo.net/hls/TOKEN/index-a1.m3u8?loc=ru\"", result);
+        Assert.Contains("http://cdn.cdntogo.net/hls/TOKEN/seg-1.ts", result);
+        Assert.Contains("http://cdn.cdntogo.net/hls/TOKEN/seg-2.ts", result);
+        Assert.DoesNotContain("https://", result);
+    }
+
+    [Fact]
+    public void PlainHttp_WithProxyUrls_InnerUrlsStayHttps()
+    {
+        const string manifest =
+            "#EXTM3U\n" +
+            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"a\",NAME=\"rus\",URI=\"https://cdn.cdntogo.net/hls/TOKEN/index-a1.m3u8?loc=ru\"\n" +
+            "#EXTINF:10.010,\n" +
+            "https://cdn.cdntogo.net/hls/TOKEN/seg-1.ts\n" +
+            "#EXT-X-ENDLIST";
+
+        // proxyUrls=true must win: segments route through /proxy (or /hls/rewrite) with
+        // the original https CDN url escaped inside, not downgraded to http
+        var result = HlsRewriter.Rewrite(manifest,
+            "https://cdn.cdntogo.net/hls/TOKEN/index-v1.m3u8?loc=ru", audioIndex: 1,
+            proxyUrls: true, plainHttp: true);
+
+        Assert.Contains("/proxy?url=" + Uri.EscapeDataString("https://cdn.cdntogo.net/hls/TOKEN/seg-1.ts"), result);
+        Assert.Contains("URI=\"/hls/rewrite?url=" + Uri.EscapeDataString("https://cdn.cdntogo.net/hls/TOKEN/index-a1.m3u8?loc=ru"), result);
+    }
+
+    [Fact]
+    public void PlainHttp_CommentLineNonUriHttpsUntouched()
+    {
+        const string manifest =
+            "#EXTM3U\n" +
+            "#EXT-X-COMMENT:see https://example.com/note for details\n" +
+            "#EXTINF:10.010,\n" +
+            "seg-1.ts\n" +
+            "#EXT-X-ENDLIST";
+
+        var result = HlsRewriter.Rewrite(manifest,
+            "https://cdn.cdntogo.net/hls/TOKEN/index-v1.m3u8?loc=ru", audioIndex: 1, plainHttp: true);
+
+        // comment lines are never touched by the rewriter (no full-line or URI="" match)
+        Assert.Contains("#EXT-X-COMMENT:see https://example.com/note for details", result);
+    }
 }

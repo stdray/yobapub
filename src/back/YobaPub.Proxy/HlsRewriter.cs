@@ -15,7 +15,7 @@ public static class HlsRewriter
     private static readonly System.Text.RegularExpressions.Regex _relativeUri =
         new(@"URI=""([^""]+)""", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    public static string Rewrite(string manifest, string sourceUrl, int audioIndex, bool proxyUrls = false)
+    public static string Rewrite(string manifest, string sourceUrl, int audioIndex, bool proxyUrls = false, bool plainHttp = false)
     {
         manifest = manifest.Replace("\r\n", "\n").Replace('\r', '\n');
         var baseUrl = sourceUrl[..(sourceUrl.LastIndexOf('/') + 1)];
@@ -74,6 +74,27 @@ public static class HlsRewriter
                             : "/proxy?url=" + Uri.EscapeDataString(uri);
                         return $"URI=\"{rewritten}\"";
                     });
+                }
+                return l;
+            }).ToArray();
+        }
+        // CDN's ECC-only TLS cert (since 2026-09-02) is unsupported by the Tizen 2.x
+        // TLS stack; the CDN also serves the same content over plain http with CORS.
+        // Downgrade absolute https:// CDN URLs to http:// for legacy clients that have
+        // media proxying off. Ignored when proxyUrls is set (segments go via /proxy).
+        else if (plainHttp)
+        {
+            lines = lines.Select(l =>
+            {
+                var trimmed = l.Trim();
+                if (trimmed.Length > 0 && trimmed[0] != '#' && trimmed.StartsWith("https://"))
+                    return l.Replace("https://", "http://");
+                if (trimmed.Contains("URI=\""))
+                {
+                    return _relativeUri.Replace(l, m =>
+                        m.Groups[1].Value.StartsWith("https://")
+                            ? $"URI=\"http://{m.Groups[1].Value["https://".Length..]}\""
+                            : m.Value);
                 }
                 return l;
             }).ToArray();
