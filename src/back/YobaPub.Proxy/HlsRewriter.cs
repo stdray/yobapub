@@ -15,7 +15,13 @@ public static class HlsRewriter
     private static readonly System.Text.RegularExpressions.Regex _relativeUri =
         new(@"URI=""([^""]+)""", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    public static string Rewrite(string manifest, string sourceUrl, int audioIndex, bool proxyUrls = false)
+    // Builds a /hls/rewrite url that re-enters the backend for a nested playlist
+    // (master -> level), carrying the ORIGINAL absolute uri so the backend can
+    // fetch it server-side (TLS/https is fine there even when the client can't).
+    private static string BuildPlaylistRewriteUrl(string uri, int audioIndex, string modeParam) =>
+        "/hls/rewrite?url=" + Uri.EscapeDataString(uri) + "&audio=" + audioIndex + modeParam;
+
+    public static string Rewrite(string manifest, string sourceUrl, int audioIndex, bool proxyUrls = false, bool plainHttp = false)
     {
         manifest = manifest.Replace("\r\n", "\n").Replace('\r', '\n');
         var baseUrl = sourceUrl[..(sourceUrl.LastIndexOf('/') + 1)];
@@ -60,7 +66,7 @@ public static class HlsRewriter
                 if (trimmed.Length > 0 && trimmed[0] != '#' && trimmed.Contains("://"))
                 {
                     return trimmed.Contains(".m3u8")
-                        ? "/hls/rewrite?url=" + Uri.EscapeDataString(trimmed) + "&audio=" + audioIndex + "&proxy=true"
+                        ? BuildPlaylistRewriteUrl(trimmed, audioIndex, "&proxy=true")
                         : "/proxy?url=" + Uri.EscapeDataString(trimmed);
                 }
                 if (trimmed.Contains("URI=\""))
@@ -70,8 +76,42 @@ public static class HlsRewriter
                         var uri = m.Groups[1].Value;
                         if (!uri.Contains("://")) return m.Value;
                         var rewritten = uri.Contains(".m3u8")
-                            ? "/hls/rewrite?url=" + Uri.EscapeDataString(uri) + "&audio=" + audioIndex + "&proxy=true"
+                            ? BuildPlaylistRewriteUrl(uri, audioIndex, "&proxy=true")
                             : "/proxy?url=" + Uri.EscapeDataString(uri);
+                        return $"URI=\"{rewritten}\"";
+                    });
+                }
+                return l;
+            }).ToArray();
+        }
+        // CDN's ECC-only TLS cert (since 2026-09-02) is unsupported by the Tizen 2.x
+        // TLS stack; the CDN also serves the same content over plain http with CORS.
+        // Downgrade absolute https:// CDN URLs to http:// for legacy clients that have
+        // media proxying off. Ignored when proxyUrls is set (segments go via /proxy).
+        // Nested playlists (master -> level, hls2) are re-routed through
+        // /hls/rewrite?...&plain=true instead of being downgraded in place: the CDN
+        // serves ITS OWN absolute https:// segment urls inside a level playlist, which
+        // the backend never sees unless it fetches and rewrites that playlist too.
+        else if (plainHttp)
+        {
+            lines = lines.Select(l =>
+            {
+                var trimmed = l.Trim();
+                if (trimmed.Length > 0 && trimmed[0] != '#' && trimmed.StartsWith("https://"))
+                {
+                    return trimmed.Contains(".m3u8")
+                        ? BuildPlaylistRewriteUrl(trimmed, audioIndex, "&plain=true")
+                        : l.Replace("https://", "http://");
+                }
+                if (trimmed.Contains("URI=\""))
+                {
+                    return _relativeUri.Replace(l, m =>
+                    {
+                        var uri = m.Groups[1].Value;
+                        if (!uri.StartsWith("https://")) return m.Value;
+                        var rewritten = uri.Contains(".m3u8")
+                            ? BuildPlaylistRewriteUrl(uri, audioIndex, "&plain=true")
+                            : "http://" + uri["https://".Length..];
                         return $"URI=\"{rewritten}\"";
                     });
                 }

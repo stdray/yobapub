@@ -72,13 +72,17 @@ export const logPlaybackStart = (log: Logger, url: string, opts?: PlaybackOpts):
     ua: navigator.userAgent,
   });
   log.info('playback url={url}', { url });
-  log.info('playback opts proxy={proxy} streaming={streaming} startPos={startPos} quality={quality} audio={audio} sub={sub}', {
-    proxy: storage.isProxyEnabled(ProxyCategory.Media),
+  const mediaProxyOn = storage.isProxyEnabled(ProxyCategory.Media);
+  log.info('playback opts proxy={proxy} streaming={streaming} startPos={startPos} quality={quality} audio={audio} sub={sub} plain={plain}', {
+    proxy: mediaProxyOn,
     streaming: storage.getStreamingType(),
     startPos: opts && opts.startPosition !== undefined ? opts.startPosition : null,
     quality: opts && opts.quality !== undefined ? opts.quality : null,
     audio: opts && opts.audio !== undefined ? opts.audio : null,
     sub: opts && opts.sub !== undefined ? opts.sub : null,
+    // same condition as getRewrittenHlsUrl: legacy Tizen + media proxy off
+    // means the backend was asked to downgrade CDN URLs to plain http
+    plain: !mediaProxyOn && platform.isLegacyTizen(),
   });
 };
 
@@ -89,8 +93,14 @@ export const logPlaybackStart = (log: Logger, url: string, opts?: PlaybackOpts):
 // category; callers just pass the category and don't check the flag.
 export const getRewrittenHlsUrl = (url: string, audioIndex: number, cat: ProxyCategory): string => {
   const token = storage.getAccessToken() || '';
+  // CDN switched to an ECC-only TLS cert; the Tizen 2.x TLS stack can't
+  // negotiate it, so legacy Tizen clients with media proxying off would fail
+  // to load CDN URLs directly. The CDN also serves plain http with CORS, so
+  // ask the backend to downgrade absolute CDN URLs to http in that case.
+  const plain = !storage.isProxyEnabled(cat) && platform.isLegacyTizen();
   return '/hls/rewrite?url=' + encodeURIComponent(url) + '&audio=' + audioIndex +
     (storage.isProxyEnabled(cat) ? '&proxy=true' : '') +
+    (plain ? '&plain=true' : '') +
     (token ? '&access_token=' + encodeURIComponent(token) : '');
 };
 
