@@ -175,6 +175,7 @@ class PlayerController implements PlayerFsmCtx {
   // Flags
   private playbackStarted = false;
   private fsm: Fsm<PlayerState, PlayerFsmCtx, PlayerEvent> | null = null;
+  private disposed = false;
 
   constructor() {
     installCtLogShim(this.hlslog);
@@ -334,6 +335,7 @@ class PlayerController implements PlayerFsmCtx {
     const prefs = getTitlePrefs(this.media.item.id);
 
     this.mediaService.loadLinks(found.mid, (files, subs) => {
+      if (this.disposed) { this.plog.info('loadLinks callback ignored after unmount'); return; }
       this.medlog.debug('loadMediaLinks cb files={files} subs={subs}', { files: files.length, subs: subs.length });
       this.media.files = files.slice().sort((a, b) => b.w - a.w);
       this.media.subs = subs.filter((s) => s.url && !s.embed);
@@ -562,6 +564,7 @@ class PlayerController implements PlayerFsmCtx {
 
     loadItemWithWatching(id,
       (item, watching) => {
+        if (this.disposed) { this.plog.info('loadItemWithWatching success ignored after unmount'); return; }
         try {
           this.media.item = item;
           this.media.watching = watching;
@@ -580,6 +583,7 @@ class PlayerController implements PlayerFsmCtx {
         }
       },
       () => {
+        if (this.disposed) { this.plog.info('loadItemWithWatching failure ignored after unmount'); return; }
         this.plog.error('mount loadItemWithWatching failed');
         this.reportFatal();
         this.errorView.showMessage('Ошибка загрузки');
@@ -590,6 +594,7 @@ class PlayerController implements PlayerFsmCtx {
   }
 
   unmount(): void {
+    this.disposed = true;
     if (this.fsm) { this.fsm.stop(); this.fsm = null; }
     this.destroyPlayer();
     this.keys.unbind();
