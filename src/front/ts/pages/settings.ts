@@ -175,6 +175,10 @@ const buildLegacyHlsSetting = (): SettingItem => {
   return { key: '_legacyHls', label: 'Старый телевизор', type: 'checkbox', value: storage.isLegacyHls() };
 };
 
+const buildTelemetrySetting = (): SettingItem => {
+  return { key: '_telemetry', label: 'Телеметрия', type: 'checkbox', value: storage.isTelemetryEnabled() };
+};
+
 const buildStartPageSetting = (): SettingItem => {
   const savedId = storage.getStartPage();
   const opts: SettingOption[] = [];
@@ -250,6 +254,7 @@ class SettingsPage extends SidebarPage {
           ordered.push(buildVersionSetting());
           ordered.push(buildReloadSetting());
           if (!storage.isLegacyHlsForced()) ordered.push(buildLegacyHlsSetting());
+          ordered.push(buildTelemetrySetting());
           if (parsed.serverLocation) ordered.push(parsed.serverLocation);
           const proxy = buildProxySetting(vip);
           if (proxy) ordered.push(proxy);
@@ -434,6 +439,14 @@ class SettingsPage extends SidebarPage {
           () => { location.reload(); }
         );
       }
+      return;
+    }
+
+    if (item.key === '_telemetry') {
+      const newVal = this.focusedOptionIndex === 1;
+      storage.setTelemetryEnabled(newVal);
+      item.value = newVal;
+      this.closeOptions();
       return;
     }
 

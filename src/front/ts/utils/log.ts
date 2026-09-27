@@ -34,6 +34,7 @@ export const setMinLogLevel = (level: string): void => {
 // Fire-and-forget fetch of this device's effective log level from the proxy
 // (which resolves it from PetBox config, down to a per-device override).
 export const syncMinLogLevel = (): void => {
+  if (!storage.isTelemetryEnabled()) return;
   try {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', '/api/log-config?deviceId=' + encodeURIComponent(storage.getDeviceId()), true);
@@ -61,6 +62,7 @@ const renderTemplate = (template: string, props: Record<string, unknown>): strin
   });
 
 const sendToBackend = (level: Level, message: string, props: Record<string, unknown>, traceId?: string): void => {
+  if (!storage.isTelemetryEnabled()) return;
   try {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/log', true);

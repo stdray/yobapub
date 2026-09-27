@@ -94,7 +94,8 @@ const KEYS = {
   LEGACY_HLS: 'kp_legacy_hls',
   LEGACY_HLS_FORCED: 'kp_legacy_hls_forced',
   DEVICE_SETTINGS: 'kp_device_settings',
-  LOG_LEVEL: 'kp_log_level'
+  LOG_LEVEL: 'kp_log_level',
+  TELEMETRY_ENABLED: 'kp_telemetry_enabled'
 } as const;
 
 // Old per-flag keys — read once during migration, then removed.
@@ -333,6 +334,18 @@ export class Storage {
 
   setLogLevel = (level: string): void => {
     localStorage.setItem(KEYS.LOG_LEVEL, level);
+  };
+
+  // --- Telemetry opt-out ---
+  // Default is enabled — absent key means "on". Gates everything log.ts sends
+  // to the backend (POST /api/log, GET /api/log-config); console logging is
+  // unaffected.
+
+  isTelemetryEnabled = (): boolean =>
+    localStorage.getItem(KEYS.TELEMETRY_ENABLED) !== '0';
+
+  setTelemetryEnabled = (enabled: boolean): void => {
+    localStorage.setItem(KEYS.TELEMETRY_ENABLED, enabled ? '1' : '0');
   };
 
   // --- Cached device settings (from /v1/device/{id}/settings) ---
