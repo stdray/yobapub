@@ -337,12 +337,25 @@ export class Storage {
   };
 
   // --- Telemetry opt-out ---
-  // Default is enabled — absent key means "on". Gates everything log.ts sends
-  // to the backend (POST /api/log, GET /api/log-config); console logging is
-  // unaffected.
+  // Default is disabled for a fresh install (absent key means "off"). One-time
+  // migration on first read: an already-logged-in user (upgrading from a
+  // version that had no toggle) is grandfathered in as "on"; a not-yet-logged-in
+  // user starts "off". Gates everything log.ts sends to the backend
+  // (POST /api/log, GET /api/log-config); console logging is unaffected.
 
-  isTelemetryEnabled = (): boolean =>
-    localStorage.getItem(KEYS.TELEMETRY_ENABLED) !== '0';
+  // Runs once: once TELEMETRY_ENABLED exists, this is a no-op on every
+  // subsequent call. Mirrors migrateProxyKeys — called from the read getter
+  // so it fires before the first backend send/log-config fetch can happen.
+  private migrateTelemetryKey = (): void => {
+    if (localStorage.getItem(KEYS.TELEMETRY_ENABLED) !== null) return;
+    const hasAccessToken = localStorage.getItem(KEYS.ACCESS_TOKEN) !== null;
+    localStorage.setItem(KEYS.TELEMETRY_ENABLED, hasAccessToken ? '1' : '0');
+  };
+
+  isTelemetryEnabled = (): boolean => {
+    this.migrateTelemetryKey();
+    return localStorage.getItem(KEYS.TELEMETRY_ENABLED) === '1';
+  };
 
   setTelemetryEnabled = (enabled: boolean): void => {
     localStorage.setItem(KEYS.TELEMETRY_ENABLED, enabled ? '1' : '0');
