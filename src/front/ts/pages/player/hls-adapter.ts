@@ -135,25 +135,9 @@ const formatBufferedRanges = (v: HTMLVideoElement): string => {
   return parts.join(',');
 };
 
-interface BufferedRange {
-  readonly start: number;
-  readonly end: number;
-}
-
-const toBufferedRanges = (v: HTMLVideoElement): ReadonlyArray<BufferedRange> => {
-  const ranges: BufferedRange[] = [];
-  for (let i = 0; i < v.buffered.length; i++) {
-    ranges.push({ start: v.buffered.start(i), end: v.buffered.end(i) });
-  }
-  return ranges;
-};
-
 // If a performUserSeek() continuation (drain wait or flush wait) hasn't run
 // by this long, run it anyway rather than leave hls.js stuck STOPPED forever.
 const LEGACY_SEEK_FLUSH_FALLBACK_MS = 3000;
-
-// Below this, the kept range already starts at ~0 — no [0, start) flush needed.
-const SEEK_FLUSH_START_EPSILON_SEC = 0.05;
 
 const toStats = (s: RawStats | undefined): HlsFragStats | null => {
   if (!s || s.total === undefined) return null;
@@ -388,8 +372,15 @@ export class HlsAdapterLegacy extends HlsAdapter {
   // Why: rapid backward seeks fragment the buffer into disjoint islands
   // (stale fragments from the pre-seek load land next to the new target);
   // appending across an unmerged junction later can silently drop audio with
-  // no hls.js/MSE event (open incident tizen23-audio-loss). This collapses
-  // the buffer to one clean island at `target` on every user seek.
+  // no hls.js/MSE event (open incident tizen23-audio-loss). So every user
+  // seek flushes the WHOLE buffer [0, +Inf) and reloads from `target`.
+  //
+  // Why not keep the range containing `target`: on-device (Tizen 2.3,
+  // 2026-09-28) a complement flush kept=1163.5-1378.0 / 1300.3-1439.8 still
+  // ended with `done after=[none]` — MSE remove() of the ADJACENT range wiped
+  // the kept range too (likely dependency removal to the next RAP), so the
+  // optimisation only forced a reload via an unexpected path. Note also that
+  // hls.js 0.14's removeBufferRange skips removals <= 0.5s (buffer-controller.ts).
   //
   // Ordering: currentTime must be assigned before startLoad() — hls.js 0.14's
   // `_doTickIdle` reads media.currentTime (not the startLoad arg) once
@@ -450,8 +441,8 @@ export class HlsAdapterLegacy extends HlsAdapter {
     this.flushAndLoad(v, target);
   }
 
-  // Flushes every buffered range that doesn't contain `target`, then starts
-  // loading at `target`. Listener-before-trigger (see performUserSeek gate 2).
+  // Flushes the WHOLE buffer, then starts loading at `target`. Listener before
+  // trigger (see performUserSeek gate 2). Nothing to flush on an empty buffer.
   private flushAndLoad(v: HTMLVideoElement, target: number): void {
     const startLoadForTarget = (): void => {
       this.hls.startLoad(target);
@@ -460,9 +451,7 @@ export class HlsAdapterLegacy extends HlsAdapter {
       });
     };
 
-    const plan = this.planFlush(v, target);
-    this.log.info('legacySeekFlush kept={kept}', { kept: plan.range });
-    if (plan.ranges.length === 0) {
+    if (v.buffered.length === 0) {
       startLoadForTarget();
       return;
     }
@@ -472,34 +461,7 @@ export class HlsAdapterLegacy extends HlsAdapter {
       this.hls.on(Hls.Events.BUFFER_FLUSHED, onFlushed);
       return (): void => this.hls.off(Hls.Events.BUFFER_FLUSHED, onFlushed);
     }, startLoadForTarget);
-    plan.ranges.forEach((r) => this.flushBuffer(r.start, r.end));
-  }
-
-  // Buffered ranges to flush so `target` ends up the sole clean island: the
-  // COMPLEMENT of the kept range, not just the other video.buffered islands —
-  // video.buffered is the audio∩video intersection, so a per-island flush
-  // would leave stale audio slivers (AAC frames extending past a video
-  // range's edges) sitting right at the kept range's boundaries, to be
-  // overlap-appended onto later. [kept.end, +Inf) also drops the audio
-  // sliver just past kept.end on purpose — the next fragment re-appends from
-  // there. Note: hls.js 0.14's removeBufferRange only calls sb.remove() for
-  // an overlap > 0.5s (buffer-controller.ts), so a sliver shorter than that
-  // survives regardless — this narrows the window, it doesn't close it. Pure
-  // — issues no flushBuffer() calls — so the caller can arm its listener first.
-  private planFlush(v: HTMLVideoElement, target: number): { readonly range: string; readonly ranges: ReadonlyArray<BufferedRange> } {
-    const ranges = toBufferedRanges(v);
-    if (ranges.length === 0) return { range: 'none', ranges: [] };
-
-    const containsTarget = (r: BufferedRange): boolean => target >= r.start && target <= r.end;
-    const kept = ranges.filter(containsTarget)[0];
-    if (!kept) {
-      return { range: 'none', ranges: [{ start: 0, end: Number.POSITIVE_INFINITY }] };
-    }
-
-    const complement: BufferedRange[] = [];
-    if (kept.start > SEEK_FLUSH_START_EPSILON_SEC) complement.push({ start: 0, end: kept.start });
-    complement.push({ start: kept.end, end: Number.POSITIVE_INFINITY });
-    return { range: kept.start.toFixed(1) + '-' + kept.end.toFixed(1), ranges: complement };
+    this.flushBuffer(0, Number.POSITIVE_INFINITY);
   }
 
   // Runs `action` exactly once: when `attach`'s `fire` callback signals
