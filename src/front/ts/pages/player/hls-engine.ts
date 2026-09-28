@@ -127,14 +127,18 @@ export class HlsEngine {
     this.adapter.onVideoCanplay(v);
   }
 
-  // Called by the player right before it commits a user-initiated seek (not
-  // the startup resume-seek, not an internal watchdog/gap-controller seek).
-  // No-op on modern hls.js; legacy uses it to defragment the buffer around
-  // the seek target (see HlsAdapterLegacy#prepareUserSeek).
-  prepareUserSeek(target: number): void {
+  // Commits a user-initiated seek (not the startup resume-seek, not an
+  // internal watchdog/gap-controller seek) — the adapter owns the currentTime
+  // assignment: a plain assignment on modern (unchanged behavior), a
+  // stopLoad/flush/currentTime/startLoad sequence on legacy to defragment the
+  // buffer around the target (see HlsAdapterLegacy#performUserSeek). Falls
+  // back to a direct assignment if there is no adapter yet (mirrors the old
+  // unconditional `videoEl.currentTime = ...` this replaces).
+  performUserSeek(target: number): void {
     const v = this.deps.getVideoEl();
-    if (!v || !this.adapter) return;
-    this.adapter.prepareUserSeek(v, target);
+    if (!v) return;
+    if (!this.adapter) { v.currentTime = target; return; }
+    this.adapter.performUserSeek(v, target);
   }
 
   onVideoPlaying(): void {
