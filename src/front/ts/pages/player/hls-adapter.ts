@@ -437,7 +437,13 @@ export class HlsAdapterLegacy extends HlsAdapter {
         const onAppended = (): void => { if (this.appendDepth <= 0) fire(); };
         this.hls.on(Hls.Events.BUFFER_APPENDED, onAppended);
         return (): void => this.hls.off(Hls.Events.BUFFER_APPENDED, onAppended);
-      }, (): void => this.flushAndLoad(v, target));
+      }, (): void => {
+        // appendDepth can drift upward without a matching BUFFER_APPENDED
+        // (segments dropped while _needsFlush, or cleared on QuotaExceeded),
+        // which would make every later seek wait out the full fallback.
+        this.appendDepth = 0;
+        this.flushAndLoad(v, target);
+      });
       return;
     }
 
@@ -476,8 +482,10 @@ export class HlsAdapterLegacy extends HlsAdapter {
   // range's edges) sitting right at the kept range's boundaries, to be
   // overlap-appended onto later. [kept.end, +Inf) also drops the audio
   // sliver just past kept.end on purpose — the next fragment re-appends from
-  // there. Pure — issues no flushBuffer() calls — so the caller can arm its
-  // listener first.
+  // there. Note: hls.js 0.14's removeBufferRange only calls sb.remove() for
+  // an overlap > 0.5s (buffer-controller.ts), so a sliver shorter than that
+  // survives regardless — this narrows the window, it doesn't close it. Pure
+  // — issues no flushBuffer() calls — so the caller can arm its listener first.
   private planFlush(v: HTMLVideoElement, target: number): { readonly range: string; readonly ranges: ReadonlyArray<BufferedRange> } {
     const ranges = toBufferedRanges(v);
     if (ranges.length === 0) return { range: 'none', ranges: [] };
