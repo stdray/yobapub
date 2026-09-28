@@ -127,6 +127,16 @@ export class HlsEngine {
     this.adapter.onVideoCanplay(v);
   }
 
+  // Called by the player right before it commits a user-initiated seek (not
+  // the startup resume-seek, not an internal watchdog/gap-controller seek).
+  // No-op on modern hls.js; legacy uses it to defragment the buffer around
+  // the seek target (see HlsAdapterLegacy#prepareUserSeek).
+  prepareUserSeek(target: number): void {
+    const v = this.deps.getVideoEl();
+    if (!v || !this.adapter) return;
+    this.adapter.prepareUserSeek(v, target);
+  }
+
   onVideoPlaying(): void {
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;

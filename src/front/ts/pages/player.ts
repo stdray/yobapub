@@ -396,6 +396,11 @@ class PlayerController implements PlayerFsmCtx {
     }
 
     if (needSeek && this.videoEl) {
+      // This branch is only reachable via seekCommit() -> continueWith({ position })
+      // (the other continueWith callers never change position), so it is exactly
+      // the user-seek commit point. Let the adapter defragment the legacy buffer
+      // around the target before the actual seek lands (no-op on modern).
+      this.engine.prepareUserSeek(next.position);
       this.videoEl.currentTime = next.position;
     }
 

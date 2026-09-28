@@ -124,6 +124,30 @@ const toFragInfo = (f: RawFrag | undefined): HlsFragInfo | null => {
   };
 };
 
+// Local — hls-engine.ts exports its own `formatBuffered` for log lines, but
+// hls-engine.ts imports from this module, so importing back would be circular.
+const formatBufferedRanges = (v: HTMLVideoElement): string => {
+  if (v.buffered.length === 0) return '[none]';
+  const parts: string[] = [];
+  for (let i = 0; i < v.buffered.length; i++) {
+    parts.push(v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1));
+  }
+  return parts.join(',');
+};
+
+interface BufferedRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+const toBufferedRanges = (v: HTMLVideoElement): ReadonlyArray<BufferedRange> => {
+  const ranges: BufferedRange[] = [];
+  for (let i = 0; i < v.buffered.length; i++) {
+    ranges.push({ start: v.buffered.start(i), end: v.buffered.end(i) });
+  }
+  return ranges;
+};
+
 const toStats = (s: RawStats | undefined): HlsFragStats | null => {
   if (!s || s.total === undefined) return null;
   return {
@@ -155,6 +179,13 @@ export abstract class HlsAdapter {
   // first-fragment PTS boundary; modern doesn't need them.
   onVideoSeeking(_video: HTMLVideoElement): void { /* no-op on modern */ }
   onVideoCanplay(_video: HTMLVideoElement): void { /* no-op on modern */ }
+
+  // Called by the player right before it commits a USER-initiated seek (i.e.
+  // assigns videoEl.currentTime for a seek the viewer requested, as opposed to
+  // the startup resume-seek or an internal watchdog/gap-controller seek).
+  // Legacy overrides this to collapse the buffer into a single clean island at
+  // `target` — see HlsAdapterLegacy for why. No-op on modern.
+  prepareUserSeek(_video: HTMLVideoElement, _target: number): void { /* no-op on modern */ }
 
   get version(): string { return Hls.version || 'unknown'; }
 
@@ -316,6 +347,40 @@ export class HlsAdapterLegacy extends HlsAdapter {
       target, ct: v.currentTime,
     });
     v.currentTime = target;
+  }
+
+  // Backward seeks during rapid seek-flurries fragment the buffer into
+  // disjoint islands (stale fragments from the pre-seek load land next to the
+  // new target); appending across an island junction later can silently drop
+  // audio frames with no hls.js/MSE event (see decision log / open incident
+  // tizen23-audio-loss). Collapse to a single clean island at `target` on
+  // every user seek: abort the stale load, flush every range that doesn't
+  // already contain the target, restart loading at the target. Re-running
+  // this on each of several rapid seeks is safe — it registers no listeners
+  // or timers, only queues BUFFER_FLUSHING triggers (a plain event dispatch;
+  // hls.js's own flush queue absorbs repeats, see buffer-controller.ts).
+  prepareUserSeek(v: HTMLVideoElement, target: number): void {
+    const before = formatBufferedRanges(v);
+    this.hls.stopLoad();
+    const kept = this.flushNonContainingRanges(v, target);
+    this.hls.startLoad(target);
+    this.log.info('legacySeekFlush target={target} ct={ct} before={before} kept={kept}', {
+      target, ct: v.currentTime, before, kept,
+    });
+  }
+
+  // Flushes every buffered range that does not contain `target` (or the whole
+  // buffer when no range contains it). Returns the kept range for logging.
+  private flushNonContainingRanges(v: HTMLVideoElement, target: number): string {
+    const ranges = toBufferedRanges(v);
+    const containsTarget = (r: BufferedRange): boolean => target >= r.start && target <= r.end;
+    const kept = ranges.filter(containsTarget)[0];
+    if (!kept) {
+      if (ranges.length > 0) this.flushBuffer(0, Number.POSITIVE_INFINITY);
+      return 'none';
+    }
+    ranges.filter((r) => !containsTarget(r)).forEach((r) => this.flushBuffer(r.start, r.end));
+    return kept.start.toFixed(1) + '-' + kept.end.toFixed(1);
   }
 
   private applyPendingStartSeek(v: HTMLVideoElement): void {
