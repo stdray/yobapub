@@ -152,6 +152,9 @@ const toBufferedRanges = (v: HTMLVideoElement): ReadonlyArray<BufferedRange> => 
 // by this long, run it anyway rather than leave hls.js stuck STOPPED forever.
 const LEGACY_SEEK_FLUSH_FALLBACK_MS = 3000;
 
+// Below this, the kept range already starts at ~0 — no [0, start) flush needed.
+const SEEK_FLUSH_START_EPSILON_SEC = 0.05;
+
 const toStats = (s: RawStats | undefined): HlsFragStats | null => {
   if (!s || s.total === undefined) return null;
   return {
@@ -466,17 +469,29 @@ export class HlsAdapterLegacy extends HlsAdapter {
     plan.ranges.forEach((r) => this.flushBuffer(r.start, r.end));
   }
 
-  // Buffered ranges to flush so `target` ends up the sole clean island (or
-  // the sentinel [0, +Inf] when no range contains it at all). Pure — issues
-  // no flushBuffer() calls — so the caller can arm its listener first.
+  // Buffered ranges to flush so `target` ends up the sole clean island: the
+  // COMPLEMENT of the kept range, not just the other video.buffered islands —
+  // video.buffered is the audio∩video intersection, so a per-island flush
+  // would leave stale audio slivers (AAC frames extending past a video
+  // range's edges) sitting right at the kept range's boundaries, to be
+  // overlap-appended onto later. [kept.end, +Inf) also drops the audio
+  // sliver just past kept.end on purpose — the next fragment re-appends from
+  // there. Pure — issues no flushBuffer() calls — so the caller can arm its
+  // listener first.
   private planFlush(v: HTMLVideoElement, target: number): { readonly range: string; readonly ranges: ReadonlyArray<BufferedRange> } {
     const ranges = toBufferedRanges(v);
+    if (ranges.length === 0) return { range: 'none', ranges: [] };
+
     const containsTarget = (r: BufferedRange): boolean => target >= r.start && target <= r.end;
     const kept = ranges.filter(containsTarget)[0];
     if (!kept) {
-      return { range: 'none', ranges: ranges.length > 0 ? [{ start: 0, end: Number.POSITIVE_INFINITY }] : [] };
+      return { range: 'none', ranges: [{ start: 0, end: Number.POSITIVE_INFINITY }] };
     }
-    return { range: kept.start.toFixed(1) + '-' + kept.end.toFixed(1), ranges: ranges.filter((r) => !containsTarget(r)) };
+
+    const complement: BufferedRange[] = [];
+    if (kept.start > SEEK_FLUSH_START_EPSILON_SEC) complement.push({ start: 0, end: kept.start });
+    complement.push({ start: kept.end, end: Number.POSITIVE_INFINITY });
+    return { range: kept.start.toFixed(1) + '-' + kept.end.toFixed(1), ranges: complement };
   }
 
   // Runs `action` exactly once: when `attach`'s `fire` callback signals
