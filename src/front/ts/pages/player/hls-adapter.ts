@@ -215,6 +215,11 @@ export abstract class HlsAdapter {
   }
   get currentLevel(): number { return this.hls.currentLevel; }
   set currentLevel(i: number) { this.hls.currentLevel = i; }
+  // The level hls.js is currently fetching fragments for. Unlike currentLevel
+  // (the level actually being rendered, which can legitimately read -1 right
+  // after a source swap or during a level switch), loadLevel stays populated
+  // — used as a fallback for error diagnostics when currentLevel is -1.
+  get loadLevel(): number { return this.hls.loadLevel; }
 
   // flush (used by legacy start-seek workaround; harmless on modern but unused there)
   flushBuffer(startOffset: number, endOffset: number): void {

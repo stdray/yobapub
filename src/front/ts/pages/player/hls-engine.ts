@@ -41,6 +41,38 @@ export const formatBuffered = (v: HTMLVideoElement | null): string => {
   return parts.join(',');
 };
 
+// Legacy WebKit (Tizen 2.3) exposes decoded/dropped frame counts as plain
+// properties instead of the standard getVideoPlaybackQuality() API. Unlike
+// overlay.ts's getFrameCounters (badge display, ignores a genuine 0 as
+// "no data yet"), this returns 0 verbatim — for error diagnostics, "0 frames
+// decoded" is the key signal that the device never decoded the stream at all
+// (e.g. an unsupported profile), which must not be conflated with "unknown".
+const getDecodedFrameCount = (v: HTMLVideoElement | null): number | null => {
+  if (!v) return null;
+  const legacy = v as unknown as {
+    readonly getVideoPlaybackQuality?: () => { readonly totalVideoFrames: number };
+    readonly webkitDecodedFrameCount?: number;
+  };
+  if (typeof legacy.getVideoPlaybackQuality === 'function') {
+    return legacy.getVideoPlaybackQuality().totalVideoFrames;
+  }
+  if (typeof legacy.webkitDecodedFrameCount === 'number') return legacy.webkitDecodedFrameCount;
+  return null;
+};
+
+export interface HlsErrorSnapshot {
+  readonly ct: number;
+  readonly readyState: number;
+  readonly networkState: number;
+  readonly buffered: string;
+  readonly decodedFrames: number | null;
+  readonly levelIndex: number | null;
+  readonly level: HlsLevelInfo | null;
+  readonly lastFragSn: number | null;
+  readonly lastFragStart: number | null;
+  readonly lastFragSize: number | null;
+}
+
 const HEVC_STALL_THRESHOLD = 5;
 
 export class HlsEngine {
@@ -51,6 +83,15 @@ export class HlsEngine {
   private stallCount = 0;
   private hevcStallCount = 0;
   private hevcToastShown = false;
+
+  // Last-known-good values for error diagnostics — currentLevel/currentTime
+  // can already be reset (by hls.js internals or the UA itself) by the time
+  // the `error` event handler runs, so the snapshot falls back to these.
+  private lastLevelIndex: number | null = null;
+  private lastLevel: HlsLevelInfo | null = null;
+  private lastFragSn: number | null = null;
+  private lastFragStart: number | null = null;
+  private lastFragSize: number | null = null;
 
   constructor(private readonly deps: HlsEngineDeps) {}
 
@@ -76,6 +117,7 @@ export class HlsEngine {
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     this.stallCount = 0;
+    this.resetDiagnosticTracking();
   }
 
   load(videoEl: HTMLVideoElement, originalUrl: string, ctx: HlsLoadContext): boolean {
@@ -86,6 +128,7 @@ export class HlsEngine {
     this.stallCount = 0;
     this.hevcStallCount = 0;
     this.hevcToastShown = false;
+    this.resetDiagnosticTracking();
 
     const log = this.deps.log;
 
@@ -145,6 +188,42 @@ export class HlsEngine {
     this.appendErrorCount = 0;
     this.hadBufferFullError = false;
     this.stallCount = 0;
+  }
+
+  private resetDiagnosticTracking(): void {
+    this.lastLevelIndex = null;
+    this.lastLevel = null;
+    this.lastFragSn = null;
+    this.lastFragStart = null;
+    this.lastFragSize = null;
+  }
+
+  // Snapshot taken at the moment the <video> `error` event fires, before any
+  // teardown. currentLevel can legitimately read -1 (e.g. mid level-switch),
+  // so fall back to loadLevel, then to the last LEVEL_SWITCHED level tracked
+  // below.
+  captureErrorSnapshot(v: HTMLVideoElement | null): HlsErrorSnapshot {
+    const a = this.adapter;
+    const liveLevelIndex = a ? a.currentLevel : -1;
+    const loadLevelIndex = a ? a.loadLevel : -1;
+    const levelIndex = liveLevelIndex >= 0 ? liveLevelIndex
+      : loadLevelIndex >= 0 ? loadLevelIndex
+        : this.lastLevelIndex;
+    const level = a && levelIndex !== null && levelIndex >= 0
+      ? (a.levels[levelIndex] || this.lastLevel)
+      : this.lastLevel;
+    return {
+      ct: v ? v.currentTime : -1,
+      readyState: v ? v.readyState : -1,
+      networkState: v ? v.networkState : -1,
+      buffered: formatBuffered(v),
+      decodedFrames: getDecodedFrameCount(v),
+      levelIndex,
+      level,
+      lastFragSn: this.lastFragSn,
+      lastFragStart: this.lastFragStart,
+      lastFragSize: this.lastFragSize,
+    };
   }
 
   tryRecoverVideoError(): boolean {
@@ -264,7 +343,10 @@ export class HlsEngine {
 
     adapter.onFragLoaded((p) => {
       const { frag, stats } = p;
+      this.lastFragSn = frag.sn;
+      this.lastFragStart = frag.start;
       if (stats) {
+        this.lastFragSize = stats.total;
         const loadMs = stats.tload - stats.trequest;
         const sizeKb = (stats.total / 1024).toFixed(0);
         log.info('hls FRAG_LOADED sn={sn} start={start} dur={dur} size={size}KB load={load}ms', {
@@ -276,6 +358,8 @@ export class HlsEngine {
 
     adapter.onFragBuffered((frag) => {
       const v = this.deps.getVideoEl();
+      this.lastFragSn = frag.sn;
+      this.lastFragStart = frag.start;
       log.info('hls FRAG_BUFFERED sn={sn} start={start} type={type} started={started} ct={ct} br={br}', {
         sn: frag.sn, start: frag.start, type: frag.type,
         started: this.deps.getPlaybackStarted(),
@@ -294,6 +378,8 @@ export class HlsEngine {
     adapter.onLevelSwitched((level) => {
       const levels = adapter.levels;
       const lvl = level !== null && level >= 0 ? levels[level] : undefined;
+      this.lastLevelIndex = level;
+      this.lastLevel = lvl || null;
       log.info('hls LEVEL_SWITCHED level={level} {w}x{h} bitrate={br} videoCodec={vc} audioCodec={ac}', {
         level,
         w: lvl ? lvl.width : null, h: lvl ? lvl.height : null,

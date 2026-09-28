@@ -82,20 +82,32 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
   videoEl.addEventListener('error', () => {
     const v = getV();
     const err2 = v ? v.error : null;
-    const curLevel = engine.getCurrentLevel();
-    log.error('video error code={code} message={message} ct={ct} readyState={rs}'
-      + ' buffered={br} hlsLevel={hlsLevel} videoCodec={vc} audioCodec={ac} hlsBitrate={hlsBitrate}', {
+    // Snapshot taken here, before any teardown — engine.getCurrentLevel()/
+    // getCurrentLevelIndex() and v.currentTime itself can already read
+    // reset/detached values by the time later code (onFatalError,
+    // showPlaybackError) runs.
+    const snap = engine.captureErrorSnapshot(v);
+    log.error('video error code={code} message={message} ct={ct} readyState={rs} networkState={ns}'
+      + ' buffered={br} decodedFrames={frames} hlsLevel={hlsLevel} hlsRes={hlsRes}'
+      + ' videoCodec={vc} audioCodec={ac} hlsBitrate={hlsBitrate}'
+      + ' lastFragSn={fsn} lastFragStart={fstart} lastFragSize={fsize}', {
       code: err2 ? err2.code : null,
       message: err2 ? (err2 as { message?: string }).message || null : null,
-      ct: v ? v.currentTime : null,
-      rs: v ? v.readyState : null,
-      br: formatBuffered(v),
-      hlsLevel: engine.getCurrentLevelIndex(),
-      vc: curLevel ? curLevel.videoCodec : null,
-      ac: curLevel ? curLevel.audioCodec : null,
-      hlsBitrate: curLevel ? curLevel.bitrate : null,
+      ct: snap.ct,
+      rs: snap.readyState,
+      ns: snap.networkState,
+      br: snap.buffered,
+      frames: snap.decodedFrames,
+      hlsLevel: snap.levelIndex,
+      hlsRes: snap.level ? snap.level.width + 'x' + snap.level.height : null,
+      vc: snap.level ? snap.level.videoCodec : null,
+      ac: snap.level ? snap.level.audioCodec : null,
+      hlsBitrate: snap.level ? snap.level.bitrate : null,
+      fsn: snap.lastFragSn,
+      fstart: snap.lastFragStart,
+      fsize: snap.lastFragSize,
     });
     if (engine.tryRecoverVideoError()) return;
-    if (v) { deps.onFatalError(); errorView.showPlaybackError(v.error, sourceUrl); }
+    if (v) { deps.onFatalError(); errorView.showPlaybackError(v.error, sourceUrl, snap); }
   });
 };
