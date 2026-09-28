@@ -124,6 +124,37 @@ const toFragInfo = (f: RawFrag | undefined): HlsFragInfo | null => {
   };
 };
 
+// Local — hls-engine.ts exports its own `formatBuffered` for log lines, but
+// hls-engine.ts imports from this module, so importing back would be circular.
+const formatBufferedRanges = (v: HTMLVideoElement): string => {
+  if (v.buffered.length === 0) return '[none]';
+  const parts: string[] = [];
+  for (let i = 0; i < v.buffered.length; i++) {
+    parts.push(v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1));
+  }
+  return parts.join(',');
+};
+
+interface BufferedRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+const toBufferedRanges = (v: HTMLVideoElement): ReadonlyArray<BufferedRange> => {
+  const ranges: BufferedRange[] = [];
+  for (let i = 0; i < v.buffered.length; i++) {
+    ranges.push({ start: v.buffered.start(i), end: v.buffered.end(i) });
+  }
+  return ranges;
+};
+
+// If a performUserSeek() continuation (drain wait or flush wait) hasn't run
+// by this long, run it anyway rather than leave hls.js stuck STOPPED forever.
+const LEGACY_SEEK_FLUSH_FALLBACK_MS = 3000;
+
+// Below this, the kept range already starts at ~0 — no [0, start) flush needed.
+const SEEK_FLUSH_START_EPSILON_SEC = 0.05;
+
 const toStats = (s: RawStats | undefined): HlsFragStats | null => {
   if (!s || s.total === undefined) return null;
   return {
@@ -155,6 +186,15 @@ export abstract class HlsAdapter {
   // first-fragment PTS boundary; modern doesn't need them.
   onVideoSeeking(_video: HTMLVideoElement): void { /* no-op on modern */ }
   onVideoCanplay(_video: HTMLVideoElement): void { /* no-op on modern */ }
+
+  // Commits a USER-initiated seek (as opposed to the startup resume-seek or
+  // an internal watchdog/gap-controller seek) — the adapter owns the actual
+  // currentTime assignment because legacy needs to sequence it against
+  // stopLoad/flush/startLoad (see HlsAdapterLegacy). Modern default: a plain
+  // assignment, identical to what the caller used to do directly.
+  performUserSeek(video: HTMLVideoElement, target: number): void {
+    video.currentTime = target;
+  }
 
   get version(): string { return Hls.version || 'unknown'; }
 
@@ -291,6 +331,25 @@ export class HlsAdapterLegacy extends HlsAdapter {
   // flush [0..target-1]. See decision log 2026-04-13 19:45 / 17:55.
   private firstFragSnapped = false;
   private pendingStartSeek = 0;
+  // Approximates buffer-controller's private pending-append queue depth from
+  // public events only (BUFFER_APPENDING/BUFFER_APPENDED), so performUserSeek
+  // can wait for it to drain before flushing — see performUserSeek.
+  private appendDepth = 0;
+  // Cancels an in-flight performUserSeek() continuation (drain wait or flush
+  // wait) so only the latest seek's continuation can ever run.
+  private cancelPendingSeek: (() => void) | null = null;
+
+  constructor(cfg: Partial<Hls.Config>, log: Logger) {
+    super(cfg, log);
+    this.hls.on(Hls.Events.BUFFER_APPENDING, (): void => { this.appendDepth++; });
+    this.hls.on(Hls.Events.BUFFER_APPENDED, (): void => {
+      this.appendDepth = Math.max(0, this.appendDepth - 1);
+    });
+    const resetAppendDepth = (): void => { this.appendDepth = 0; };
+    this.hls.on(Hls.Events.BUFFER_RESET, resetAppendDepth);
+    this.hls.on(Hls.Events.MANIFEST_LOADING, resetAppendDepth);
+    this.hls.on(Hls.Events.MEDIA_DETACHING, resetAppendDepth);
+  }
 
   startPlayback(video: HTMLVideoElement, startPos: number): void {
     this.pendingStartSeek = startPos > 0 ? startPos : 0;
@@ -321,6 +380,155 @@ export class HlsAdapterLegacy extends HlsAdapter {
       target, ct: v.currentTime,
     });
     v.currentTime = target;
+  }
+
+  // Only runs on the legacy (0.14.x) hls.js build — chosen via the device
+  // setting `kp_legacy_hls`/`kp_legacy_hls_forced`, not by Tizen version.
+  //
+  // Why: rapid backward seeks fragment the buffer into disjoint islands
+  // (stale fragments from the pre-seek load land next to the new target);
+  // appending across an unmerged junction later can silently drop audio with
+  // no hls.js/MSE event (open incident tizen23-audio-loss). This collapses
+  // the buffer to one clean island at `target` on every user seek.
+  //
+  // Ordering: currentTime must be assigned before startLoad() — hls.js 0.14's
+  // `_doTickIdle` reads media.currentTime (not the startLoad arg) once
+  // loadedmetadata is true, so calling startLoad first would fetch the
+  // fragment after the STALE playhead, i.e. the very fragment we're trying to
+  // kill (mirrors the proven applyPendingStartSeek order). It's safe to
+  // assign currentTime immediately, even before the drain/flush waits below:
+  // hls.js stays STOPPED throughout, and onMediaSeeking while STOPPED only
+  // records lastCurrentTime — doTick() no-ops for State.STOPPED — so nothing
+  // reacts early, and the scrubber updates without waiting on network timing.
+  //
+  // Two async gates before startLoad() can safely run:
+  //  1. Append drain — buffer-controller queues already-demuxed segments
+  //     independently of stopLoad()/flush (see appendDepth). Flushing while
+  //     one is still landing would let it get appended AFTER the flush,
+  //     recreating a stale island invisible in video.buffered. Wait for
+  //     appendDepth to reach 0 first — stopLoad() already guarantees the
+  //     queue can only shrink from here (demuxer destroyed, no new fragments
+  //     parsed) — so this reliably converges. This closes the residual gap
+  //     using only public events; there is no public API to drop the queue
+  //     directly.
+  //  2. Flush — sourceBuffer.remove() is async; wait for BUFFER_FLUSHED.
+  //
+  // Each wait uses armSeekContinuation: a listener registered BEFORE the
+  // triggering call (doFlush can resolve synchronously with nothing
+  // in-flight, and a listener added after would miss it, leaving hls.js
+  // stuck STOPPED with no watchdog to rescue it — stopLoad already killed
+  // the tick interval) plus a fallback timer, so the continuation always
+  // runs exactly once. Only the latest seek's continuation can run: an
+  // earlier one is cancelled by a newer call and by destroy().
+  performUserSeek(v: HTMLVideoElement, target: number): void {
+    if (this.cancelPendingSeek) { this.cancelPendingSeek(); this.cancelPendingSeek = null; }
+
+    const before = formatBufferedRanges(v);
+    this.hls.stopLoad();
+    v.currentTime = target;
+    const depth = this.appendDepth;
+    this.log.info('legacySeekFlush target={target} ct={ct} before={before} depth={depth}', {
+      target, ct: v.currentTime, before, depth,
+    });
+
+    if (depth > 0) {
+      this.log.warn('legacySeekFlush drain depth={depth}', { depth });
+      this.cancelPendingSeek = this.armSeekContinuation('drain', (fire) => {
+        const onAppended = (): void => { if (this.appendDepth <= 0) fire(); };
+        this.hls.on(Hls.Events.BUFFER_APPENDED, onAppended);
+        return (): void => this.hls.off(Hls.Events.BUFFER_APPENDED, onAppended);
+      }, (): void => {
+        // appendDepth can drift upward without a matching BUFFER_APPENDED
+        // (segments dropped while _needsFlush, or cleared on QuotaExceeded),
+        // which would make every later seek wait out the full fallback.
+        this.appendDepth = 0;
+        this.flushAndLoad(v, target);
+      });
+      return;
+    }
+
+    this.flushAndLoad(v, target);
+  }
+
+  // Flushes every buffered range that doesn't contain `target`, then starts
+  // loading at `target`. Listener-before-trigger (see performUserSeek gate 2).
+  private flushAndLoad(v: HTMLVideoElement, target: number): void {
+    const startLoadForTarget = (): void => {
+      this.hls.startLoad(target);
+      this.log.info('legacySeekFlush done target={target} after={after}', {
+        target, after: formatBufferedRanges(v),
+      });
+    };
+
+    const plan = this.planFlush(v, target);
+    this.log.info('legacySeekFlush kept={kept}', { kept: plan.range });
+    if (plan.ranges.length === 0) {
+      startLoadForTarget();
+      return;
+    }
+
+    this.cancelPendingSeek = this.armSeekContinuation('flush', (fire) => {
+      const onFlushed = (): void => fire();
+      this.hls.on(Hls.Events.BUFFER_FLUSHED, onFlushed);
+      return (): void => this.hls.off(Hls.Events.BUFFER_FLUSHED, onFlushed);
+    }, startLoadForTarget);
+    plan.ranges.forEach((r) => this.flushBuffer(r.start, r.end));
+  }
+
+  // Buffered ranges to flush so `target` ends up the sole clean island: the
+  // COMPLEMENT of the kept range, not just the other video.buffered islands —
+  // video.buffered is the audio∩video intersection, so a per-island flush
+  // would leave stale audio slivers (AAC frames extending past a video
+  // range's edges) sitting right at the kept range's boundaries, to be
+  // overlap-appended onto later. [kept.end, +Inf) also drops the audio
+  // sliver just past kept.end on purpose — the next fragment re-appends from
+  // there. Note: hls.js 0.14's removeBufferRange only calls sb.remove() for
+  // an overlap > 0.5s (buffer-controller.ts), so a sliver shorter than that
+  // survives regardless — this narrows the window, it doesn't close it. Pure
+  // — issues no flushBuffer() calls — so the caller can arm its listener first.
+  private planFlush(v: HTMLVideoElement, target: number): { readonly range: string; readonly ranges: ReadonlyArray<BufferedRange> } {
+    const ranges = toBufferedRanges(v);
+    if (ranges.length === 0) return { range: 'none', ranges: [] };
+
+    const containsTarget = (r: BufferedRange): boolean => target >= r.start && target <= r.end;
+    const kept = ranges.filter(containsTarget)[0];
+    if (!kept) {
+      return { range: 'none', ranges: [{ start: 0, end: Number.POSITIVE_INFINITY }] };
+    }
+
+    const complement: BufferedRange[] = [];
+    if (kept.start > SEEK_FLUSH_START_EPSILON_SEC) complement.push({ start: 0, end: kept.start });
+    complement.push({ start: kept.end, end: Number.POSITIVE_INFINITY });
+    return { range: kept.start.toFixed(1) + '-' + kept.end.toFixed(1), ranges: complement };
+  }
+
+  // Runs `action` exactly once: when `attach`'s `fire` callback signals
+  // readiness, or after LEGACY_SEEK_FLUSH_FALLBACK_MS, whichever is first —
+  // logging a warning in the fallback case. Returns a canceller that clears
+  // both the listener and the timer without running `action`.
+  private armSeekContinuation(stage: string, attach: (fire: () => void) => (() => void), action: () => void): () => void {
+    let done = false;
+    const finish = (viaFallback: boolean): void => {
+      if (done) return;
+      done = true;
+      detach();
+      window.clearTimeout(timer);
+      if (viaFallback) this.log.warn('legacySeekFlush fallback stage={stage}', { stage });
+      action();
+    };
+    const detach = attach((): void => finish(false));
+    const timer = window.setTimeout((): void => finish(true), LEGACY_SEEK_FLUSH_FALLBACK_MS);
+    return (): void => {
+      if (done) return;
+      done = true;
+      detach();
+      window.clearTimeout(timer);
+    };
+  }
+
+  destroy(): void {
+    if (this.cancelPendingSeek) { this.cancelPendingSeek(); this.cancelPendingSeek = null; }
+    super.destroy();
   }
 
   private applyPendingStartSeek(v: HTMLVideoElement): void {
