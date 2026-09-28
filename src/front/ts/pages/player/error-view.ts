@@ -4,7 +4,7 @@ import { PageKeys } from '../../utils/page';
 import { Logger } from '../../utils/log';
 import { showHlsError } from '../../utils/hls-utils';
 import { tplErrorScreen } from './template';
-import { HlsEngine } from './hls-engine';
+import { HlsEngine, HlsErrorSnapshot } from './hls-engine';
 import { HlsError } from './hls-adapter';
 
 interface PlayerErrorViewDeps {
@@ -34,21 +34,33 @@ const getVideoErrorMessage = (error: MediaError | null): string => {
 export class PlayerErrorView {
   constructor(private readonly deps: PlayerErrorViewDeps) {}
 
-  showPlaybackError(error: MediaError | null, url: string): void {
+  // `snapshot` must be the one captured by video-bindings.ts's `error`
+  // listener at the moment the event fired — re-reading engine/video state
+  // here would be too late: by this point onFatalError has already run and
+  // currentLevel/currentTime can read as reset/detached (-1/0/[none]).
+  showPlaybackError(error: MediaError | null, url: string, snapshot: HlsErrorSnapshot): void {
     const msg = getVideoErrorMessage(error);
     const code = error ? error.code : 0;
     const detail = error && (error as { message?: string }).message ? (error as { message?: string }).message : '';
     const domain = this.deps.engine.getDomain();
-    const curLevel = this.deps.engine.getCurrentLevel();
     const devInfo = platform.getDeviceInfo();
-    this.deps.log.error('playbackError {code} {msg} {detail} {domain} hlsLevel={hlsLevel} hlsRes={hlsRes} videoCodec={vc} audioCodec={ac}', {
+    this.deps.log.error('playbackError {code} {msg} {detail} {domain} hlsLevel={hlsLevel} hlsRes={hlsRes}'
+      + ' videoCodec={vc} audioCodec={ac} decodedFrames={frames} ct={ct} readyState={rs} buffered={br}'
+      + ' lastFragSn={fsn} lastFragStart={fstart} lastFragSize={fsize}', {
       code, msg, detail: detail || null, domain,
       url: url.substring(0, 120), ua: navigator.userAgent,
       hw: devInfo.hardware, sw: devInfo.software,
-      hlsLevel: this.deps.engine.getCurrentLevelIndex(),
-      hlsRes: curLevel ? curLevel.width + 'x' + curLevel.height : null,
-      vc: curLevel ? curLevel.videoCodec : null,
-      ac: curLevel ? curLevel.audioCodec : null,
+      hlsLevel: snapshot.levelIndex,
+      hlsRes: snapshot.level ? snapshot.level.width + 'x' + snapshot.level.height : null,
+      vc: snapshot.level ? snapshot.level.videoCodec : null,
+      ac: snapshot.level ? snapshot.level.audioCodec : null,
+      frames: snapshot.decodedFrames,
+      ct: snapshot.ct,
+      rs: snapshot.readyState,
+      br: snapshot.buffered,
+      fsn: snapshot.lastFragSn,
+      fstart: snapshot.lastFragStart,
+      fsize: snapshot.lastFragSize,
     });
     this.deps.onDestroy();
     const debugLines: string[] = [];
