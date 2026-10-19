@@ -627,16 +627,22 @@ export class HlsAdapterLegacy extends HlsAdapter {
     // resume seek has to run exactly once.
     if (this.startWarmupArmed) return;
     const target = this.pendingStartSeek;
+    const ct = v.currentTime;
     const bStart = v.buffered.start(0);
-    if (v.currentTime < bStart) {
-      const ct = v.currentTime;
-      v.currentTime = bStart + START_WARMUP_SNAP_OFFSET_S;
+    // The assigned value is authoritative: Tizen 2.3 can read `currentTime`
+    // back stale right after the write, which would leave the baseline at 0 and
+    // let the very first timeupdate skip the warmup entirely.
+    let baseCt = ct;
+    if (ct < bStart) {
+      const snapTo = bStart + START_WARMUP_SNAP_OFFSET_S;
+      v.currentTime = snapTo;
+      baseCt = snapTo;
       this.log.info('startSeek warmup snap ct={ct} bStart={bStart} target={target}', { ct, bStart, target });
     }
-    // Baseline is whatever the playhead reads after the snap: the resume seek
-    // must not fire before the decoder has actually advanced from here. The
-    // fallback timer covers a device that never starts playing at all.
-    this.armStartWarmup(v, target, v.currentTime);
+    // Baseline is whatever the playhead was set to: the resume seek must not
+    // fire before the decoder has actually advanced from here. The fallback
+    // timer covers a device that never starts playing at all.
+    this.armStartWarmup(v, target, baseCt);
   }
 
   private armStartWarmup(v: HTMLVideoElement, target: number, baseCt: number): void {
