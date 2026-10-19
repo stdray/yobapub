@@ -93,6 +93,7 @@ const KEYS = {
   DEVICE_ID: 'kp_device_id',
   LEGACY_HLS: 'kp_legacy_hls',
   LEGACY_HLS_FORCED: 'kp_legacy_hls_forced',
+  IN_BUFFER_SEEK_NO_FLUSH: 'kp_seek_nobufferflush',
   DEVICE_SETTINGS: 'kp_device_settings',
   LOG_LEVEL: 'kp_log_level'
 } as const;
@@ -326,6 +327,20 @@ export class Storage {
 
   isLegacyHlsForced = (): boolean =>
     localStorage.getItem(KEYS.LEGACY_HLS_FORCED) === '1';
+
+  // --- Legacy in-buffer seek mode ---
+  // Default ON: a seek that lands inside a single contiguous buffered range
+  // must not call SourceBuffer.remove() — on Tizen 2.3 the full flush after
+  // such a seek left hls.js with no FRAG_BUFFERED and no further events
+  // (device hung, 2026-10-19). `'0'` restores the previous always-flush path.
+  // Read at seek time, so the switch needs no app restart.
+
+  isInBufferSeekNoFlush = (): boolean =>
+    localStorage.getItem(KEYS.IN_BUFFER_SEEK_NO_FLUSH) !== '0';
+
+  setInBufferSeekNoFlush = (enabled: boolean): void => {
+    localStorage.setItem(KEYS.IN_BUFFER_SEEK_NO_FLUSH, enabled ? '1' : '0');
+  };
 
   // --- Log level (server-driven, cached for instant apply on next launch) ---
 

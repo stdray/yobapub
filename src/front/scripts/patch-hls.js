@@ -1,5 +1,6 @@
 // Diagnostic patch: insert window.__ctLog() calls before every media.currentTime = X
-// assignment in hls.js, so we can trace who triggers seeks on Tizen 2.3
+// assignment in hls.js plus the SourceBuffer append/remove/update edges, so we can
+// trace who triggers seeks and whether appends make progress on Tizen 2.3
 // (HTMLMediaElement.currentTime is a data property there — JS wrapping is impossible).
 // Idempotent: re-running is a no-op. Runs automatically before each build.
 
@@ -34,6 +35,29 @@ var patches = [
     site: 'audio-stream-controller:noAltAudio',
     find: 'logger["logger"].log("no alt audio available @currentTime:" + this.media.currentTime + ", seeking @" + (nextBuffered + 0.05));\n                this.media.currentTime = nextBuffered + 0.05;',
     replace: 'logger["logger"].log("no alt audio available @currentTime:" + this.media.currentTime + ", seeking @" + (nextBuffered + 0.05));\n                if (typeof window !== \'undefined\' && window.__ctLog) window.__ctLog(\'audio-stream-controller:noAltAudio\', nextBuffered + 0.05, this.media.currentTime);\n                this.media.currentTime = nextBuffered + 0.05;'
+  },
+  {
+    // Append pipeline probes: the 2026-10-19 Tizen 2.3 hang showed no events
+    // at all after "flush done", so log the native appendBuffer/remove calls
+    // and SourceBuffer update-end/update-error edges.
+    site: 'buffer-controller:appendBuffer',
+    find: '      this.parent = segment.parent;\n      sb.appendBuffer(segment.data);',
+    replace: '      this.parent = segment.parent;\n      if (typeof window !== \'undefined\' && window.__ctLog) window.__ctLog(\'buffer-controller:appendBuffer\', segment.data.byteLength, 0);\n      sb.appendBuffer(segment.data);'
+  },
+  {
+    site: 'buffer-controller:_onSBUpdateEnd',
+    find: '    _this._onSBUpdateEnd = function () {\n      // update timestampOffset',
+    replace: '    _this._onSBUpdateEnd = function () {\n      if (typeof window !== \'undefined\' && window.__ctLog) window.__ctLog(\'buffer-controller:_onSBUpdateEnd\', 0, 0);\n      // update timestampOffset'
+  },
+  {
+    site: 'buffer-controller:removeBufferRange',
+    find: 'logger["logger"].log("sb remove " + type + " [" + removeStart + "," + removeEnd + "], of [" + bufStart + "," + bufEnd + "], pos:" + currentTime);\n          sb.remove(removeStart, removeEnd);',
+    replace: 'logger["logger"].log("sb remove " + type + " [" + removeStart + "," + removeEnd + "], of [" + bufStart + "," + bufEnd + "], pos:" + currentTime);\n          if (typeof window !== \'undefined\' && window.__ctLog) window.__ctLog(\'buffer-controller:removeBufferRange\', removeStart, removeEnd);\n          sb.remove(removeStart, removeEnd);'
+  },
+  {
+    site: 'buffer-controller:_onSBUpdateError',
+    find: '    _this._onSBUpdateError = function (event) {\n      logger["logger"].error(\'sourceBuffer error:\', event);',
+    replace: '    _this._onSBUpdateError = function (event) {\n      if (typeof window !== \'undefined\' && window.__ctLog) window.__ctLog(\'buffer-controller:_onSBUpdateError\', 0, 0);\n      logger["logger"].error(\'sourceBuffer error:\', event);'
   }
 ];
 
