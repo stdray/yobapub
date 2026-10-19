@@ -56,6 +56,16 @@ interface MediaContext {
   duration: number;
 }
 
+// --- Startup reveal ---
+
+// Distance from the resume target that counts as "playhead reached it". Kept in
+// sync with the 2 s tolerance continuePlaying() uses to decide a seek is needed.
+const START_REVEAL_TOLERANCE_S = 2;
+// Never keep the spinner up longer than this, even if the target never arrives.
+const START_REVEAL_TIMEOUT_MS = 20000;
+
+type StartRevealReason = 'target' | 'timeout';
+
 // --- Defaults ---
 
 const defaultMedia = (): MediaContext => ({
@@ -174,6 +184,13 @@ class PlayerController implements PlayerFsmCtx {
 
   // Flags
   private playbackStarted = false;
+  // Startup reveal: the first source of this player instance can start playing
+  // long before the saved position is buffered (legacy decoder warmup). The
+  // resume target is remembered once, the element stays muted/covered until the
+  // playhead reaches it.
+  private startTarget: number | null = null;
+  private startRevealed = false;
+  private startRevealTimer: number | null = null;
   private fsm: Fsm<PlayerState, PlayerFsmCtx, PlayerEvent> | null = null;
   private disposed = false;
 
@@ -448,8 +465,25 @@ class PlayerController implements PlayerFsmCtx {
     this.plog.info('onSourceReady pos={pos} paused={paused} ct={ct}', {
       pos: this.state.position, paused: this.state.paused, ct: this.videoEl.currentTime,
     });
+    this.armStartTarget();
+    const deferReveal = this.startTarget !== null && !this.startRevealed;
+    if (deferReveal) {
+      // Warmup plays the first fragment before the resume seek lands on the
+      // target — mute it and drop its opacity so the user gets only the
+      // spinner. Opacity (not visibility) keeps the element composited, so the
+      // decoder still warms up; worst case there is a cosmetic blip, not a
+      // broken warmup.
+      this.videoEl.muted = true;
+      this.videoEl.style.opacity = '0';
+    }
     if (!this.state.paused) safePlay(this.videoEl);
     this.playbackStarted = true;
+    if (deferReveal) {
+      this.plog.info('onSourceReady deferred: start target pending target={target} ct={ct}', {
+        target: this.startTarget, ct: this.videoEl.currentTime,
+      });
+      return;
+    }
     if (this.state.sub >= 0 && this.videoEl) {
       this.subtitleLoader.load(this.videoEl, this.$root, this.media.subs, this.state.sub);
     }
@@ -457,6 +491,84 @@ class PlayerController implements PlayerFsmCtx {
     this.watchTracker.start();
     this.overlay.updateBadge();
     if (this.fsm) this.fsm.send({ type: 'SOURCE_READY' });
+  }
+
+  // --- Startup reveal ---
+
+  // True while the start target is set, not yet revealed and the playhead is
+  // still away from it. The bindings keep the spinner up and skip the reveal
+  // path while this holds.
+  isStartTargetPending(ct: number): boolean {
+    if (this.startTarget === null || this.startRevealed) return false;
+    return Math.abs(ct - this.startTarget) > START_REVEAL_TOLERANCE_S;
+  }
+
+  // True until the startup reveal has run: the bindings must not uncover the
+  // video on their own (canplay/seeked) while this holds.
+  isStartRevealOwed(): boolean {
+    return this.startTarget !== null && !this.startRevealed;
+  }
+
+  // Called by the video bindings on `playing`/`timeupdate`. Reveals exactly
+  // once, and only when the playhead is at the target and the element plays.
+  onStartReveal(ct: number): void {
+    if (this.startTarget === null || this.startRevealed) return;
+    if (Math.abs(ct - this.startTarget) > START_REVEAL_TOLERANCE_S) return;
+    const v = this.videoEl;
+    if (!v || v.paused || v.ended) return;
+    this.revealStart('target');
+  }
+
+  // Remembers the resume position for the FIRST source-ready of this player
+  // instance only — a quality/audio switch re-init must not re-arm it.
+  private armStartTarget(): void {
+    if (this.playbackStarted || this.state.position <= 0 || this.startTarget !== null) return;
+    this.startTarget = this.state.position;
+    this.startRevealed = false;
+    this.clearStartRevealTimer();
+    this.startRevealTimer = window.setTimeout(() => {
+      this.startRevealTimer = null;
+      this.revealStart('timeout');
+    }, START_REVEAL_TIMEOUT_MS);
+    this.plog.info('startTarget armed target={target} timeoutMs={ms}', {
+      target: this.startTarget, ms: START_REVEAL_TIMEOUT_MS,
+    });
+  }
+
+  private revealStart(reason: StartRevealReason): void {
+    if (this.startRevealed) return;
+    this.startRevealed = true;
+    this.clearStartRevealTimer();
+    const v = this.videoEl;
+    const target = this.startTarget === null ? -1 : this.startTarget;
+    this.plog.info('startReveal reason={reason} ct={ct} target={target}', {
+      reason, ct: v ? v.currentTime : -1, target,
+    });
+    if (v) {
+      v.muted = false;
+      v.style.opacity = '';
+      v.classList.add('player__video--visible');
+    }
+    this.overlay.hideSpinner();
+    this.watchTracker.start();
+    if (this.state.sub >= 0 && v) {
+      this.subtitleLoader.load(v, this.$root, this.media.subs, this.state.sub);
+    }
+    this.overlay.updateBadge();
+    if (this.fsm) this.fsm.send({ type: 'SOURCE_READY' });
+  }
+
+  private clearStartRevealTimer(): void {
+    if (this.startRevealTimer !== null) {
+      window.clearTimeout(this.startRevealTimer);
+      this.startRevealTimer = null;
+    }
+  }
+
+  private resetStartReveal(): void {
+    this.clearStartRevealTimer();
+    this.startTarget = null;
+    this.startRevealed = false;
   }
 
   private playUrl(url: string, title: string): void {
@@ -477,6 +589,9 @@ class PlayerController implements PlayerFsmCtx {
       errorView: this.errorView,
       sourceUrl: url,
       log: this.hlslog,
+      isStartTargetPending: (ct) => this.isStartTargetPending(ct),
+      isStartRevealOwed: () => this.isStartRevealOwed(),
+      onStartReveal: (ct) => this.onStartReveal(ct),
       onBack: () => router.goBack(),
       onFatalError: () => this.reportFatal(),
     };
@@ -494,6 +609,7 @@ class PlayerController implements PlayerFsmCtx {
   }
 
   private destroyPlayer(): void {
+    this.resetStartReveal();
     this.watchTracker.sendMarkTime();
     this.watchTracker.stop();
     this.overlay.dispose();
@@ -518,6 +634,7 @@ class PlayerController implements PlayerFsmCtx {
     this.panel.reset();
     this.progressBar.resetElements();
     this.playbackStarted = false;
+    this.resetStartReveal();
     this.watchTracker.setWasWatched(false);
   }
 
