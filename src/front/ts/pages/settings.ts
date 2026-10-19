@@ -179,7 +179,7 @@ const buildLegacyHlsSetting = (): SettingItem => {
 // an already buffered range does not flush the SourceBuffer; OFF = the previous
 // always-flush behaviour. Read per seek, so no restart is needed.
 const buildSeekNoFlushSetting = (): SettingItem => {
-  return { key: '_seekNoFlush', label: 'Seek без сброса буфера', type: 'checkbox', value: storage.isInBufferSeekNoFlush() };
+  return { key: '_seekNoFlush', label: 'Перемотка без сброса буфера', type: 'checkbox', value: storage.isInBufferSeekNoFlush() };
 };
 
 const buildStartPageSetting = (): SettingItem => {
@@ -257,7 +257,8 @@ class SettingsPage extends SidebarPage {
           ordered.push(buildVersionSetting());
           ordered.push(buildReloadSetting());
           if (!storage.isLegacyHlsForced()) ordered.push(buildLegacyHlsSetting());
-          ordered.push(buildSeekNoFlushSetting());
+          // Only meaningful where the legacy adapter's Tizen 2.3 gate can fire.
+          if (!storage.isLegacyHlsForced() && platform.isLegacyTizen()) ordered.push(buildSeekNoFlushSetting());
           if (parsed.serverLocation) ordered.push(parsed.serverLocation);
           const proxy = buildProxySetting(vip);
           if (proxy) ordered.push(proxy);
