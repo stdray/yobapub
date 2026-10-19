@@ -622,6 +622,19 @@ html, body {
   display: none !important;
 }
 
+/* Opaque DOM cover above the video plane: on Tizen 2.3 the hardware plane
+   ignores element opacity, so the startup warmup frame must be covered by a
+   sibling element instead. Sits under the spinner (z-index 5). */
+.player__cover {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: #000;
+  z-index: 4;
+}
+
 .player--hide-video video {
   visibility: hidden;
   opacity: 0;
