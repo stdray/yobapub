@@ -29,6 +29,7 @@ import { OverlayView } from './player/overlay';
 import { installCtLogShim } from './player/ct-debug';
 import { bindVideoEvents, VideoBindingsDeps } from './player/video-bindings';
 import { Fsm } from '../utils/fsm';
+import { Lazy } from '../utils/lazy';
 import { playerMachine, PlayerFsmCtx, PlayerState, PlayerEvent } from './player/player-fsm';
 
 import { Logger, generateTraceId } from '../utils/log';
@@ -81,6 +82,8 @@ const defaultPlayState = (): PlayState => ({
 
 class PlayerController implements PlayerFsmCtx {
   private readonly $root = $('#page-player');
+  // Starts hidden by the template; covers the tv screen while the warmup plays.
+  private readonly $startCover = new Lazy(() => this.$root.find('.player__cover'));
   private readonly keys = new PageKeys();
 
   // Loggers — all share one traceId per PlayerController instance
@@ -469,12 +472,13 @@ class PlayerController implements PlayerFsmCtx {
     const deferReveal = this.startTarget !== null && !this.startRevealed;
     if (deferReveal) {
       // Warmup plays the first fragment before the resume seek lands on the
-      // target — mute it and drop its opacity so the user gets only the
-      // spinner. Opacity (not visibility) keeps the element composited, so the
-      // decoder still warms up; worst case there is a cosmetic blip, not a
-      // broken warmup.
+      // target — mute it and cover the picture so the user gets only the
+      // spinner. The cover is a DOM sibling, not element opacity: the Tizen 2.3
+      // hardware video plane ignores opacity, and hiding the element itself
+      // (visibility) risks dropping it out of compositing and killing the
+      // very warmup this feature depends on.
       this.videoEl.muted = true;
-      this.videoEl.style.opacity = '0';
+      this.$startCover.get().removeClass('hidden');
     }
     if (!this.state.paused) safePlay(this.videoEl);
     this.playbackStarted = true;
@@ -546,9 +550,9 @@ class PlayerController implements PlayerFsmCtx {
     });
     if (v) {
       v.muted = false;
-      v.style.opacity = '';
       v.classList.add('player__video--visible');
     }
+    this.$startCover.get().addClass('hidden');
     this.overlay.hideSpinner();
     this.watchTracker.start();
     if (this.state.sub >= 0 && v) {
@@ -567,6 +571,7 @@ class PlayerController implements PlayerFsmCtx {
 
   private resetStartReveal(): void {
     this.clearStartRevealTimer();
+    this.$startCover.get().addClass('hidden');
     this.startTarget = null;
     this.startRevealed = false;
   }
@@ -579,6 +584,7 @@ class PlayerController implements PlayerFsmCtx {
     this.progressBar.resetElements();
     this.overlay.resetDomCache();
     this.panel.resetDomCache();
+    this.$startCover.reset();
 
     const bindingsDeps: VideoBindingsDeps = {
       getVideoEl: () => this.videoEl,
