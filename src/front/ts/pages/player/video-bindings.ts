@@ -15,9 +15,26 @@ export interface VideoBindingsDeps {
   readonly errorView: PlayerErrorView;
   readonly sourceUrl: string;
   readonly log: Logger;
+  // Startup reveal (see PlayerController.armStartTarget). While the resume
+  // target is owed the spinner stays up and the element stays covered.
+  readonly isStartTargetPending: (ct: number) => boolean;
+  readonly isStartRevealOwed: () => boolean;
+  readonly onStartReveal: (ct: number) => void;
   readonly onBack: () => void;
   readonly onFatalError: () => void;
 }
+
+// True when ct sits inside one of the buffered ranges. Outside them the decoder
+// has nothing to show yet — hiding the spinner there uncovers the black gap
+// between the resume seek and the first fragment at the target.
+const isInsideBuffered = (v: HTMLVideoElement | null, ct: number): boolean => {
+  if (!v || ct < 0) return false;
+  const b = v.buffered;
+  for (let i = 0; i < b.length; i++) {
+    if (b.start(i) <= ct && ct < b.end(i)) return true;
+  }
+  return false;
+};
 
 export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDeps): void => {
   const { log, engine, overlay, watchTracker, trackNavigator, errorView, sourceUrl, onBack } = deps;
@@ -53,31 +70,50 @@ export const bindVideoEvents = (videoEl: HTMLVideoElement, deps: VideoBindingsDe
   videoEl.addEventListener('canplay', () => {
     const v = getV();
     log.debug('video canplay currentTime={currentTime}', { currentTime: v ? v.currentTime : -1 });
-    overlay.hideSpinner();
+    if (!deps.isStartRevealOwed()) overlay.hideSpinner();
     // Fresh playback (pos=0): some HLS streams have first-segment PTS != 0, leaving the
     // SourceBuffer starting at e.g. 10.0 while playhead sits at 0. Gap-controller won't
     // close gaps > maxBufferHole. Snap once to the buffered start so playback can begin.
     engine.onVideoCanplay();
   });
+  let startPendingLogged = false;
   videoEl.addEventListener('playing', () => {
     engine.onVideoPlaying();
     const v = getV();
+    const ct = v ? v.currentTime : -1;
     log.info('video playing ct={ct} readyState={rs} buffered={br}', {
-      ct: v ? v.currentTime : -1,
+      ct,
       rs: v ? v.readyState : -1,
       br: formatBuffered(v),
     });
+    if (deps.isStartTargetPending(ct)) {
+      // Startup warmup: this is the first fragment, not the resume target.
+      if (!startPendingLogged) {
+        startPendingLogged = true;
+        log.info('video playing held: start target pending ct={ct}', { ct });
+      }
+      return;
+    }
+    deps.onStartReveal(ct);
     overlay.hideSpinner();
     videoEl.classList.add('player__video--visible');
   });
+  videoEl.addEventListener('timeupdate', () => {
+    // Fallback for platforms where the resume seek does not re-fire `playing`.
+    const v = getV();
+    deps.onStartReveal(v ? v.currentTime : -1);
+  });
   videoEl.addEventListener('seeked', () => {
     const v = getV();
+    const ct = v ? v.currentTime : -1;
     log.debug('video seeked ct={ct} readyState={rs} buffered={br}', {
-      ct: v ? v.currentTime : -1,
+      ct,
       rs: v ? v.readyState : -1,
       br: formatBuffered(v),
     });
-    overlay.hideSpinner();
+    // Only reveal when there is data at the playhead and the startup target is
+    // settled; the warmup/seeked pair otherwise uncovers an empty gap.
+    if (isInsideBuffered(v, ct) && !deps.isStartRevealOwed()) overlay.hideSpinner();
   });
   videoEl.addEventListener('error', () => {
     const v = getV();
