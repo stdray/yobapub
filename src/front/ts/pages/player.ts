@@ -566,6 +566,9 @@ class PlayerController implements PlayerFsmCtx {
     this.plog.info('mount start id={id} season={s} episode={e} video={v}', {
       id, s: params.season, e: params.episode, v: params.video,
     });
+    this.hlslog.info('seekMode inBufferNoFlush={mode}', {
+      mode: storage.isInBufferSeekNoFlush() ? 'on' : 'off',
+    });
 
     loadItemWithWatching(id,
       (item, watching) => {

@@ -1,5 +1,7 @@
 import Hls from 'hls.js';
 import { Logger } from '../../utils/log';
+import { platform } from '../../utils/platform';
+import { storage } from '../../utils/storage';
 
 // HlsAdapter — thin wrapper over an `Hls` instance that hides the differences
 // between hls.js 0.14.x (legacy) and 1.5+ (modern) from the player code.
@@ -126,14 +128,18 @@ const toFragInfo = (f: RawFrag | undefined): HlsFragInfo | null => {
 
 // Local — hls-engine.ts exports its own `formatBuffered` for log lines, but
 // hls-engine.ts imports from this module, so importing back would be circular.
-const formatBufferedRanges = (v: HTMLVideoElement): string => {
-  if (v.buffered.length === 0) return '[none]';
+const formatBufferedRanges = (v: HTMLVideoElement | null): string => {
+  if (!v || v.buffered.length === 0) return '[none]';
   const parts: string[] = [];
   for (let i = 0; i < v.buffered.length; i++) {
     parts.push(v.buffered.start(i).toFixed(1) + '-' + v.buffered.end(i).toFixed(1));
   }
   return parts.join(',');
 };
+
+// After a flushed reload the playhead must not sit within this distance of
+// buffered.start(0): Tizen 2.3 stops emitting events when it does.
+const POST_RELOAD_CLAMP_GAP_S = 0.3;
 
 // If a performUserSeek() continuation (drain wait or flush wait) hasn't run
 // by this long, run it anyway rather than leave hls.js stuck STOPPED forever.
@@ -322,6 +328,15 @@ export class HlsAdapterLegacy extends HlsAdapter {
   // Cancels an in-flight performUserSeek() continuation (drain wait or flush
   // wait) so only the latest seek's continuation can ever run.
   private cancelPendingSeek: (() => void) | null = null;
+  // Monotonic id of the latest user seek, stamped on every seek-path log line
+  // plus the FRAG_PARSED/BUFFER_* probes, so one repro can be correlated.
+  private seekGen = 0;
+  // The adapter only receives the <video> via attachMedia(); kept for probe
+  // logging and the post-reload clamp.
+  private video: HTMLVideoElement | null = null;
+  // Set by flushAndLoad when a flushed buffer is reloaded; consumed by the
+  // first FRAG_BUFFERED (see applyPostReloadClamp). Never set on the startup path.
+  private pendingPostReloadClamp = false;
 
   constructor(cfg: Partial<Hls.Config>, log: Logger) {
     super(cfg, log);
@@ -333,12 +348,48 @@ export class HlsAdapterLegacy extends HlsAdapter {
     this.hls.on(Hls.Events.BUFFER_RESET, resetAppendDepth);
     this.hls.on(Hls.Events.MANIFEST_LOADING, resetAppendDepth);
     this.hls.on(Hls.Events.MEDIA_DETACHING, resetAppendDepth);
+
+    // Playback telemetry around the append pipeline (one line per fragment /
+    // append, nothing per timeupdate). These fill the blind zone between
+    // "flush done" and "FRAG_BUFFERED" — the exact point where the 2026-10-19
+    // Tizen 2.3 hang produced no events at all.
+    this.hls.on(Hls.Events.FRAG_PARSED, (_e: string, d: unknown): void => {
+      const frag = toFragInfo((d as { frag?: RawFrag }).frag);
+      const v = this.video;
+      this.log.info('hls FRAG_PARSED gen={gen} sn={sn} start={start} ct={ct} br={br}', {
+        gen: this.seekGen,
+        sn: frag ? frag.sn : null, start: frag ? frag.start : null,
+        ct: v ? v.currentTime : -1, br: formatBufferedRanges(v),
+      });
+    });
+    this.hls.on(Hls.Events.BUFFER_APPENDED, (_e: string, d: unknown): void => {
+      const v = this.video;
+      this.log.info('hls BUFFER_APPENDED gen={gen} pending={pending} ct={ct} br={br}', {
+        gen: this.seekGen,
+        pending: (d as { pending?: number }).pending ?? -1,
+        ct: v ? v.currentTime : -1, br: formatBufferedRanges(v),
+      });
+    });
+    this.hls.on(Hls.Events.BUFFER_RESET, (): void => {
+      const v = this.video;
+      this.log.info('hls BUFFER_RESET gen={gen} ct={ct} br={br}', {
+        gen: this.seekGen, ct: v ? v.currentTime : -1, br: formatBufferedRanges(v),
+      });
+    });
+  }
+
+  attachMedia(v: HTMLVideoElement): void {
+    this.video = v;
+    super.attachMedia(v);
   }
 
   startPlayback(video: HTMLVideoElement, startPos: number): void {
     this.pendingStartSeek = startPos > 0 ? startPos : 0;
     this.firstFragSnapped = false;
-    this.hls.on(Hls.Events.FRAG_BUFFERED, (): void => this.applyPendingStartSeek(video));
+    this.hls.on(Hls.Events.FRAG_BUFFERED, (): void => {
+      this.applyPendingStartSeek(video);
+      this.applyPostReloadClamp(video);
+    });
     this.hls.startLoad(0);
   }
 
@@ -411,19 +462,42 @@ export class HlsAdapterLegacy extends HlsAdapter {
   // the tick interval) plus a fallback timer, so the continuation always
   // runs exactly once. Only the latest seek's continuation can run: an
   // earlier one is cancelled by a newer call and by destroy().
+  //
+  // EXCEPTION (2026-10-19, Tizen 2.3): when the target lies inside the single
+  // contiguous buffered range, the flush is what hung the device — `done
+  // after=[none]`, the same fragment reloaded from cache, then no
+  // FRAG_BUFFERED/BUFFER_* and no events at all. In that case skip the flush
+  // entirely (stopLoad / currentTime / startLoad, the same sequence as
+  // applyPendingStartSeek) and leave the buffer intact. The kill switch
+  // (storage.isInBufferSeekNoFlush, settings checkbox) restores this path.
   performUserSeek(v: HTMLVideoElement, target: number): void {
     if (this.cancelPendingSeek) { this.cancelPendingSeek(); this.cancelPendingSeek = null; }
 
+    // Snapshot the buffer BEFORE assigning currentTime — the gate and the log
+    // line must both see the pre-seek range set.
     const before = formatBufferedRanges(v);
+    const gen = ++this.seekGen;
+    this.pendingPostReloadClamp = false;
+
+    if (storage.isInBufferSeekNoFlush() && this.seekInsideSingleRange(v, target)) {
+      this.hls.stopLoad();
+      v.currentTime = target;
+      this.hls.startLoad(target);
+      this.log.info('legacySeekInBuffer gen={gen} target={target} ct={ct} before={before}', {
+        gen, target, ct: v.currentTime, before,
+      });
+      return;
+    }
+
     this.hls.stopLoad();
     v.currentTime = target;
     const depth = this.appendDepth;
-    this.log.info('legacySeekFlush target={target} ct={ct} before={before} depth={depth}', {
-      target, ct: v.currentTime, before, depth,
+    this.log.info('legacySeekFlush gen={gen} target={target} ct={ct} before={before} depth={depth}', {
+      gen, target, ct: v.currentTime, before, depth,
     });
 
     if (depth > 0) {
-      this.log.warn('legacySeekFlush drain depth={depth}', { depth });
+      this.log.warn('legacySeekFlush drain gen={gen} depth={depth}', { gen, depth });
       this.cancelPendingSeek = this.armSeekContinuation('drain', (fire) => {
         const onAppended = (): void => { if (this.appendDepth <= 0) fire(); };
         this.hls.on(Hls.Events.BUFFER_APPENDED, onAppended);
@@ -433,21 +507,34 @@ export class HlsAdapterLegacy extends HlsAdapter {
         // (segments dropped while _needsFlush, or cleared on QuotaExceeded),
         // which would make every later seek wait out the full fallback.
         this.appendDepth = 0;
-        this.flushAndLoad(v, target);
+        this.flushAndLoad(v, target, gen);
       });
       return;
     }
 
-    this.flushAndLoad(v, target);
+    this.flushAndLoad(v, target, gen);
+  }
+
+  // True only for the legacy adapter on Tizen 2.3 with exactly one buffered
+  // range containing the target. Deliberately NOT keyed off the legacy flag
+  // alone: legacy hls.js is also used on Tizen 3 via a device setting.
+  private seekInsideSingleRange(v: HTMLVideoElement, target: number): boolean {
+    if (!platform.isLegacyTizen()) return false;
+    if (v.buffered.length !== 1) return false;
+    return v.buffered.start(0) <= target && target < v.buffered.end(0);
   }
 
   // Flushes the WHOLE buffer, then starts loading at `target`. Listener before
   // trigger (see performUserSeek gate 2). Nothing to flush on an empty buffer.
-  private flushAndLoad(v: HTMLVideoElement, target: number): void {
+  private flushAndLoad(v: HTMLVideoElement, target: number, gen: number): void {
     const startLoadForTarget = (): void => {
       this.hls.startLoad(target);
-      this.log.info('legacySeekFlush done target={target} after={after}', {
-        target, after: formatBufferedRanges(v),
+      // A flushed buffer is rebuilt from scratch: keep the post-reload clamp
+      // armed for the first FRAG_BUFFERED. With the kill switch OFF this stays
+      // unarmed, so OFF is exactly the pre-change flush path.
+      this.pendingPostReloadClamp = storage.isInBufferSeekNoFlush();
+      this.log.info('legacySeekFlush done gen={gen} target={target} after={after}', {
+        gen, target, after: formatBufferedRanges(v),
       });
     };
 
@@ -464,6 +551,23 @@ export class HlsAdapterLegacy extends HlsAdapter {
     this.flushBuffer(0, Number.POSITIVE_INFINITY);
   }
 
+  // After a flushed reload, a playhead within POST_RELOAD_CLAMP_GAP_S of
+  // buffered.start(0) leaves Tizen 2.3 stuck. Nudge it forward once. Startup
+  // never arms this (pendingPostReloadClamp is set by flushAndLoad only), so
+  // applyPendingStartSeek's snap behaviour is untouched.
+  private applyPostReloadClamp(v: HTMLVideoElement): void {
+    if (!this.pendingPostReloadClamp || v.buffered.length === 0) return;
+    this.pendingPostReloadClamp = false;
+    const bStart = v.buffered.start(0);
+    const ct = v.currentTime;
+    if (ct >= bStart + POST_RELOAD_CLAMP_GAP_S) return;
+    const target = bStart + POST_RELOAD_CLAMP_GAP_S;
+    this.log.warn('legacySeekFlush clamp gen={gen} ct={ct} bStart={bStart} target={target}', {
+      gen: this.seekGen, ct, bStart, target,
+    });
+    v.currentTime = target;
+  }
+
   // Runs `action` exactly once: when `attach`'s `fire` callback signals
   // readiness, or after LEGACY_SEEK_FLUSH_FALLBACK_MS, whichever is first —
   // logging a warning in the fallback case. Returns a canceller that clears
@@ -475,7 +579,7 @@ export class HlsAdapterLegacy extends HlsAdapter {
       done = true;
       detach();
       window.clearTimeout(timer);
-      if (viaFallback) this.log.warn('legacySeekFlush fallback stage={stage}', { stage });
+      if (viaFallback) this.log.warn('legacySeekFlush fallback gen={gen} stage={stage}', { gen: this.seekGen, stage });
       action();
     };
     const detach = attach((): void => finish(false));

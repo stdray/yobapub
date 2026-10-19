@@ -175,6 +175,13 @@ const buildLegacyHlsSetting = (): SettingItem => {
   return { key: '_legacyHls', label: 'Старый телевизор', type: 'checkbox', value: storage.isLegacyHls() };
 };
 
+// Kill switch for the Tizen 2.3 in-buffer seek fix. ON (default) = seek inside
+// an already buffered range does not flush the SourceBuffer; OFF = the previous
+// always-flush behaviour. Read per seek, so no restart is needed.
+const buildSeekNoFlushSetting = (): SettingItem => {
+  return { key: '_seekNoFlush', label: 'Перемотка без сброса буфера', type: 'checkbox', value: storage.isInBufferSeekNoFlush() };
+};
+
 const buildStartPageSetting = (): SettingItem => {
   const savedId = storage.getStartPage();
   const opts: SettingOption[] = [];
@@ -250,6 +257,8 @@ class SettingsPage extends SidebarPage {
           ordered.push(buildVersionSetting());
           ordered.push(buildReloadSetting());
           if (!storage.isLegacyHlsForced()) ordered.push(buildLegacyHlsSetting());
+          // Only meaningful where the legacy adapter's Tizen 2.3 gate can fire.
+          if (!storage.isLegacyHlsForced() && platform.isLegacyTizen()) ordered.push(buildSeekNoFlushSetting());
           if (parsed.serverLocation) ordered.push(parsed.serverLocation);
           const proxy = buildProxySetting(vip);
           if (proxy) ordered.push(proxy);
@@ -410,6 +419,15 @@ class SettingsPage extends SidebarPage {
         }
         storage.setDefaultQuality(item.options[this.focusedOptionIndex].id);
       }
+      this.closeOptions();
+      return;
+    }
+
+    if (item.key === '_seekNoFlush') {
+      const enabled = this.focusedOptionIndex === 1;
+      storage.setInBufferSeekNoFlush(enabled);
+      item.value = enabled;
+      slog.info('seekMode inBufferNoFlush={mode}', { mode: enabled ? 'on' : 'off' });
       this.closeOptions();
       return;
     }
