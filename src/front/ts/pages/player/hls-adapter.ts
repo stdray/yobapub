@@ -145,6 +145,18 @@ const POST_RELOAD_CLAMP_GAP_S = 0.3;
 // by this long, run it anyway rather than leave hls.js stuck STOPPED forever.
 const LEGACY_SEEK_FLUSH_FALLBACK_MS = 3000;
 
+// Startup resume-seek warmup (see applyPendingStartSeek). At the first
+// FRAG_BUFFERED the playhead can still sit at ct=0, 1.4 s BEFORE
+// buffered.start(0) — seeking to the resume target right then leaves A/V
+// desync (measured on Tizen 2.3, builds 2.1.1-51/-54). So: snap the playhead
+// past the range boundary without the 1 s guard used by onVideoSeeking, then
+// wait for real playback progress before running the resume seek.
+const START_WARMUP_SNAP_OFFSET_S = 0.05;
+const START_WARMUP_PROGRESS_S = 0.5;
+const START_WARMUP_FALLBACK_MS = 2000;
+
+type StartWarmupReason = 'progress' | 'timeout';
+
 const toStats = (s: RawStats | undefined): HlsFragStats | null => {
   if (!s || s.total === undefined) return null;
   return {
@@ -337,6 +349,13 @@ export class HlsAdapterLegacy extends HlsAdapter {
   // Set by flushAndLoad when a flushed buffer is reloaded; consumed by the
   // first FRAG_BUFFERED (see applyPostReloadClamp). Never set on the startup path.
   private pendingPostReloadClamp = false;
+  // True while the startup warmup (snap → wait for progress) is armed and the
+  // resume seek has NOT run yet. Blocks re-arming from later FRAG_BUFFERED
+  // events so the resume seek can fire exactly once.
+  private startWarmupArmed = false;
+  // Cancels the in-flight startup warmup (timeupdate listener + fallback timer)
+  // on destroy() or on a new startPlayback().
+  private cancelStartWarmup: (() => void) | null = null;
 
   constructor(cfg: Partial<Hls.Config>, log: Logger) {
     super(cfg, log);
@@ -384,6 +403,8 @@ export class HlsAdapterLegacy extends HlsAdapter {
   }
 
   startPlayback(video: HTMLVideoElement, startPos: number): void {
+    if (this.cancelStartWarmup) { this.cancelStartWarmup(); this.cancelStartWarmup = null; }
+    this.startWarmupArmed = false;
     this.pendingStartSeek = startPos > 0 ? startPos : 0;
     this.firstFragSnapped = false;
     this.hls.on(Hls.Events.FRAG_BUFFERED, (): void => {
@@ -593,13 +614,62 @@ export class HlsAdapterLegacy extends HlsAdapter {
   }
 
   destroy(): void {
+    if (this.cancelStartWarmup) { this.cancelStartWarmup(); this.cancelStartWarmup = null; }
+    this.startWarmupArmed = false;
+    this.pendingStartSeek = 0;
     if (this.cancelPendingSeek) { this.cancelPendingSeek(); this.cancelPendingSeek = null; }
     super.destroy();
   }
 
   private applyPendingStartSeek(v: HTMLVideoElement): void {
     if (this.pendingStartSeek <= 0 || v.buffered.length === 0) return;
+    // A later FRAG_BUFFERED while the warmup is armed must not re-arm — the
+    // resume seek has to run exactly once.
+    if (this.startWarmupArmed) return;
     const target = this.pendingStartSeek;
+    const bStart = v.buffered.start(0);
+    if (v.currentTime < bStart) {
+      const ct = v.currentTime;
+      v.currentTime = bStart + START_WARMUP_SNAP_OFFSET_S;
+      this.log.info('startSeek warmup snap ct={ct} bStart={bStart} target={target}', { ct, bStart, target });
+    }
+    // Baseline is whatever the playhead reads after the snap: the resume seek
+    // must not fire before the decoder has actually advanced from here. The
+    // fallback timer covers a device that never starts playing at all.
+    this.armStartWarmup(v, target, v.currentTime);
+  }
+
+  private armStartWarmup(v: HTMLVideoElement, target: number, baseCt: number): void {
+    this.startWarmupArmed = true;
+    const startedAt = Date.now();
+    let done = false;
+    const finish = (reason: StartWarmupReason): void => {
+      if (done) return;
+      done = true;
+      v.removeEventListener('timeupdate', onTimeUpdate);
+      window.clearTimeout(timer);
+      this.startWarmupArmed = false;
+      this.cancelStartWarmup = null;
+      this.log.info('startSeek warmup done ct={ct} waited={waited}ms reason={reason}', {
+        ct: v.currentTime, waited: Date.now() - startedAt, reason,
+      });
+      this.runStartSeek(v, target);
+    };
+    const onTimeUpdate = (): void => {
+      if (v.currentTime >= baseCt + START_WARMUP_PROGRESS_S) finish('progress');
+    };
+    v.addEventListener('timeupdate', onTimeUpdate);
+    const timer = window.setTimeout((): void => finish('timeout'), START_WARMUP_FALLBACK_MS);
+    this.cancelStartWarmup = (): void => {
+      if (done) return;
+      done = true;
+      v.removeEventListener('timeupdate', onTimeUpdate);
+      window.clearTimeout(timer);
+    };
+  }
+
+  // The resume seek itself — unchanged from the pre-warmup implementation.
+  private runStartSeek(v: HTMLVideoElement, target: number): void {
     this.pendingStartSeek = 0;
     this.firstFragSnapped = true;
     this.log.info('startSeek target={target} from ct={ct}', { target, ct: v.currentTime });
