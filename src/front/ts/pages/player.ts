@@ -469,9 +469,11 @@ class PlayerController implements PlayerFsmCtx {
     const deferReveal = this.startTarget !== null && !this.startRevealed;
     if (deferReveal) {
       // Warmup plays the first fragment before the resume seek lands on the
-      // target — mute and cover it so the user gets only the spinner.
+      // target — mute it and drop its opacity so the user gets only the
+      // spinner. Opacity (not visibility) keeps the element composited, so the
+      // decoder still warms up; worst case there is a cosmetic blip, not a
+      // broken warmup.
       this.videoEl.muted = true;
-      this.videoEl.style.visibility = 'hidden';
       this.videoEl.style.opacity = '0';
     }
     if (!this.state.paused) safePlay(this.videoEl);
@@ -544,7 +546,6 @@ class PlayerController implements PlayerFsmCtx {
     });
     if (v) {
       v.muted = false;
-      v.style.visibility = '';
       v.style.opacity = '';
       v.classList.add('player__video--visible');
     }
