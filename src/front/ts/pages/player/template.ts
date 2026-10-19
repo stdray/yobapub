@@ -15,7 +15,6 @@ interface PlayerTplData {
 const tplPlayerCompiled = doT.template(`
   <div class="player">
     <video></video>
-    <div class="player__cover hidden"></div>
     <div class="player__subs"></div>
     <div class="player__spinner"><div class="spinner__circle"></div></div>
     <div class="player__icon hidden"></div>

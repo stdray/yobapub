@@ -29,7 +29,6 @@ import { OverlayView } from './player/overlay';
 import { installCtLogShim } from './player/ct-debug';
 import { bindVideoEvents, VideoBindingsDeps } from './player/video-bindings';
 import { Fsm } from '../utils/fsm';
-import { Lazy } from '../utils/lazy';
 import { playerMachine, PlayerFsmCtx, PlayerState, PlayerEvent } from './player/player-fsm';
 
 import { Logger, generateTraceId } from '../utils/log';
@@ -82,8 +81,6 @@ const defaultPlayState = (): PlayState => ({
 
 class PlayerController implements PlayerFsmCtx {
   private readonly $root = $('#page-player');
-  // Starts hidden by the template; covers the tv screen while the warmup plays.
-  private readonly $startCover = new Lazy(() => this.$root.find('.player__cover'));
   private readonly keys = new PageKeys();
 
   // Loggers — all share one traceId per PlayerController instance
@@ -472,13 +469,19 @@ class PlayerController implements PlayerFsmCtx {
     const deferReveal = this.startTarget !== null && !this.startRevealed;
     if (deferReveal) {
       // Warmup plays the first fragment before the resume seek lands on the
-      // target — mute it and cover the picture so the user gets only the
-      // spinner. The cover is a DOM sibling, not element opacity: the Tizen 2.3
-      // hardware video plane ignores opacity, and hiding the element itself
-      // (visibility) risks dropping it out of compositing and killing the
-      // very warmup this feature depends on.
+      // target, so mute it: the user hears nothing until the saved position.
+      //
+      // The FRAME, however, stays visible and static on Tizen 2.3 — accepted
+      // deliberately (device owner, 2026-10-19). Measured: neither element
+      // `opacity: 0` (2.1.1-60) nor an opaque DOM sibling above the video
+      // (2.1.1-62: the spinner did render over the frame, the frame itself
+      // stayed a static first frame) occludes the hardware video plane. Hiding
+      // the element (`visibility`) does occlude it, but risks dropping the
+      // element out of compositing and killing the very decoder warmup this
+      // block exists for — which brings the A/V desync back. So: a short static
+      // first frame is the cheaper price. Do not retry hiding it without
+      // device evidence.
       this.videoEl.muted = true;
-      this.$startCover.get().removeClass('hidden');
     }
     if (!this.state.paused) safePlay(this.videoEl);
     this.playbackStarted = true;
@@ -552,7 +555,6 @@ class PlayerController implements PlayerFsmCtx {
       v.muted = false;
       v.classList.add('player__video--visible');
     }
-    this.$startCover.get().addClass('hidden');
     this.overlay.hideSpinner();
     this.watchTracker.start();
     if (this.state.sub >= 0 && v) {
@@ -571,7 +573,6 @@ class PlayerController implements PlayerFsmCtx {
 
   private resetStartReveal(): void {
     this.clearStartRevealTimer();
-    this.$startCover.get().addClass('hidden');
     this.startTarget = null;
     this.startRevealed = false;
   }
@@ -584,7 +585,6 @@ class PlayerController implements PlayerFsmCtx {
     this.progressBar.resetElements();
     this.overlay.resetDomCache();
     this.panel.resetDomCache();
-    this.$startCover.reset();
 
     const bindingsDeps: VideoBindingsDeps = {
       getVideoEl: () => this.videoEl,
